@@ -1,0 +1,31 @@
+{
+  "status": 0,
+  "message": "success",
+  "result": {
+    "content": [],
+    "isError": false,
+    "structuredContent": {
+      "data": {
+        "status": "success",
+        "message": "请求成功",
+        "data": {
+          "id": "law-509",
+          "fgid": "law",
+          "fgmc": "中华人民共和国民法典",
+          "ft_num": "第五百零九条",
+          "content": "当事人应当按照约定全面履行自己的义务。",
+          "sxx": "现行有效",
+          "xljb_1": "法律",
+          "fbrq": "2020-05-28",
+          "ssrq": "2021-01-01",
+          "url": "https://example.invalid/statute/law-509"
+        }
+      },
+      "ok": true,
+      "requestId": "provider-request-1",
+      "status": 200,
+      "tool": "yuandian_rh_ft_detail"
+    }
+  },
+  "rid": "qy-request-1"
+}

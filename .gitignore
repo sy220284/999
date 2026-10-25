@@ -1,0 +1,22 @@
+# 临时文件与缓存
+__pycache__/
+*.pyc
+*.pyo
+.DS_Store
+Thumbs.db
+*.log
+*.tmp
+/tmp/
+
+# 依赖与虚拟环境
+node_modules/
+.venv/
+venv/
+
+# 上传目录（用户私有内容不入库）
+upload/
+
+# IDE
+.idea/
+.vscode/
+*.swp

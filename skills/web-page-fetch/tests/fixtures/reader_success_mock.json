@@ -1,0 +1,14 @@
+{
+  "fixture_kind": "synthetic_mock_not_real_government_response",
+  "code": 200,
+  "status": 200,
+  "data": {
+    "title": "政策发布示例（Mock）",
+    "url": "https://www.gov.cn/mock-policy.html",
+    "html": "<html><head><style>.noise{display:none}</style></head><body><article><h1>政策发布示例（Mock）</h1><p>发布时间：2026-09-17</p><p>来源：测试示例，非真实政策。</p><p>用于验证正文清洗与日期不自动核验。</p></article><script>alert('ignore')</script></body></html>",
+    "publishedTime": "Thu, 17 Sep 2026 06:13:00 GMT",
+    "httpStatus": 200,
+    "usage": {"tokens": 100}
+  },
+  "meta": {"usage": {"tokens": 100}}
+}

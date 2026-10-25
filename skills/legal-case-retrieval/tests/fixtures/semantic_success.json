@@ -1,0 +1,34 @@
+{
+  "status": 0,
+  "message": "success",
+  "result": {
+    "content": [],
+    "isError": false,
+    "structuredContent": {
+      "data": {
+        "code": 201,
+        "msg": "成功(返回结构化数据)",
+        "extra": {
+          "wenshu": [
+            {
+              "scid": "case-1",
+              "title": "李某劳动争议案",
+              "ah": "（2024）京01民终1号",
+              "anyou": ["劳动争议"],
+              "jbdw": "北京市第一中级人民法院",
+              "wszl": "判决书",
+              "ajlb": "民事案件",
+              "jaDate": 20240525,
+              "content": "案情、争议焦点及裁判理由摘要。"
+            }
+          ]
+        }
+      },
+      "ok": true,
+      "requestId": "provider-request-2",
+      "status": 200,
+      "tool": "yuandian_case_vector_search"
+    }
+  },
+  "rid": "qy-request-2"
+}

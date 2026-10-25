@@ -1,0 +1,1 @@
+{"status":0,"message":"success","result":{"position":"甲方（买方）","merged_key_points":"合成多类型Mock：不代表真实合并语义","merged_standard_clauses":{"采购付款条件":"模拟付款条款","保密义务":"模拟保密条款"},"selected_types":["API/AI采购合同","保密协议"],"resolved_types":["通用采购合同","API/AI采购合同","保密协议"]},"rid":"mock-load-multiple"}
