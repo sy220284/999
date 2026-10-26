@@ -4,7 +4,7 @@ import kotlinx.coroutines.*
 import kotlinx.serialization.json.*
 
 /** 同一进程内执行模型 → 工具 → 审批 → 结果回注；不连接桌面 app-server。 */
-class AgentRuntime(private val client: ResponsesClient, private val tools: LocalTools, private val approve: suspend (Approval) -> Boolean) {
+class AgentRuntime(private val client: ResponsesClient, private val tools: LocalTools, private val approve: suspend (Approval) -> Boolean, private val steeringInbox: SteeringInbox? = null) {
     suspend fun run(initial: Session, prompt: String, attachments: List<JsonObject> = emptyList(), emit: (AgentEvent) -> Unit): Session {
         var session = initial.copy(
             title = if (initial.messages.isEmpty()) prompt.take(30) else initial.title,
@@ -54,7 +54,26 @@ class AgentRuntime(private val client: ResponsesClient, private val tools: Local
             }
             session = session.copy(wire = JsonArray(input), updated = System.currentTimeMillis())
             emit(AgentEvent.Updated(session))
-            if (calls.isEmpty()) return session
+            // 按提交顺序注入追加指令，不在当前工具调用中间打断状态。
+            // 先持久化会话中消耗的 ID，再从信箱确认，避免崩溃后重复注入。
+            val queued = steeringInbox?.pending(session.id, session.consumedSteeringIds.toSet()).orEmpty()
+            if (queued.isNotEmpty()) {
+                queued.forEach { item ->
+                    input += buildJsonObject {
+                        put("role", "user")
+                        put("content", buildJsonArray { add(obj("type" to "input_text", "text" to item.text)) })
+                    }
+                }
+                session = session.copy(
+                    wire = JsonArray(input),
+                    messages = session.messages + queued.map { Message(role = "user", text = it.text) },
+                    consumedSteeringIds = session.consumedSteeringIds + queued.map { it.id },
+                    updated = System.currentTimeMillis()
+                )
+                emit(AgentEvent.Updated(session))
+                steeringInbox?.acknowledge(session.id, queued.map { it.id }.toSet())
+            }
+            if (calls.isEmpty() && queued.isEmpty()) return session
         }
         error("本轮达到 100 次模型调用，请检查任务并继续")
     }

@@ -321,8 +321,8 @@
   },
   {
     "method": "turn/steer",
-    "status": "待移植",
-    "detail": "尚未实现，不能视为 Android 本身不支持"
+    "status": "安卓等价实现",
+    "detail": "任务运行时追加指令，文件持久信箱保证先保存再确认消费；模型当前响应结束后注入，无原版 RPC"
   },
   {
     "method": "turn/interrupt",

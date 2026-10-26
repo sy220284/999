@@ -214,6 +214,48 @@ class RuntimeTest {
         }
     }
 
+
+    @Test fun `steering inbox survives restart and only acknowledges consumed IDs`() {
+        val dir = Files.createTempDirectory("steering").toFile()
+        val inbox = SteeringInbox(dir)
+        val first = inbox.add("session-1", "继续读取文件")
+        val second = inbox.add("session-1", "然后检查结果")
+        assertEquals(listOf(first, second), SteeringInbox(dir).pending("session-1", emptySet()))
+        assertEquals(listOf(second), SteeringInbox(dir).pending("session-1", setOf(first.id)))
+        inbox.acknowledge("session-1", setOf(first.id))
+        assertEquals(listOf(second), SteeringInbox(dir).pending("session-1", emptySet()))
+        inbox.clear("session-1")
+        assertTrue(inbox.pending("session-1", emptySet()).isEmpty())
+    }
+
+    @Test fun `queued steering runs after model completion and persists before acknowledgement`() = runBlocking<Unit> {
+        MockWebServer().use { server ->
+            val firstReply = Json.parseToJsonElement("""[{"type":"message","content":[{"type":"output_text","text":"第一轮已完成"}]}]""").jsonArray
+            val secondReply = Json.parseToJsonElement("""[{"type":"message","content":[{"type":"output_text","text":"追加检查已完成"}]}]""").jsonArray
+            server.enqueue(stream(firstReply))
+            server.enqueue(stream(secondReply))
+            val inbox = SteeringInbox(Files.createTempDirectory("steering-run").toFile())
+            val start = Session(project = "项目")
+            val queued = inbox.add(start.id, "继续检查新增文件")
+            val fs = workspace()
+            val runtime = AgentRuntime(
+                ResponsesClient(ApiConfig(server.url("/").toString(), "test", "test", allowLoopbackHttp = true)),
+                LocalTools(fs, ShellRunner("/bin/sh", fs.root)), { false }, inbox
+            )
+            var saved: Session? = null
+            val final = runtime.run(start, "先列出文件") { event ->
+                if (event is AgentEvent.Updated) saved = event.session
+            }
+            assertEquals(2, final.messages.count { it.role == "assistant" })
+            assertTrue(final.messages.any { it.text == "继续检查新增文件" })
+            assertTrue(queued.id in final.consumedSteeringIds)
+            assertEquals(final.wire, saved?.wire)
+            assertTrue(inbox.pending(start.id, emptySet()).isEmpty())
+            server.takeRequest()
+            assertTrue(server.takeRequest().body.readUtf8().contains("继续检查新增文件"))
+        }
+    }
+
     @Test fun `change history never leaks across projects and survives restart`() {
         val dir = Files.createTempDirectory("changes").toFile()
         val store = ChangeStore(dir)

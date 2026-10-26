@@ -91,6 +91,9 @@ import kotlinx.serialization.json.*
                         IconButton(onClick = { attachment.launch(arrayOf("text/*", "image/*", "application/json", "application/octet-stream")) }, enabled = !state.busy && !attachLoading) { if (attachLoading) CircularProgressIndicator(Modifier.size(18.dp), strokeWidth = 2.dp) else Icon(Icons.Outlined.Add, "添加图片或文本附件") }
                         TextButton(onClick = settings, contentPadding = PaddingValues(horizontal = 8.dp)) { Text(state.config.model.ifBlank { "连接模型" }.take(22), style = MaterialTheme.typography.labelMedium, maxLines = 1); Icon(Icons.Outlined.ExpandMore, null, Modifier.size(16.dp)) }
                         Spacer(Modifier.weight(1f))
+                        if (state.canSteer && draft.isNotBlank()) {
+                            TextButton(onClick = { controller.steer(draft); onDraft("") }) { Text("追加指令") }
+                        }
                         FilledIconButton(onClick = { if (state.busy) controller.stop() else if (draft.isNotBlank()) send(draft) }, enabled = state.busy || (draft.isNotBlank() && !attachLoading), modifier = Modifier.size(48.dp)) { AnimatedContent(state.busy, transitionSpec = { fadeIn(tween(if (state.config.motion) 180 else 0)) togetherWith fadeOut(tween(if (state.config.motion) 120 else 0)) }, label = "发送与停止") { busy -> Icon(if (busy) Icons.Outlined.Stop else Icons.Outlined.ArrowUpward, if (busy) "停止任务" else "发送任务") } }
                     }
                 }

@@ -13,7 +13,7 @@ import java.io.File
 data class ScreenState(
     val config: ApiConfig = ApiConfig(), val session: Session? = null,
     val sessions: List<SessionSummary> = emptyList(), val projects: List<String> = emptyList(),
-    val project: String = "默认项目", val busy: Boolean = false, val stream: String = "",
+    val project: String = "默认项目", val busy: Boolean = false, val canSteer: Boolean = false, val stream: String = "",
     val thinking: String = "", val tool: String = "", val terminal: String = "",
     val approval: Approval? = null, val error: String? = null, val usage: String = "",
     val changes: List<FileChange> = emptyList(), val attachments: List<String> = emptyList()
@@ -23,6 +23,7 @@ class RuntimeController(private val context: Context) {
     private val home = File(context.filesDir, "工作区").apply { mkdirs() }
     val store = SessionStore(File(context.filesDir, "会话"))
     private val changeStore = ChangeStore(File(context.filesDir, "修改历史"))
+    private val steeringInbox = SteeringInbox(File(context.filesDir, "追加指令"))
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate + CoroutineExceptionHandler { _, error -> fail("数据操作失败：${error.message}") })
     private val mutable = MutableStateFlow(ScreenState())
     val state = mutable.asStateFlow()
@@ -59,7 +60,7 @@ class RuntimeController(private val context: Context) {
     fun deleteSession(id: String) = scope.launch {
         if (state.value.busy) return@launch
         runSuspendCatching {
-            withContext(Dispatchers.IO) { store.delete(id) }
+            withContext(Dispatchers.IO) { store.delete(id); steeringInbox.clear(id) }
             if (state.value.session?.id == id) newSession(state.value.project)
             refresh()
         }.onFailure { fail("删除会话失败：${it.message}") }
@@ -118,6 +119,16 @@ class RuntimeController(private val context: Context) {
         changeStore.append(project, changes)
         mutable.update { s -> if (s.project == project) s.copy(changes = changeStore.list(project)) else s }
     }
+    fun steer(text: String) {
+        val now = state.value
+        val session = now.session
+        if (!now.canSteer || session == null) { fail("当前没有可追加指令的对话任务"); return }
+        scope.launch {
+            runSuspendCatching { withContext(Dispatchers.IO) { steeringInbox.add(session.id, text) } }
+                .onSuccess { mutable.update { it.copy(usage = "追加指令已排队，将在当前回复完成后执行") } }
+                .onFailure { fail("追加指令保存失败：${it.message}") }
+        }
+    }
     fun reserveTask(): Boolean {
         if (state.value.busy) return false
         mutable.update { it.copy(busy = true) }
@@ -129,7 +140,7 @@ class RuntimeController(private val context: Context) {
         active = currentCoroutineContext().job
         val snapshot = state.value
         val initial = snapshot.session ?: Session(project = snapshot.project)
-        mutable.update { it.copy(busy = true, stream = "", thinking = "", tool = "", error = null) }
+        mutable.update { it.copy(busy = true, canSteer = !terminal, stream = "", thinking = "", tool = "", error = null) }
         val fs = workspace(snapshot.project)
         val runner = ShellRunner("/system/bin/sh", fs.root, launcher = { NativeShell.start(it, fs.root) }).also { shell = it }
         try {
@@ -143,7 +154,7 @@ class RuntimeController(private val context: Context) {
                 require(snapshot.config.model.isNotBlank()) { "请先在设置中选择模型并填写 API 密钥" }
                 val extras = listOf(GitTools(fs), McpTools(context))
                 val tools = LocalTools(fs, runner, extras) { record(it, snapshot.project) }
-                val runtime = AgentRuntime(ResponsesClient(snapshot.config), tools, ::approve)
+                val runtime = AgentRuntime(ResponsesClient(snapshot.config), tools, ::approve, steeringInbox)
                 val attachments = attachmentInputs.toList()
                 withContext(Dispatchers.IO) { runtime.run(initial, prompt, attachments) { event ->
                     when (event) {
@@ -165,7 +176,7 @@ class RuntimeController(private val context: Context) {
             runner.stop(); shell = null
             withContext(NonCancellable) { refresh() }
             active = null
-            mutable.update { it.copy(busy = false, approval = null, tool = "") }
+            mutable.update { it.copy(busy = false, canSteer = false, approval = null, tool = "") }
         }
     }
     fun stop() { answer?.cancel(); shell?.stop(); active?.cancel() }

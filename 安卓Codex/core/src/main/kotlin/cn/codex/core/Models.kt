@@ -39,6 +39,7 @@ data class Session(
     val wire: JsonArray = JsonArray(emptyList()),
     val archived: Boolean = false,
     val goal: String = "",
+    val consumedSteeringIds: List<String> = emptyList(),
     val updated: Long = System.currentTimeMillis()
 )
 
