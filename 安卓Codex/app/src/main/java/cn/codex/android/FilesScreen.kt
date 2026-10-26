@@ -72,7 +72,7 @@ import kotlinx.coroutines.*
                 IconButton(onClick = ::closeEditor) { Icon(Icons.AutoMirrored.Outlined.ArrowBack, "关闭编辑器") }
                 Text(selected!!.substringAfterLast('/') + if (text != original) " · 未保存" else "", Modifier.weight(1f), maxLines = 1, overflow = TextOverflow.Ellipsis, style = MaterialTheme.typography.bodyMedium)
                 IconButton(onClick = { export.launch(selected!!.substringAfterLast('/')) }) { Icon(Icons.Outlined.IosShare, "导出文件") }
-                TextButton(onClick = { scope.launch { working = true; runSuspendCatching { controller.writeFile(selected!!, text, state.project) }.onSuccess { original = text; revision++ }.onFailure { controller.fail("保存失败：${it.message}") }; working = false } }, enabled = !state.busy && !working && text != original) { Text("保存") }
+                TextButton(onClick = { scope.launch { working = true; runSuspendCatching { controller.writeFile(selected!!, text, state.project, original) }.onSuccess { original = text; revision++ }.onFailure { controller.fail("保存失败：${it.message}") }; working = false } }, enabled = !state.busy && !working && text != original) { Text("保存") }
             }
             OutlinedTextField(text, { text = it }, modifier = Modifier.fillMaxSize().padding(12.dp), textStyle = LocalTextStyle.current.copy(fontFamily = FontFamily.Monospace, fontSize = 14.sp, lineHeight = 23.sp), enabled = !state.busy && !working, shape = RoundedCornerShape(14.dp), label = { Text("UTF-8 文本") })
         } else {
