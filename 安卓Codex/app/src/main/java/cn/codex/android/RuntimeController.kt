@@ -183,7 +183,7 @@ class RuntimeController(private val context: Context) {
             mutable.update { it.copy(busy = false, canSteer = false, approval = null, tool = "") }
         }
     }
-    private val controlSequences = Regex("\\u001B\\[[0-9;?]*[ -/]*[@-~]")
+    private val controlSequences = Regex("\u001B\\[[0-9;?]*[ -/]*[@-~]")
     fun startInteractiveTerminal() {
         if (state.value.busy || interactive != null) return
         val project = state.value.project
@@ -192,14 +192,14 @@ class RuntimeController(private val context: Context) {
                 withContext(Dispatchers.IO) { NativePty.start(workspace(project).root) }
             }.onSuccess { pty ->
                 interactive = pty
-                mutable.update { it.copy(interactiveTerminal = true, terminal = "已连接当前项目的交互式终端。\\n") }
+                mutable.update { it.copy(interactiveTerminal = true, terminal = "已连接当前项目的交互式终端。\n") }
                 scope.launch(Dispatchers.IO) {
                     try {
                         val buffer = ByteArray(4096)
                         while (true) {
                             val count = pty.input.read(buffer)
                             if (count < 0) break
-                            val cleaned = controlSequences.replace(String(buffer, 0, count, Charsets.UTF_8), "").replace("\\r", "")
+                            val cleaned = controlSequences.replace(String(buffer, 0, count, Charsets.UTF_8), "").replace("\r", "")
                             mutable.update { it.copy(terminal = (it.terminal + cleaned).takeLast(256 * 1024)) }
                         }
                     } catch (e: java.io.IOException) {

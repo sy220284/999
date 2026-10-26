@@ -123,7 +123,7 @@ fun formatSize(size: Long) = when { size < 1024 -> "$size B"; size < 1024 * 1024
             if (!state.interactiveTerminal) Button(onClick = controller::startInteractiveTerminal, enabled = !state.busy) { Text("开启交互终端") }
             else {
                 OutlinedButton(onClick = controller::closeInteractiveTerminal) { Text("关闭终端") }
-                TextButton(onClick = { controller.writeInteractiveTerminal("\\u0003") }) { Text("Ctrl+C") }
+                TextButton(onClick = { controller.writeInteractiveTerminal("\u0003") }) { Text("Ctrl+C") }
                 TextButton(onClick = { controller.resizeInteractiveTerminal(40, 100) }) { Text("宽屏 100 列") }
             }
         }
@@ -132,7 +132,7 @@ fun formatSize(size: Long) = when { size < 1024 -> "$size B"; size < 1024 * 1024
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) { listOf("pwd", "ls -la", "uname -a").forEach { text -> SuggestionChip(onClick = { command = text }, label = { Text(text, fontFamily = FontFamily.Monospace) }, enabled = !state.busy) } }
         OutlinedTextField(command, { command = it }, modifier = Modifier.fillMaxWidth(), label = { Text("输入命令") }, minLines = 2, maxLines = 5, shape = RoundedCornerShape(14.dp))
         Button(onClick = {
-            if (state.interactiveTerminal) { controller.writeInteractiveTerminal(command + "\\n"); command = "" }
+            if (state.interactiveTerminal) { controller.writeInteractiveTerminal(command + "\n"); command = "" }
             else send(command)
         }, enabled = command.isNotBlank() && (state.interactiveTerminal || !state.busy), modifier = Modifier.fillMaxWidth().height(50.dp)) { Icon(Icons.Outlined.PlayArrow, null); Spacer(Modifier.width(8.dp)); Text(if (state.interactiveTerminal) "发送到当前终端" else "确认并执行") }
     }

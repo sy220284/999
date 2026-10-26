@@ -66,25 +66,15 @@ class AppFlowTest {
     @Test fun interactivePtyReceivesInputAndSupportsResizing() {
         val context = InstrumentationRegistry.getInstrumentation().targetContext
         val root = File(context.cacheDir, "PTY验收-${System.currentTimeMillis()}").apply { mkdirs() }
+        val resultFile = File(root, "结果.txt")
         val terminal = NativePty.start(root)
         try {
             terminal.resize(40, 100)
-            terminal.send("echo CODEX_PTY_CHECK\\\\n".replace("\\\\n", "\\n"))
-            val reader = java.util.concurrent.Executors.newSingleThreadExecutor()
-            try {
-                val output = reader.submit<String> {
-                    val bytes = ByteArray(2048)
-                    val found = StringBuilder()
-                    while (!found.contains("CODEX_PTY_CHECK")) {
-                        val count = terminal.input.read(bytes)
-                        if (count < 0) break
-                        found.append(String(bytes, 0, count, Charsets.UTF_8))
-                    }
-                    found.toString()
-                }
-                assertTrue(output.get(10, java.util.concurrent.TimeUnit.SECONDS).contains("CODEX_PTY_CHECK"))
-            } finally { reader.shutdownNow() }
+            terminal.send("echo CODEX_PTY_OK > 结果.txt\n")
+            val limit = System.currentTimeMillis() + 10_000
+            while (!resultFile.exists() && System.currentTimeMillis() < limit) Thread.sleep(50)
+            assertTrue("交互式 shell 必须实际执行输入命令", resultFile.exists())
+            assertEquals("CODEX_PTY_OK", resultFile.readText().trim())
         } finally { terminal.close() }
     }
-
 }
