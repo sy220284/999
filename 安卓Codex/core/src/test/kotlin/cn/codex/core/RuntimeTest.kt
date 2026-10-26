@@ -398,6 +398,29 @@ class RuntimeTest {
         assertEquals("用户的新修改", fs.read("b"))
     }
 
+
+    @Test fun `skill catalog finds default and configured project directories`() {
+        val fs = workspace()
+        fs.write("技能/默认/SKILL.md", "默认技能")
+        fs.write("扩展/示例/SKILL.md", "扩展技能")
+        val catalog = SkillCatalog(fs)
+        assertEquals(listOf("技能/默认/SKILL.md"), catalog.list())
+        fs.commit(catalog.previewConfig(listOf("扩展", "扩展")))
+        assertEquals(listOf("扩展"), catalog.extraRoots())
+        assertEquals(setOf("扩展/示例/SKILL.md", "技能/默认/SKILL.md"), SkillCatalog(fs).list().toSet())
+        assertFails { catalog.previewConfig(listOf("../外部")) }
+    }
+
+    @Test fun `skill catalog ignores symlinked subdirectories`() {
+        val fs = workspace()
+        val outside = Files.createTempDirectory("outside-skill")
+        Files.createDirectories(outside.resolve("bad"))
+        Files.writeString(outside.resolve("bad/SKILL.md"), "不应读取")
+        fs.resolve("技能").mkdirs()
+        Files.createSymbolicLink(fs.resolve("技能/链接").toPath(), outside)
+        assertTrue(SkillCatalog(fs).list().isEmpty())
+    }
+
     @Test fun `change history never leaks across projects and survives restart`() {
         val dir = Files.createTempDirectory("changes").toFile()
         val store = ChangeStore(dir)

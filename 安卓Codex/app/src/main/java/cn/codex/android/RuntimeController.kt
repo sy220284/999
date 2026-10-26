@@ -189,6 +189,18 @@ class RuntimeController(private val context: Context) {
         changeStore.append(project, changes.map { it.copy(sessionId = sessionId, turnId = turnId) })
         mutable.update { s -> if (s.project == project) s.copy(changes = changeStore.list(project)) else s }
     }
+    fun setSkillRoots(roots: List<String>) = scope.launch {
+        if (state.value.busy) return@launch
+        val project = state.value.project
+        runSuspendCatching {
+            withContext(Dispatchers.IO) {
+                val fs = workspace(project)
+                val change = SkillCatalog(fs).previewConfig(roots)
+                fs.commit(change)
+                record(listOf(change), project)
+            }
+        }.onFailure { fail("技能目录保存失败：${it.message}") }
+    }
     fun steer(text: String) {
         val now = state.value
         val session = now.session

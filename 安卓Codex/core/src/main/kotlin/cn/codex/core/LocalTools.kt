@@ -30,7 +30,17 @@ class LocalTools(
         spec("shell", "在手机应用权限内执行 /system/bin/sh 命令。没有 Linux 桌面沙箱，不能假设安装了 git/python/node。执行前需用户批准", "command" to "string", "timeout_seconds" to "integer", required = listOf("command")),
         spec("update_plan", "更新工作计划，使用简洁中文说明步骤、当前状态", "plan" to "string"),
         spec("list_skills", "列出项目内 技能/ 或 .agents/skills/ 中的 SKILL.md", required = emptyList()),
-        spec("read_skill", "读取技能指令，path 为 list_skills 返回的相对路径", "path" to "string")
+        spec("read_skill", "读取技能指令，path 为 list_skills 返回的相对路径", "path" to "string"),
+        ToolSpec("set_skill_roots", "设置项目的额外技能搜索目录，路径必须位于项目内，修改需用户批准", buildJsonObject {
+            put("type", "object")
+            put("properties", buildJsonObject {
+                put("roots", buildJsonObject {
+                    put("type", "array")
+                    put("items", obj("type" to "string"))
+                })
+            })
+            put("required", buildJsonArray { add("roots") })
+        })
     ) + extensions.flatMap { it.specs() }
 
     suspend fun execute(call: ToolCall, approve: suspend (Approval) -> Boolean, emit: (AgentEvent) -> Unit): String {
@@ -70,10 +80,16 @@ class LocalTools(
                     }
                 }
                 "update_plan" -> a.string("plan").also { emit(AgentEvent.Tool("update_plan", it, false)) }
-                "list_skills" -> listOf("技能", ".agents/skills").flatMap { root ->
-                    fs.resolve(root).takeIf { it.isDirectory }?.walkTopDown()?.maxDepth(3)?.filter { it.isFile && it.name == "SKILL.md" }?.map { it.relativeTo(fs.root).path }?.toList() ?: emptyList()
-                }.joinToString("\n")
-                "read_skill" -> fs.read(path)
+                "list_skills" -> SkillCatalog(fs).list().joinToString("\n")
+                "read_skill" -> {
+                    require(path in SkillCatalog(fs).list()) { "技能路径不在当前项目注册列表中" }
+                    fs.read(path)
+                }
+                "set_skill_roots" -> {
+                    val names = a["roots"]?.jsonArray?.map { it.jsonPrimitive.content }
+                        ?: error("需要 roots 字符串数组")
+                    apply(listOf(SkillCatalog(fs).previewConfig(names)), approve)
+                }
                 else -> {
                     val ext = extensions.firstOrNull { x -> x.specs().any { it.name == call.name } } ?: error("未知工具：${call.name}")
                     if (!approve(Approval("使用扩展工具", "${call.name}\n${call.arguments}"))) "用户拒绝使用工具" else ext.execute(call)

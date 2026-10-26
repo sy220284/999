@@ -60,16 +60,25 @@ import kotlinx.serialization.json.*
 }
 @Composable fun SkillsScreen(controller: RuntimeController, state: ScreenState) {
     var skills by remember { mutableStateOf(emptyList<Pair<String, String>>()) }
+    var additionalRoots by rememberSaveable(state.project) { mutableStateOf("") }
+    var reload by remember { mutableIntStateOf(0) }
     var loading by remember { mutableStateOf(true) }
-    LaunchedEffect(state.project, state.busy) {
+    LaunchedEffect(state.project, state.busy, reload) {
         runSuspendCatching { withContext(Dispatchers.IO) {
-            val fs = controller.workspace()
-            listOf("技能", ".agents/skills").flatMap { dir -> fs.resolve(dir).takeIf { it.isDirectory }?.walkTopDown()?.maxDepth(3)?.filter { it.name == "SKILL.md" && it.isFile }?.map { f -> f.relativeTo(fs.root).path to fs.read(f.relativeTo(fs.root).path) }?.toList().orEmpty() }
-        } }.onSuccess { skills = it }.onFailure { controller.fail("技能读取失败：${it.message}") }
+            val fs = controller.workspace(state.project)
+            val catalog = SkillCatalog(fs)
+            val roots = catalog.extraRoots()
+            val files = catalog.list().map { path -> path to fs.read(path) }
+            roots to files
+        } }.onSuccess { (roots, files) -> additionalRoots = roots.joinToString(", "); skills = files }.onFailure { controller.fail("技能读取失败：${it.message}") }
         loading = false
     }
     LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(20.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-        item { Text("让项目带着自己的经验", style = MaterialTheme.typography.titleLarge); Spacer(Modifier.height(8.dp)); Text("把 SKILL.md 放进项目的“技能/技能名”或“.agents/skills/技能名”目录，助手可以发现并读取。指令文件本身不会自动安装可执行程序。", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant) }
+        item { Text("让项目带着自己的经验", style = MaterialTheme.typography.titleLarge); Spacer(Modifier.height(8.dp)); Text("支持项目内的“技能”、“.agents/skills”及自定义技能目录。只发现 SKILL.md，不自动安装执行程序。", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant) }
+        item {
+            OutlinedTextField(additionalRoots, { additionalRoots = it }, label = { Text("额外技能目录（逗号分隔的项目相对路径）") }, modifier = Modifier.fillMaxWidth())
+            TextButton(onClick = { controller.setSkillRoots(additionalRoots.split(",").map { it.trim() }); reload++ }, enabled = !state.busy) { Text("保存技能目录") }
+        }
         if (loading) item { LinearProgressIndicator(Modifier.fillMaxWidth()) }
         if (!loading && skills.isEmpty()) item { EmptyPanel("还没有项目技能", "在文件页创建技能目录并导入 SKILL.md。", Icons.Outlined.AutoAwesome) }
         items(skills) { (path, text) -> ExpandableCard(path, text, Icons.Outlined.AutoAwesome) }
