@@ -41,13 +41,14 @@ data class Session(
     val goal: String = "",
     val consumedSteeringIds: List<String> = emptyList(),
     val updated: Long = System.currentTimeMillis(),
-    val sectionId: String? = null
+    val sectionId: String? = null,
+    val lastTurnId: String? = null
 )
 
 @Serializable
 data class SessionSummary(val id: String, val title: String, val project: String, val archived: Boolean, val updated: Long, val sectionId: String? = null)
 @Serializable
-data class FileChange(val path: String, val before: String?, val after: String?)
+data class FileChange(val path: String, val before: String?, val after: String?, val sessionId: String? = null, val turnId: String? = null)
 data class Approval(val title: String, val detail: String, val changes: List<FileChange> = emptyList(), val shell: Boolean = false)
 data class ToolCall(val id: String, val name: String, val arguments: JsonObject)
 data class ToolSpec(val name: String, val description: String, val parameters: JsonObject) {

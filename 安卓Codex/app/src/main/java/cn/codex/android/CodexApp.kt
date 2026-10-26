@@ -50,6 +50,7 @@ private object NoMotion: MotionDurationScale { override val scaleFactor = 0f }
     var projectDialog by remember { mutableStateOf(false) }
     var editDialog by remember { mutableStateOf("") }
     var deleteTarget by remember { mutableStateOf<SessionSummary?>(null) }
+    var revertDialog by remember { mutableStateOf(false) }
     var moveTarget by remember { mutableStateOf<SessionSummary?>(null) }
     var sectionManager by remember { mutableStateOf(false) }
     var renameSectionTarget by remember { mutableStateOf<SessionSection?>(null) }
@@ -141,6 +142,7 @@ private object NoMotion: MotionDurationScale { override val scaleFactor = 0f }
                                 DropdownMenuItem(text = { Text("设置任务目标") }, onClick = { menu = false; editDialog = "goal"; newValue = state.session?.goal.orEmpty() }, enabled = !state.busy)
                                 DropdownMenuItem(text = { Text("压缩上下文") }, onClick = { menu = false; controller.compactContext() }, enabled = !state.busy && (state.session?.wire?.count { (it as? JsonObject)?.string("role") == "user" } ?: 0) >= 5)
                                 DropdownMenuItem(text = { Text("审查当前修改") }, onClick = { menu = false; draft = "审查当前项目的修改，先查看 Git 差异，再检查错误、回归和遗漏，给出带文件位置的中文结论。" }, enabled = !state.busy)
+                                DropdownMenuItem(text = { Text("撤销最近任务修改") }, onClick = { menu = false; revertDialog = true }, enabled = !state.busy && state.session?.lastTurnId != null)
                             }
                         }
                     }
@@ -174,6 +176,9 @@ private object NoMotion: MotionDurationScale { override val scaleFactor = 0f }
         else ModalNavigationDrawer(drawerState = drawer, gesturesEnabled = drawer.isOpen, drawerContent = { ModalDrawerSheet(drawerContainerColor = MaterialTheme.colorScheme.surfaceContainerLow) { side() } }) { content() }
     }
     state.approval?.let { approval -> ApprovalSheet(approval, controller::decide) }
+    if (revertDialog) AlertDialog(onDismissRequest = { revertDialog = false }, title = { Text("撤销最近任务修改？") }, text = {
+        Text("仅撤销本轮通过文件工具记录的修改。命令、Git 提交和其他外部副作用无法自动还原；文件被其他操作修改后将拒绝覆盖。")
+    }, confirmButton = { TextButton(onClick = { controller.revertLastTask(); revertDialog = false }, enabled = !state.busy) { Text("确认撤销") } }, dismissButton = { TextButton(onClick = { revertDialog = false }) { Text("取消") } })
     moveTarget?.let { target ->
         AlertDialog(onDismissRequest = { moveTarget = null }, title = { Text("移动到分类") }, text = {
             Column {

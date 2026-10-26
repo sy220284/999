@@ -8,6 +8,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.serialization.json.*
 import java.io.File
+import java.util.UUID
 
 // 前台服务持有任务；旋转、切换页面不会重建或重放正在执行的工作。
 data class ScreenState(
@@ -101,6 +102,39 @@ class RuntimeController(private val context: Context) {
             refresh()
         }.onFailure { fail("移动会话失败：${it.message}") }
     }
+    fun revertLastTask() = scope.launch {
+        if (state.value.busy) return@launch
+        val selected = state.value.session ?: return@launch
+        val turnId = selected.lastTurnId ?: run { fail("当前会话没有可撤销的任务修改"); return@launch }
+        runSuspendCatching {
+            withContext(Dispatchers.IO) {
+                val changes = changeStore.list(selected.project).filter { it.turnId == turnId && it.sessionId == selected.id }
+                require(changes.isNotEmpty()) { "最近任务没有可撤销的文件修改" }
+                val fs = workspace(selected.project)
+                val reversed = changes.groupBy { fs.resolve(it.path).canonicalPath }.values.map { steps ->
+                    FileChange(steps.first().path, steps.last().after, steps.first().before)
+                }
+                fs.commitAll(reversed)
+                changeStore.removeTurn(selected.project, turnId)
+                val paths = reversed.joinToString { it.path }
+                val notice = "已撤销最近任务的文件修改：$paths。命令、Git 提交及其他外部副作用无法自动回滚，请核对实际状态。"
+                val next = selected.copy(
+                    lastTurnId = null,
+                    wire = JsonArray(selected.wire + buildJsonObject {
+                        put("role", "user")
+                        put("content", buildJsonArray { add(obj("type" to "input_text", "text" to notice)) })
+                    }),
+                    messages = selected.messages + Message(role = "assistant", text = notice),
+                    updated = System.currentTimeMillis()
+                )
+                store.save(next)
+                next
+            }
+        }.onSuccess { next ->
+            mutable.update { it.copy(session = next, changes = changeStore.list(next.project), usage = "最近任务修改已撤销") }
+            refresh()
+        }.onFailure { fail("撤销失败：${it.message}") }
+    }
     fun fork() = scope.launch { if (!state.value.busy) state.value.session?.let { s -> withContext(Dispatchers.IO) { store.save(s); store.fork(s.id) }.let { mutable.update { old -> old.copy(session = it) }; refresh() } } }
     fun rename(title: String) = updateSession { it.copy(title = title.trim().ifBlank { "新对话" }) }
     fun goal(goal: String) = updateSession { it.copy(goal = goal) }
@@ -151,8 +185,8 @@ class RuntimeController(private val context: Context) {
         attachmentInputs += input; mutable.update { it.copy(attachments = it.attachments + name) }
     }
     fun clearAttachments() { if (!state.value.busy) { attachmentInputs.clear(); mutable.update { it.copy(attachments = emptyList()) } } }
-    private fun record(changes: List<FileChange>, project: String = state.value.project) {
-        changeStore.append(project, changes)
+    private fun record(changes: List<FileChange>, project: String = state.value.project, sessionId: String? = null, turnId: String? = null) {
+        changeStore.append(project, changes.map { it.copy(sessionId = sessionId, turnId = turnId) })
         mutable.update { s -> if (s.project == project) s.copy(changes = changeStore.list(project)) else s }
     }
     fun steer(text: String) {
@@ -175,7 +209,7 @@ class RuntimeController(private val context: Context) {
         if (active != null || prompt.isBlank()) return
         active = currentCoroutineContext().job
         val snapshot = state.value
-        val initial = snapshot.session ?: Session(project = snapshot.project)
+        val initial = (snapshot.session ?: Session(project = snapshot.project)).copy(lastTurnId = UUID.randomUUID().toString())
         mutable.update { it.copy(busy = true, canSteer = !terminal, stream = "", thinking = "", tool = "", error = null) }
         val fs = workspace(snapshot.project)
         val runner = ShellRunner("/system/bin/sh", fs.root, launcher = { NativeShell.start(it, fs.root) }).also { shell = it }
@@ -189,7 +223,7 @@ class RuntimeController(private val context: Context) {
             } else {
                 require(snapshot.config.model.isNotBlank()) { "请先在设置中选择模型并填写 API 密钥" }
                 val extras = listOf(GitTools(fs), McpTools(context))
-                val tools = LocalTools(fs, runner, extras) { record(it, snapshot.project) }
+                val tools = LocalTools(fs, runner, extras) { record(it, snapshot.project, initial.id, initial.lastTurnId) }
                 val runtime = AgentRuntime(ResponsesClient(snapshot.config), tools, ::approve, steeringInbox, toolJournal)
                 val attachments = attachmentInputs.toList()
                 withContext(Dispatchers.IO) { runtime.run(initial, prompt, attachments) { event ->

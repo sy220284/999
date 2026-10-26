@@ -106,8 +106,8 @@
   },
   {
     "method": "thread/revert",
-    "status": "待移植",
-    "detail": "尚未实现，不能视为 Android 本身不支持"
+    "status": "安卓等价实现",
+    "detail": "按会话及最近任务 ID 撤销文件工具变更，冲突检测后原子应用，记录不可回滚的命令副作用；无上游 RPC"
   },
   {
     "method": "thread/list",

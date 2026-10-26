@@ -19,6 +19,11 @@ class ChangeStore(private val directory: File) {
         values.removeAt(index)
         save(all().toMutableMap().apply { put(project, values) })
     }
+    @Synchronized fun removeTurn(project: String, turnId: String) {
+        val current = list(project)
+        require(current.any { it.turnId == turnId }) { "本轮没有可撤销的文件修改" }
+        save(all().toMutableMap().apply { put(project, current.filterNot { it.turnId == turnId }) })
+    }
     private fun save(data: Map<String, List<FileChange>>) {
         val temp = File.createTempFile("changes-", ".tmp", directory)
         try { temp.writeText(codec.encodeToString(data)); Files.move(temp.toPath(), file.toPath(), StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.ATOMIC_MOVE) } finally { temp.delete() }

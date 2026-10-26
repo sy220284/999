@@ -373,6 +373,31 @@ class RuntimeTest {
         assertEquals("重要", sections.create("项目二", "重要").name)
     }
 
+
+    @Test fun `turn change history removes only the selected turn`() {
+        val directory = Files.createTempDirectory("turn-history").toFile()
+        val store = ChangeStore(directory)
+        val first = FileChange("a", null, "第一次", sessionId = "one", turnId = "t1")
+        val second = FileChange("a", "第一次", "第二次", sessionId = "one", turnId = "t2")
+        val other = FileChange("a", null, "其他会话", sessionId = "two", turnId = "t3")
+        store.append("同一项目", listOf(first, second, other))
+        store.removeTurn("同一项目", "t2")
+        assertEquals(listOf(first, other), ChangeStore(directory).list("同一项目"))
+    }
+
+    @Test fun `revert batch refuses a newer human edit and keeps all files unchanged`() {
+        val fs = workspace()
+        fs.write("a", "初始A")
+        fs.write("b", "初始B")
+        val changes = listOf(fs.previewWrite("a", "修改A"), fs.previewWrite("b", "修改B"))
+        fs.commitAll(changes)
+        fs.write("b", "用户的新修改")
+        val reverse = changes.map { FileChange(it.path, it.after, it.before) }
+        assertFails { fs.commitAll(reverse) }
+        assertEquals("修改A", fs.read("a"))
+        assertEquals("用户的新修改", fs.read("b"))
+    }
+
     @Test fun `change history never leaks across projects and survives restart`() {
         val dir = Files.createTempDirectory("changes").toFile()
         val store = ChangeStore(dir)
