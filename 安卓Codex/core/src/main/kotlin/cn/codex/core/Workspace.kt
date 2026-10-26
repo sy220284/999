@@ -44,7 +44,7 @@ class Workspace(val root: File, val maxTextBytes: Long = 2 * 1024 * 1024) {
     fun previewWrite(path: String, content: String?) = FileChange(path, resolve(path).takeIf { it.isFile }?.let { read(path) }, content)
     fun commit(change: FileChange) = commitAll(listOf(change))
     fun commitAll(changes: List<FileChange>) {
-        require(changes.map { it.path }.distinct().size == changes.size) { "同一补丁不能重复修改一个路径" }
+        require(changes.map { resolve(it.path).canonicalPath }.distinct().size == changes.size) { "同一批修改不能通过路径别名重复修改同一文件" }
         changes.forEach { c ->
             val f = resolve(c.path)
             require(!f.isDirectory) { "不能以文件操作覆盖目录" }

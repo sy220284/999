@@ -31,7 +31,11 @@ class AgentRuntime(private val client: ResponsesClient, private val tools: Local
             currentCoroutineContext().ensureActive()
             val output = client.respond(JsonArray(input), tools.specs(), instructions, emit)
             input.addAll(output)
-            val text = output.map { it.jsonObject }.filter { it.string("type") == "message" }.flatMap { it["content"]?.jsonArray ?: JsonArray(emptyList()) }.map { it.jsonObject }.filter { it.string("type") == "output_text" }.joinToString("\n") { it.string("text") }
+            val text = output.map { it.jsonObject }.filter { it.string("type") == "message" }.flatMap { it["content"]?.jsonArray ?: JsonArray(emptyList()) }.map { it.jsonObject }.mapNotNull { part -> when (part.string("type")) {
+                "output_text" -> part.string("text")
+                "refusal" -> part.string("refusal")
+                else -> null
+            } }.filter { it.isNotBlank() }.joinToString("\n")
             if (text.isNotBlank()) session = session.copy(messages = session.messages + Message(role = "assistant", text = text))
             val calls = output.map { it.jsonObject }.filter { it.string("type") == "function_call" }
             // 不在所有工具结果回注前保存悬空的 function_call；重启后绝不自动重放副作用。

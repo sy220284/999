@@ -18,7 +18,9 @@ class ResponsesClient(private val config: ApiConfig, private val http: OkHttpCli
         require(base.username.isEmpty() && base.password.isEmpty() && base.query == null && base.fragment == null) { "服务地址不能包含凭证、查询参数或片段" }
         return (config.endpoint.trimEnd('/') + "/" + path).toHttpUrl()
     }
-    private fun request(path: String) = Request.Builder().url(endpoint(path)).header("Authorization", "Bearer ${config.apiKey}")
+    private fun request(path: String): Request.Builder = Request.Builder().url(endpoint(path)).apply {
+        if (config.apiKey.isNotBlank()) header("Authorization", "Bearer ${config.apiKey}")
+    }
     suspend fun models(): List<String> = withContext(Dispatchers.IO) {
         val call = http.newCall(request("models").get().build())
         cancellableCall(call) { response ->
@@ -45,8 +47,10 @@ class ResponsesClient(private val config: ApiConfig, private val http: OkHttpCli
                     when (event.string("type")) {
                         "response.output_text.delta" -> emit(AgentEvent.Delta(event.string("delta")))
                         "response.reasoning_summary_text.delta" -> emit(AgentEvent.Delta(event.string("delta"), true))
+                        "response.refusal.delta" -> emit(AgentEvent.Delta(event.string("delta")))
                         "response.completed" -> {
                             val complete = event.getValue("response").jsonObject
+                            check(complete.string("status", "completed") == "completed") { "模型回复状态未完成" }
                             result = complete["output"]?.jsonArray ?: error("回复缺少输出")
                             complete["usage"]?.jsonObject?.let { emit(AgentEvent.Usage(it.int("input_tokens", 0), it.int("output_tokens", 0))) }
                         }
@@ -56,6 +60,7 @@ class ResponsesClient(private val config: ApiConfig, private val http: OkHttpCli
             }
             val source = response.body!!.source()
             while (result == null && !source.exhausted()) { currentCoroutineContext().ensureActive(); parser.line(source.readUtf8Line() ?: break) }
+            parser.finish()
             result ?: throw IncompleteResponse()
         }
     }

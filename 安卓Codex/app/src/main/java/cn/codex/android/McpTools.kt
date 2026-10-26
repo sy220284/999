@@ -11,11 +11,13 @@ import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.RequestBody.Companion.toRequestBody
 import java.io.File
 import java.util.concurrent.TimeUnit
+import java.util.concurrent.atomic.AtomicInteger
 
 @Serializable data class McpConnection(val name: String, val url: String)
 /** 无凭证的 Streamable HTTP MCP；OAuth/stdio 单独标为未移植，不能伪装成连接成功。 */
 class McpTools(private val context: Context): ToolExtension {
     private val http = OkHttpClient.Builder().callTimeout(60, TimeUnit.SECONDS).build()
+    private val nextRequestId = AtomicInteger()
     private val configFile get() = File(context.filesDir, "MCP连接.json")
     fun connections(): List<McpConnection> = if (configFile.exists()) codec.decodeFromString(configFile.readText()) else emptyList()
     fun save(connections: List<McpConnection>) {
@@ -40,7 +42,8 @@ class McpTools(private val context: Context): ToolExtension {
         rpc(server, method, params, sid).first.toString()
     }
     private suspend fun rpc(server: McpConnection, method: String, params: JsonObject, session: String? = null, notification: Boolean = false): Pair<JsonElement, String?> {
-        val payload = buildJsonObject { put("jsonrpc", "2.0"); if (!notification) put("id", 1); put("method", method); put("params", params) }
+        val requestId = if (notification) null else nextRequestId.incrementAndGet()
+        val payload = buildJsonObject { put("jsonrpc", "2.0"); requestId?.let { put("id", it) }; put("method", method); put("params", params) }
         val builder = Request.Builder().url(server.url).header("Accept", "application/json, text/event-stream").header("MCP-Protocol-Version", "2025-03-26").post(payload.toString().toRequestBody("application/json".toMediaType()))
         session?.let { builder.header("Mcp-Session-Id", it) }
         val request = http.newCall(builder.build())
@@ -52,15 +55,17 @@ class McpTools(private val context: Context): ToolExtension {
                     if (notification) return@use JsonNull to session
                     val raw = if (response.header("Content-Type").orEmpty().contains("text/event-stream")) {
                         var matched: JsonObject? = null
-                        val parser = SseParser { line -> val e = Json.parseToJsonElement(line).jsonObject; if (e["id"]?.jsonPrimitive?.intOrNull == 1) matched = e }
+                        val parser = SseParser { line -> val e = Json.parseToJsonElement(line).jsonObject; if (e["id"]?.jsonPrimitive?.intOrNull == requestId) matched = e }
                         val source = response.body!!.source()
                         while (matched == null && !source.exhausted()) {
                             currentCoroutineContext().ensureActive()
                             parser.line(source.readUtf8Line() ?: break)
                         }
+                        if (matched == null) parser.finish()
                         (matched ?: error("MCP 未返回对应结果")).toString()
                     } else response.body!!.string()
                     val obj = Json.parseToJsonElement(raw).jsonObject
+                    require(obj["id"]?.jsonPrimitive?.intOrNull == requestId) { "MCP 返回了不匹配的请求编号" }
                     check(obj["error"] == null) { "MCP 错误：${obj["error"]}" }
                     (obj["result"] ?: JsonNull) to response.header("Mcp-Session-Id")
                 }

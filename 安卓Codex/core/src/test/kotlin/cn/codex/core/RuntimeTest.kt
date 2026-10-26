@@ -121,6 +121,57 @@ class RuntimeTest {
         listOf(": heartbeat", "data: {\"a\":", "data: 1}", "").forEach(parser::line)
         assertEquals(listOf("{\"a\":\n1}"), frames)
     }
+
+    @Test fun `alias paths cannot modify the same file twice in one batch`() {
+        val fs = workspace()
+        fs.write("a.txt", "原内容")
+        val first = FileChange("a.txt", "原内容", "修改一")
+        val second = FileChange("./a.txt", "原内容", "修改二")
+        assertFails { fs.commitAll(listOf(first, second)) }
+        assertEquals("原内容", fs.read("a.txt"))
+    }
+
+    @Test fun `SSE dispatches final frame without a trailing blank line`() {
+        val frames = mutableListOf<String>()
+        val parser = SseParser { frames += it }
+        parser.line("data: hello")
+        parser.finish()
+        parser.finish()
+        assertEquals(listOf("hello"), frames)
+    }
+
+    @Test fun `stream accepts final completed event without a trailing blank line`() = runBlocking<Unit> {
+        MockWebServer().use { server ->
+            val expected = Json.parseToJsonElement("""[{"type":"message","role":"assistant","content":[{"type":"output_text","text":"回复完成"}]}]""").jsonArray
+            val event = buildJsonObject {
+                put("type", "response.completed")
+                put("response", buildJsonObject { put("status", "completed"); put("output", expected) })
+            }
+            server.enqueue(MockResponse().setHeader("Content-Type", "text/event-stream").setBody("data: $event\n"))
+            val client = ResponsesClient(ApiConfig(server.url("/").toString(), "test", "m", allowLoopbackHttp = true))
+            assertEquals(expected, client.respond(JsonArray(emptyList()), emptyList()) {})
+        }
+    }
+
+    @Test fun `model refusal remains visible in the conversation`() = runBlocking<Unit> {
+        val refusal = Json.parseToJsonElement("""[{"type":"message","role":"assistant","content":[{"type":"refusal","refusal":"无法完成该请求"}]}]""").jsonArray
+        MockWebServer().use { server ->
+            server.enqueue(stream(refusal))
+            val fs = workspace()
+            val agent = AgentRuntime(ResponsesClient(ApiConfig(server.url("/").toString(), "test", "m", allowLoopbackHttp = true)), LocalTools(fs, ShellRunner("/bin/sh", fs.root)), { false })
+            assertEquals("无法完成该请求", agent.run(Session(project = "测试"), "任务") {}.messages.last().text)
+        }
+    }
+
+    @Test fun `loopback endpoint without key does not add empty authorization header`() = runBlocking<Unit> {
+        MockWebServer().use { server ->
+            server.enqueue(stream(JsonArray(emptyList())))
+            val client = ResponsesClient(ApiConfig(server.url("/").toString(), "", "local", allowLoopbackHttp = true))
+            client.respond(JsonArray(emptyList()), emptyList()) {}
+            assertNull(server.takeRequest().getHeader("Authorization"))
+        }
+    }
+
     @Test fun `change history never leaks across projects and survives restart`() {
         val dir = Files.createTempDirectory("changes").toFile()
         val store = ChangeStore(dir)
