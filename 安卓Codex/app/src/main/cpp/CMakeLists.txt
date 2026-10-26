@@ -1,0 +1,5 @@
+cmake_minimum_required(VERSION 3.22.1)
+project(codex_process C)
+add_library(codex_process SHARED process.c)
+target_compile_options(codex_process PRIVATE -Wall -Wextra -Werror)
+target_link_options(codex_process PRIVATE "-Wl,-z,max-page-size=16384")

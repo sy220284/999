@@ -1,0 +1,156 @@
+@file:OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class)
+package cn.codex.android
+
+import androidx.activity.compose.BackHandler
+import androidx.compose.animation.*
+import androidx.compose.animation.core.*
+import androidx.compose.foundation.*
+import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.lazy.*
+import androidx.compose.foundation.shape.*
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.outlined.*
+import androidx.compose.material.icons.outlined.*
+import androidx.compose.material3.*
+import androidx.compose.runtime.*
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.ui.*
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.platform.*
+import androidx.compose.ui.semantics.*
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import cn.codex.core.*
+import kotlinx.coroutines.*
+
+private data class Destination(val id: String, val title: String, val icon: ImageVector)
+private val destinations = listOf(
+    Destination("files", "项目文件", Icons.Outlined.FolderOpen), Destination("changes", "查看修改", Icons.Outlined.Difference),
+    Destination("terminal", "本机终端", Icons.Outlined.Terminal), Destination("skills", "项目技能", Icons.Outlined.AutoAwesome),
+    Destination("mcp", "工具连接", Icons.Outlined.Extension), Destination("settings", "连接与偏好", Icons.Outlined.Tune),
+    Destination("capabilities", "功能与限制", Icons.Outlined.Info)
+)
+
+@Composable fun CodexApp(controller: RuntimeController, state: ScreenState, send: (String, Boolean) -> Unit) {
+    CompositionLocalProvider(LocalMotionEnabled provides state.config.motion) { CodexLayout(controller, state, send) }
+}
+private object NoMotion: MotionDurationScale { override val scaleFactor = 0f }
+@Composable private fun CodexLayout(controller: RuntimeController, state: ScreenState, send: (String, Boolean) -> Unit) {
+    var page by rememberSaveable { mutableStateOf("chat") }
+    var draft by rememberSaveable { mutableStateOf("") }
+    var search by rememberSaveable { mutableStateOf("") }
+    var archived by rememberSaveable { mutableStateOf(false) }
+    var projectDialog by remember { mutableStateOf(false) }
+    var editDialog by remember { mutableStateOf("") }
+    var menu by remember { mutableStateOf(false) }
+    var newValue by remember { mutableStateOf("") }
+    val scope = rememberCoroutineScope()
+    val drawer = rememberDrawerState(DrawerValue.Closed)
+    val haptic = LocalHapticFeedback.current
+    fun setDrawer(open: Boolean) {
+        scope.launch { if (state.config.motion) { if (open) drawer.open() else drawer.close() } else withContext(NoMotion) { if (open) drawer.open() else drawer.close() } }
+    }
+    fun navigate(id: String) { page = id; setDrawer(false) }
+    BackHandler(drawer.isOpen || page != "chat") { if (drawer.isOpen) setDrawer(false) else page = "chat" }
+    BoxWithConstraints(Modifier.fillMaxSize()) {
+        val wide = maxWidth >= 840.dp
+        val side: @Composable () -> Unit = {
+            Column(Modifier.fillMaxHeight().width(304.dp).background(MaterialTheme.colorScheme.surfaceContainerLow).windowInsetsPadding(WindowInsets.statusBars).padding(horizontal = 12.dp)) {
+                Row(Modifier.fillMaxWidth().padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
+                    Icon(Icons.Outlined.Code, null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(27.dp))
+                    Spacer(Modifier.width(10.dp)); Text("Codex", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Medium)
+                    Spacer(Modifier.weight(1f)); Text("随行", color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.labelMedium)
+                }
+                FilledTonalButton(onClick = { controller.newSession(); draft = ""; navigate("chat") }, enabled = !state.busy, modifier = Modifier.fillMaxWidth().height(52.dp), shape = RoundedCornerShape(14.dp)) {
+                    Icon(Icons.Outlined.Add, null); Spacer(Modifier.width(8.dp)); Text("开启新对话"); Spacer(Modifier.weight(1f)); Icon(Icons.AutoMirrored.Outlined.ArrowForward, null, Modifier.size(18.dp))
+                }
+                TextButton(onClick = { projectDialog = true }, modifier = Modifier.fillMaxWidth()) {
+                    Icon(Icons.Outlined.Folder, null, Modifier.size(18.dp)); Spacer(Modifier.width(8.dp)); Text(state.project, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f)); Icon(Icons.Outlined.UnfoldMore, "切换项目", Modifier.size(18.dp))
+                }
+                destinations.forEach { d ->
+                    NavigationDrawerItem(label = { Text(d.title, style = MaterialTheme.typography.bodyMedium) }, selected = page == d.id, onClick = { navigate(d.id) }, icon = { Icon(d.icon, null, Modifier.size(20.dp)) }, modifier = Modifier.height(45.dp))
+                }
+                HorizontalDivider(Modifier.padding(vertical = 12.dp), color = MaterialTheme.colorScheme.outlineVariant)
+                Row(Modifier.fillMaxWidth().padding(start = 12.dp), verticalAlignment = Alignment.CenterVertically) {
+                    Text(if (archived) "已归档会话" else "最近会话", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.weight(1f))
+                    IconButton(onClick = { archived = !archived }) { Icon(if (archived) Icons.Outlined.Unarchive else Icons.Outlined.Inventory2, if (archived) "显示最近会话" else "显示归档会话", Modifier.size(19.dp)) }
+                }
+                OutlinedTextField(search, { search = it }, placeholder = { Text("搜索会话标题") }, leadingIcon = { Icon(Icons.Outlined.Search, null, Modifier.size(18.dp)) }, singleLine = true, shape = RoundedCornerShape(14.dp), modifier = Modifier.fillMaxWidth())
+                Spacer(Modifier.height(8.dp))
+                val visible = state.sessions.filter { it.project == state.project && it.archived == archived && it.title.contains(search, true) }
+                LazyColumn(Modifier.weight(1f), contentPadding = PaddingValues(bottom = 12.dp)) {
+                    items(visible, key = { it.id }) { s ->
+                        ListItem(headlineContent = { Text(s.title, maxLines = 1, overflow = TextOverflow.Ellipsis, style = MaterialTheme.typography.bodyMedium) }, leadingContent = { Icon(Icons.Outlined.ChatBubbleOutline, null, Modifier.size(17.dp)) }, trailingContent = { IconButton(onClick = { controller.archive(s.id) }, enabled = !state.busy) { Icon(if (s.archived) Icons.Outlined.Unarchive else Icons.Outlined.Archive, if (s.archived) "恢复会话" else "归档会话", Modifier.size(17.dp)) } }, colors = ListItemDefaults.colors(containerColor = if (state.session?.id == s.id && page == "chat") MaterialTheme.colorScheme.surfaceContainerHigh else MaterialTheme.colorScheme.surfaceContainerLow), modifier = Modifier.clip(RoundedCornerShape(12.dp)).clickable(enabled = !state.busy) { controller.openSession(s.id); navigate("chat") })
+                    }
+                    if (visible.isEmpty()) item { Text("${if (archived) "还没有归档" else "从一个想法开始"}", Modifier.padding(16.dp), color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodyMedium) }
+                }
+                Row(Modifier.fillMaxWidth().navigationBarsPadding().padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
+                    Icon(Icons.Outlined.Smartphone, null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(18.dp)); Spacer(Modifier.width(8.dp)); Text("手机独立运行", color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.labelMedium)
+                }
+            }
+        }
+        val content: @Composable () -> Unit = {
+            Scaffold(containerColor = MaterialTheme.colorScheme.background, topBar = {
+                TopAppBar(title = {
+                    Column {
+                        Text(if (page == "chat") "Codex" else destinations.firstOrNull { it.id == page }?.title ?: "Codex", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Medium)
+                        Text(if (page == "chat") state.project else "手机工作区", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1)
+                    }
+                }, navigationIcon = {
+                    IconButton(onClick = { if (page != "chat") page = "chat" else if (!wide) setDrawer(true) }) { Icon(if (page == "chat") Icons.Outlined.Menu else Icons.AutoMirrored.Outlined.ArrowBack, if (page == "chat") "打开侧栏" else "返回对话") }
+                }, actions = {
+                    if (state.busy) IconButton(onClick = controller::stop) { Icon(Icons.Outlined.StopCircle, "停止任务", tint = MaterialTheme.colorScheme.primary) }
+                    if (page == "chat") {
+                        IconButton(onClick = { page = "files" }) { Icon(Icons.Outlined.FolderOpen, "打开项目文件", Modifier.size(22.dp)) }
+                        Box {
+                            IconButton(onClick = { menu = true }) { Icon(Icons.Outlined.MoreHoriz, "对话操作") }
+                            DropdownMenu(menu, { menu = false }) {
+                                DropdownMenuItem(text = { Text("重命名对话") }, onClick = { menu = false; editDialog = "rename"; newValue = state.session?.title.orEmpty() }, enabled = !state.busy)
+                                DropdownMenuItem(text = { Text("从这里分叉") }, onClick = { menu = false; controller.fork() }, enabled = !state.busy)
+                                DropdownMenuItem(text = { Text("设置任务目标") }, onClick = { menu = false; editDialog = "goal"; newValue = state.session?.goal.orEmpty() }, enabled = !state.busy)
+                                DropdownMenuItem(text = { Text("审查当前修改") }, onClick = { menu = false; draft = "审查当前项目的修改，先查看 Git 差异，再检查错误、回归和遗漏，给出带文件位置的中文结论。" }, enabled = !state.busy)
+                            }
+                        }
+                    }
+                }, colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.background))
+            }) { padding ->
+                Column(Modifier.fillMaxSize().padding(padding)) {
+                    state.error?.let { error ->
+                        Surface(color = MaterialTheme.colorScheme.errorContainer, modifier = Modifier.fillMaxWidth()) {
+                            Row(Modifier.padding(start = 16.dp), verticalAlignment = Alignment.CenterVertically) { Text(error, style = MaterialTheme.typography.bodyMedium, modifier = Modifier.weight(1f).padding(vertical = 8.dp)); IconButton(onClick = controller::dismissError) { Icon(Icons.Outlined.Close, "关闭提示") } }
+                        }
+                    }
+                    AnimatedContent(targetState = page, transitionSpec = { fadeIn(tween(if (state.config.motion) 220 else 0)) + slideInHorizontally { it / 32 } togetherWith fadeOut(tween(if (state.config.motion) 120 else 0)) }, label = "页面切换", modifier = Modifier.weight(1f)) { current ->
+                        when (current) {
+                            "chat" -> ChatScreen(state, draft, { draft = it }, { page = "settings" }, controller, { text ->
+                                if (state.config.model.isBlank() || (state.config.apiKey.isBlank() && !state.config.allowLoopbackHttp)) { controller.fail("先连接模型，再开始对话"); page = "settings" }
+                                else { haptic.performHapticFeedback(HapticFeedbackType.LongPress); send(text, false); draft = "" }
+                            })
+                            "files" -> FilesScreen(controller, state)
+                            "changes" -> ChangesScreen(controller, state)
+                            "terminal" -> TerminalScreen(state) { send(it, true) }
+                            "settings" -> SettingsScreen(controller, state)
+                            "skills" -> SkillsScreen(controller, state)
+                            "mcp" -> McpScreen(controller)
+                            else -> CapabilitiesScreen()
+                        }
+                    }
+                }
+            }
+        }
+        if (wide) Row { side(); Box(Modifier.weight(1f)) { content() } }
+        else ModalNavigationDrawer(drawerState = drawer, gesturesEnabled = drawer.isOpen, drawerContent = { ModalDrawerSheet(drawerContainerColor = MaterialTheme.colorScheme.surfaceContainerLow) { side() } }) { content() }
+    }
+    state.approval?.let { approval -> ApprovalSheet(approval, controller::decide) }
+    if (projectDialog) AlertDialog(onDismissRequest = { projectDialog = false }, title = { Text("项目") }, text = {
+        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            state.projects.forEach { p -> TextButton(onClick = { controller.newSession(p); projectDialog = false; page = "chat" }, enabled = !state.busy, modifier = Modifier.fillMaxWidth()) { Icon(Icons.Outlined.Folder, null); Spacer(Modifier.width(12.dp)); Text(p, Modifier.weight(1f), maxLines = 1) } }
+            OutlinedTextField(newValue, { newValue = it }, label = { Text("新项目名称") }, singleLine = true)
+        }
+    }, confirmButton = { TextButton(onClick = { runCatching { controller.newSession(newValue.trim()); projectDialog = false; newValue = "" }.onFailure { controller.fail(it.message.orEmpty()) } }, enabled = !state.busy && newValue.isNotBlank()) { Text("创建项目") } }, dismissButton = { TextButton(onClick = { projectDialog = false }) { Text("关闭") } })
+    if (editDialog.isNotBlank()) AlertDialog(onDismissRequest = { editDialog = "" }, title = { Text(if (editDialog == "rename") "对话名称" else "任务目标") }, text = { OutlinedTextField(newValue, { newValue = it }, minLines = if (editDialog == "goal") 3 else 1) }, confirmButton = { TextButton(onClick = { if (editDialog == "rename") controller.rename(newValue) else controller.goal(newValue); editDialog = "" }) { Text("保存") } }, dismissButton = { TextButton(onClick = { editDialog = "" }) { Text("取消") } })
+}
