@@ -184,6 +184,36 @@ class RuntimeTest {
         }
     }
 
+
+    @Test fun `context compaction keeps newest four user turns and original UI history`() = runBlocking<Unit> {
+        MockWebServer().use { server ->
+            val reply = Json.parseToJsonElement("""[{"type":"message","content":[{"type":"output_text","text":"已完成第一轮文件审查，剩余任务是执行验证"}]}]""").jsonArray
+            server.enqueue(stream(reply))
+            val turns = (1..7).flatMap { n ->
+                listOf(obj("role" to "user", "content" to "问题$n"), obj("role" to "assistant", "content" to "回答$n"))
+            }
+            val original = Session(project = "工程", wire = JsonArray(turns), messages = listOf(Message(role = "user", text = "完整记录")))
+            val client = ResponsesClient(ApiConfig(server.url("/").toString(), "test", "test", allowLoopbackHttp = true))
+            val result = ContextCompactor(client).compact(original)
+            assertEquals(original.messages, result.messages)
+            assertEquals(9, result.wire.size)
+            assertTrue(result.wire[0].toString().contains("剩余任务是执行验证"))
+            assertTrue(result.wire[1].toString().contains("问题4"))
+            assertEquals(turns.last(), result.wire.last())
+            assertEquals(14, original.wire.size)
+        }
+    }
+
+    @Test fun `compaction failure does not mutate the session`() = runBlocking<Unit> {
+        MockWebServer().use { server ->
+            server.enqueue(stream(JsonArray(emptyList())))
+            val original = Session(project = "工程", wire = JsonArray((1..6).map { obj("role" to "user", "content" to "提问$it") }))
+            val client = ResponsesClient(ApiConfig(server.url("/").toString(), "test", "test", allowLoopbackHttp = true))
+            assertFailsWith<IllegalStateException> { ContextCompactor(client).compact(original) }
+            assertEquals(6, original.wire.size)
+        }
+    }
+
     @Test fun `change history never leaks across projects and survives restart`() {
         val dir = Files.createTempDirectory("changes").toFile()
         val store = ChangeStore(dir)

@@ -68,6 +68,35 @@ class RuntimeController(private val context: Context) {
     fun rename(title: String) = updateSession { it.copy(title = title.trim().ifBlank { "新对话" }) }
     fun goal(goal: String) = updateSession { it.copy(goal = goal) }
     private fun updateSession(transform: (Session) -> Session) = scope.launch { if (!state.value.busy) state.value.session?.let { s -> val next = transform(s); withContext(Dispatchers.IO) { store.save(next) }; mutable.update { it.copy(session = next) }; refresh() } }
+    fun compactContext() {
+        if (state.value.busy) return
+        val session = state.value.session ?: return
+        if (session.wire.count { (it as? JsonObject)?.string("role") == "user" } < 5) {
+            fail("至少需要五轮用户消息才能压缩")
+            return
+        }
+        mutable.update { it.copy(busy = true, tool = "压缩上下文中", error = null) }
+        scope.launch {
+            active = currentCoroutineContext().job
+            try {
+                val compacted = withContext(Dispatchers.IO) {
+                    ContextCompactor(ResponsesClient(state.value.config)).compact(session) { index, total ->
+                        mutable.update { it.copy(tool = "压缩上下文 $index/$total") }
+                    }.also { store.save(it) }
+                }
+                mutable.update { it.copy(session = compacted, usage = "历史上下文已压缩；完整聊天记录保留") }
+                refresh()
+            } catch (e: CancellationException) {
+                fail("上下文压缩已取消，原会话保留")
+                throw e
+            } catch (e: Exception) {
+                fail("上下文压缩失败：${e.message}；原会话保留")
+            } finally {
+                active = null
+                mutable.update { it.copy(busy = false, tool = "") }
+            }
+        }
+    }
     fun saveConfig(config: ApiConfig) = scope.launch {
         runSuspendCatching { withContext(Dispatchers.IO) { settings.save(config) } }.onSuccess { mutable.update { it.copy(config = config, error = null) } }.onFailure { fail("设置保存失败：${it.message}") }
     }

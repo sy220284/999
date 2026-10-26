@@ -27,6 +27,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import cn.codex.core.*
 import kotlinx.coroutines.*
+import kotlinx.serialization.json.*
 
 private data class Destination(val id: String, val title: String, val icon: ImageVector)
 private val destinations = listOf(
@@ -118,6 +119,7 @@ private object NoMotion: MotionDurationScale { override val scaleFactor = 0f }
                                 DropdownMenuItem(text = { Text("重命名对话") }, onClick = { menu = false; editDialog = "rename"; newValue = state.session?.title.orEmpty() }, enabled = !state.busy)
                                 DropdownMenuItem(text = { Text("从这里分叉") }, onClick = { menu = false; controller.fork() }, enabled = !state.busy)
                                 DropdownMenuItem(text = { Text("设置任务目标") }, onClick = { menu = false; editDialog = "goal"; newValue = state.session?.goal.orEmpty() }, enabled = !state.busy)
+                                DropdownMenuItem(text = { Text("压缩上下文") }, onClick = { menu = false; controller.compactContext() }, enabled = !state.busy && (state.session?.wire?.count { (it as? JsonObject)?.string("role") == "user" } ?: 0) >= 5)
                                 DropdownMenuItem(text = { Text("审查当前修改") }, onClick = { menu = false; draft = "审查当前项目的修改，先查看 Git 差异，再检查错误、回归和遗漏，给出带文件位置的中文结论。" }, enabled = !state.busy)
                             }
                         }
