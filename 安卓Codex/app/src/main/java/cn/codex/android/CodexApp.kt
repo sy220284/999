@@ -48,6 +48,7 @@ private object NoMotion: MotionDurationScale { override val scaleFactor = 0f }
     var archived by rememberSaveable { mutableStateOf(false) }
     var projectDialog by remember { mutableStateOf(false) }
     var editDialog by remember { mutableStateOf("") }
+    var deleteTarget by remember { mutableStateOf<SessionSummary?>(null) }
     var menu by remember { mutableStateOf(false) }
     var newValue by remember { mutableStateOf("") }
     val scope = rememberCoroutineScope()
@@ -86,7 +87,10 @@ private object NoMotion: MotionDurationScale { override val scaleFactor = 0f }
                 val visible = state.sessions.filter { it.project == state.project && it.archived == archived && it.title.contains(search, true) }
                 LazyColumn(Modifier.weight(1f), contentPadding = PaddingValues(bottom = 12.dp)) {
                     items(visible, key = { it.id }) { s ->
-                        ListItem(headlineContent = { Text(s.title, maxLines = 1, overflow = TextOverflow.Ellipsis, style = MaterialTheme.typography.bodyMedium) }, leadingContent = { Icon(Icons.Outlined.ChatBubbleOutline, null, Modifier.size(17.dp)) }, trailingContent = { IconButton(onClick = { controller.archive(s.id) }, enabled = !state.busy) { Icon(if (s.archived) Icons.Outlined.Unarchive else Icons.Outlined.Archive, if (s.archived) "恢复会话" else "归档会话", Modifier.size(17.dp)) } }, colors = ListItemDefaults.colors(containerColor = if (state.session?.id == s.id && page == "chat") MaterialTheme.colorScheme.surfaceContainerHigh else MaterialTheme.colorScheme.surfaceContainerLow), modifier = Modifier.clip(RoundedCornerShape(12.dp)).clickable(enabled = !state.busy) { controller.openSession(s.id); navigate("chat") })
+                        ListItem(headlineContent = { Text(s.title, maxLines = 1, overflow = TextOverflow.Ellipsis, style = MaterialTheme.typography.bodyMedium) }, leadingContent = { Icon(Icons.Outlined.ChatBubbleOutline, null, Modifier.size(17.dp)) }, trailingContent = { Row(verticalAlignment = Alignment.CenterVertically) {
+                            IconButton(onClick = { controller.archive(s.id) }, enabled = !state.busy) { Icon(if (s.archived) Icons.Outlined.Unarchive else Icons.Outlined.Archive, if (s.archived) "恢复会话" else "归档会话", Modifier.size(17.dp)) }
+                            IconButton(onClick = { deleteTarget = s }, enabled = !state.busy) { Icon(Icons.Outlined.DeleteOutline, "删除会话", Modifier.size(17.dp)) }
+                        } }, colors = ListItemDefaults.colors(containerColor = if (state.session?.id == s.id && page == "chat") MaterialTheme.colorScheme.surfaceContainerHigh else MaterialTheme.colorScheme.surfaceContainerLow), modifier = Modifier.clip(RoundedCornerShape(12.dp)).clickable(enabled = !state.busy) { controller.openSession(s.id); navigate("chat") })
                     }
                     if (visible.isEmpty()) item { Text("${if (archived) "还没有归档" else "从一个想法开始"}", Modifier.padding(16.dp), color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodyMedium) }
                 }
@@ -148,6 +152,11 @@ private object NoMotion: MotionDurationScale { override val scaleFactor = 0f }
         else ModalNavigationDrawer(drawerState = drawer, gesturesEnabled = drawer.isOpen, drawerContent = { ModalDrawerSheet(drawerContainerColor = MaterialTheme.colorScheme.surfaceContainerLow) { side() } }) { content() }
     }
     state.approval?.let { approval -> ApprovalSheet(approval, controller::decide) }
+    deleteTarget?.let { target ->
+        AlertDialog(onDismissRequest = { deleteTarget = null }, title = { Text("删除会话？") }, text = { Text("将永久删除「${target.title}」的会话记录。已修改的项目文件不会删除。") }, confirmButton = {
+            TextButton(onClick = { controller.deleteSession(target.id); deleteTarget = null }, enabled = !state.busy) { Text("确认删除") }
+        }, dismissButton = { TextButton(onClick = { deleteTarget = null }) { Text("取消") } })
+    }
     if (projectDialog) AlertDialog(onDismissRequest = { projectDialog = false }, title = { Text("项目") }, text = {
         Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
             state.projects.forEach { p -> TextButton(onClick = { controller.newSession(p); projectDialog = false; page = "chat" }, enabled = !state.busy, modifier = Modifier.fillMaxWidth()) { Icon(Icons.Outlined.Folder, null); Spacer(Modifier.width(12.dp)); Text(p, Modifier.weight(1f), maxLines = 1) } }

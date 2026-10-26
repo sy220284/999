@@ -56,6 +56,14 @@ class RuntimeController(private val context: Context) {
     }
     fun openSession(id: String) { if (!state.value.busy) scope.launch { runSuspendCatching { withContext(Dispatchers.IO) { store.load(id) } }.onSuccess { s -> mutable.update { it.copy(session = s, project = s.project, stream = "", thinking = "", error = null, attachments = emptyList(), changes = emptyList()) }; attachmentInputs.clear(); mutable.update { it.copy(changes = changeStore.list(s.project)) } }.onFailure { fail(it.message ?: "会话读取失败") } } }
     fun archive(id: String) = scope.launch { if (!state.value.busy) runSuspendCatching { withContext(Dispatchers.IO) { val s = store.load(id); store.save(s.copy(archived = !s.archived)) }; refresh() }.onFailure { fail(it.message.orEmpty()) } }
+    fun deleteSession(id: String) = scope.launch {
+        if (state.value.busy) return@launch
+        runSuspendCatching {
+            withContext(Dispatchers.IO) { store.delete(id) }
+            if (state.value.session?.id == id) newSession(state.value.project)
+            refresh()
+        }.onFailure { fail("删除会话失败：${it.message}") }
+    }
     fun fork() = scope.launch { if (!state.value.busy) state.value.session?.let { s -> withContext(Dispatchers.IO) { store.save(s); store.fork(s.id) }.let { mutable.update { old -> old.copy(session = it) }; refresh() } } }
     fun rename(title: String) = updateSession { it.copy(title = title.trim().ifBlank { "新对话" }) }
     fun goal(goal: String) = updateSession { it.copy(goal = goal) }

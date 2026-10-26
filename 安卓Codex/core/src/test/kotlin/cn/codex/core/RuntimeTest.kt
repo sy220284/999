@@ -60,6 +60,18 @@ class RuntimeTest {
         assertTrue(big.output.length <= 1024)
     }
 
+    @Test fun `deleting a session updates the index and does not touch other sessions`() {
+        val store = SessionStore(Files.createTempDirectory("delete-sessions").toFile())
+        val original = Session(project = "项目", title = "保留")
+        val doomed = Session(project = "项目", title = "删除")
+        store.save(original)
+        store.save(doomed)
+        store.delete(doomed.id)
+        assertEquals(listOf(original.id), store.list(includeArchived = true).map { it.id })
+        assertEquals("保留", store.load(original.id).title)
+        assertFails { store.load(doomed.id) }
+    }
+
     @Test fun `session fork and archive persist without changing original`() {
         val store = SessionStore(Files.createTempDirectory("sessions").toFile())
         val s = Session(project = "默认项目", title = "测试", messages = listOf(Message(role = "user", text = "你好")))

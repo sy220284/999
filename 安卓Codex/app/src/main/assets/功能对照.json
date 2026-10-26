@@ -26,8 +26,8 @@
   },
   {
     "method": "thread/delete",
-    "status": "待移植",
-    "detail": "尚未实现，不能视为 Android 本身不支持"
+    "status": "安卓等价实现",
+    "detail": "永久删除会话前由用户确认，不删除项目文件"
   },
   {
     "method": "thread/unsubscribe",

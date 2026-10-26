@@ -27,8 +27,14 @@ class SessionStore(private val directory: File) {
     @Synchronized fun fork(id: String): Session = load(id).copy(id = java.util.UUID.randomUUID().toString(), title = load(id).title + " · 分支", archived = false, updated = System.currentTimeMillis()).also(::save)
     @Synchronized fun delete(id: String) {
         require(id.matches(Regex("[a-zA-Z0-9-]+")))
-        check(File(directory, "$id.json").delete()) { "删除会话失败" }
-        atomic(index, codec.encodeToString(summaries().filterNot { it.id == id }))
+        val target = File(directory, "$id.json")
+        require(target.isFile) { "会话不存在" }
+        val original = summaries()
+        atomic(index, codec.encodeToString(original.filterNot { it.id == id }))
+        if (!target.delete()) {
+            atomic(index, codec.encodeToString(original))
+            error("删除会话失败")
+        }
     }
     private fun atomic(file: File, text: String) {
         val temp = File.createTempFile("session-", ".tmp", directory)
