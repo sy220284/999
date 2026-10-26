@@ -15,6 +15,7 @@ data class ScreenState(
     val sessions: List<SessionSummary> = emptyList(), val projects: List<String> = emptyList(),
     val project: String = "默认项目", val busy: Boolean = false, val canSteer: Boolean = false, val stream: String = "",
     val thinking: String = "", val tool: String = "", val terminal: String = "",
+    val interactiveTerminal: Boolean = false,
     val approval: Approval? = null, val error: String? = null, val usage: String = "",
     val changes: List<FileChange> = emptyList(), val attachments: List<String> = emptyList()
 )
@@ -31,6 +32,7 @@ class RuntimeController(private val context: Context) {
     private var active: Job? = null
     private var answer: CompletableDeferred<Boolean>? = null
     private var shell: ShellRunner? = null
+    private var interactive: NativePty.Session? = null
     private val attachmentInputs = mutableListOf<JsonObject>()
     init {
         scope.launch {
@@ -52,6 +54,7 @@ class RuntimeController(private val context: Context) {
     fun newSession(project: String = state.value.project) {
         if (state.value.busy) return
         workspace(project)
+        if (project != state.value.project) closeInteractiveTerminal()
         mutable.update { it.copy(project = project, session = Session(project = project), stream = "", thinking = "", error = null, attachments = emptyList(), changes = emptyList()) }
         attachmentInputs.clear()
         scope.launch { val p = state.value.project; val changes = withContext(Dispatchers.IO) { changeStore.list(p) }; mutable.update { it.copy(changes = changes) }; refresh() }
@@ -179,6 +182,56 @@ class RuntimeController(private val context: Context) {
             active = null
             mutable.update { it.copy(busy = false, canSteer = false, approval = null, tool = "") }
         }
+    }
+    private val controlSequences = Regex("\\u001B\\[[0-9;?]*[ -/]*[@-~]")
+    fun startInteractiveTerminal() {
+        if (state.value.busy || interactive != null) return
+        val project = state.value.project
+        scope.launch {
+            runSuspendCatching {
+                withContext(Dispatchers.IO) { NativePty.start(workspace(project).root) }
+            }.onSuccess { pty ->
+                interactive = pty
+                mutable.update { it.copy(interactiveTerminal = true, terminal = "已连接当前项目的交互式终端。\\n") }
+                scope.launch(Dispatchers.IO) {
+                    try {
+                        val buffer = ByteArray(4096)
+                        while (true) {
+                            val count = pty.input.read(buffer)
+                            if (count < 0) break
+                            val cleaned = controlSequences.replace(String(buffer, 0, count, Charsets.UTF_8), "").replace("\\r", "")
+                            mutable.update { it.copy(terminal = (it.terminal + cleaned).takeLast(256 * 1024)) }
+                        }
+                    } catch (e: java.io.IOException) {
+                        if (interactive === pty) fail("终端连接中断：${e.message}")
+                    } finally {
+                        pty.close()
+                        if (interactive === pty) {
+                            interactive = null
+                            mutable.update { it.copy(interactiveTerminal = false) }
+                        }
+                    }
+                }
+            }.onFailure { fail("启动交互式终端失败：${it.message}") }
+        }
+    }
+    fun writeInteractiveTerminal(text: String) {
+        val pty = interactive ?: return
+        scope.launch(Dispatchers.IO) {
+            runCatching { pty.send(text) }.onFailure { fail("终端写入失败：${it.message}") }
+        }
+    }
+    fun resizeInteractiveTerminal(rows: Int, columns: Int) {
+        val pty = interactive ?: return
+        scope.launch(Dispatchers.IO) {
+            runCatching { pty.resize(rows, columns) }.onFailure { fail("终端调整尺寸失败：${it.message}") }
+        }
+    }
+    fun closeInteractiveTerminal() {
+        val pty = interactive ?: return
+        interactive = null
+        mutable.update { it.copy(interactiveTerminal = false) }
+        scope.launch(Dispatchers.IO) { pty.close() }
     }
     fun stop() { answer?.cancel(); shell?.stop(); active?.cancel() }
     suspend fun writeFile(path: String, text: String, project: String = state.value.project, expectedContent: String? = null) = withContext(Dispatchers.IO) {

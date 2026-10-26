@@ -115,14 +115,25 @@ fun formatSize(size: Long) = when { size < 1024 -> "$size B"; size < 1024 * 1024
     }
     undo?.let { change -> AlertDialog(onDismissRequest = { undo = null }, title = { Text("撤销修改？") }, text = { Text("${change.path}\n文件若已再次变化，撤销会停止，避免覆盖后续编辑。") }, confirmButton = { TextButton(onClick = { scope.launch { runSuspendCatching { controller.undo(change) }.onFailure { controller.fail("撤销失败：${it.message}") }; undo = null } }) { Text("撤销") } }, dismissButton = { TextButton(onClick = { undo = null }) { Text("取消") } }) }
 }
-@Composable fun TerminalScreen(state: ScreenState, send: (String) -> Unit) {
+@Composable fun TerminalScreen(state: ScreenState, controller: RuntimeController, send: (String) -> Unit) {
     var command by rememberSaveable { mutableStateOf("") }
     Column(Modifier.fillMaxSize().imePadding().padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-        Text("手机自带 shell", style = MaterialTheme.typography.titleLarge)
+        Text("手机本机终端", style = MaterialTheme.typography.titleLarge)
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            if (!state.interactiveTerminal) Button(onClick = controller::startInteractiveTerminal, enabled = !state.busy) { Text("开启交互终端") }
+            else {
+                OutlinedButton(onClick = controller::closeInteractiveTerminal) { Text("关闭终端") }
+                TextButton(onClick = { controller.writeInteractiveTerminal("\\u0003") }) { Text("Ctrl+C") }
+                TextButton(onClick = { controller.resizeInteractiveTerminal(40, 100) }) { Text("宽屏 100 列") }
+            }
+        }
         Text("在当前项目目录执行命令。可用命令取决于手机系统；不自带 Python、Node 或完整 Linux 环境。", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
         Surface(Modifier.weight(1f).fillMaxWidth(), color = MaterialTheme.colorScheme.surfaceContainerLow, shape = RoundedCornerShape(16.dp)) { SelectionContainer { Text(state.terminal.ifBlank { "命令输出会显示在这里。" }, Modifier.verticalScroll(rememberScrollState()).horizontalScroll(rememberScrollState()).padding(16.dp), fontFamily = FontFamily.Monospace, fontSize = 13.sp, lineHeight = 21.sp) } }
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) { listOf("pwd", "ls -la", "uname -a").forEach { text -> SuggestionChip(onClick = { command = text }, label = { Text(text, fontFamily = FontFamily.Monospace) }, enabled = !state.busy) } }
         OutlinedTextField(command, { command = it }, modifier = Modifier.fillMaxWidth(), label = { Text("输入命令") }, minLines = 2, maxLines = 5, shape = RoundedCornerShape(14.dp))
-        Button(onClick = { send(command) }, enabled = command.isNotBlank() && !state.busy, modifier = Modifier.fillMaxWidth().height(50.dp)) { Icon(Icons.Outlined.PlayArrow, null); Spacer(Modifier.width(8.dp)); Text("确认并执行") }
+        Button(onClick = {
+            if (state.interactiveTerminal) { controller.writeInteractiveTerminal(command + "\\n"); command = "" }
+            else send(command)
+        }, enabled = command.isNotBlank() && (state.interactiveTerminal || !state.busy), modifier = Modifier.fillMaxWidth().height(50.dp)) { Icon(Icons.Outlined.PlayArrow, null); Spacer(Modifier.width(8.dp)); Text(if (state.interactiveTerminal) "发送到当前终端" else "确认并执行") }
     }
 }

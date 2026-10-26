@@ -140,7 +140,7 @@ private object NoMotion: MotionDurationScale { override val scaleFactor = 0f }
                             })
                             "files" -> FilesScreen(controller, state)
                             "changes" -> ChangesScreen(controller, state)
-                            "terminal" -> TerminalScreen(state) { send(it, true) }
+                            "terminal" -> TerminalScreen(state, controller) { send(it, true) }
                             "settings" -> SettingsScreen(controller, state)
                             "skills" -> SkillsScreen(controller, state)
                             "mcp" -> McpScreen(controller)

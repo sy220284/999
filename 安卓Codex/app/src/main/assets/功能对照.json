@@ -466,8 +466,8 @@
   },
   {
     "method": "command/exec/write",
-    "status": "待移植",
-    "detail": "尚未实现，不能视为 Android 本身不支持"
+    "status": "安卓等价实现",
+    "detail": "Android 原生 PTY 交互式 shell，支持标准输入、尺寸调整和停止；纯文本显示，未提供原版 JSON-RPC 协议或完整终端仿真"
   },
   {
     "method": "command/exec/terminate",
@@ -476,8 +476,8 @@
   },
   {
     "method": "command/exec/resize",
-    "status": "待移植",
-    "detail": "Android 可以实现 PTY；本项目尚未实现交互终端及窗口尺寸调整"
+    "status": "安卓等价实现",
+    "detail": "Android 原生 PTY 交互式 shell，支持标准输入、尺寸调整和停止；纯文本显示，未提供原版 JSON-RPC 协议或完整终端仿真"
   },
   {
     "method": "config/read",

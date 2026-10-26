@@ -6,6 +6,9 @@
 #include <signal.h>
 #include <fcntl.h>
 #include <errno.h>
+#include <stdlib.h>
+#include <termios.h>
+#include <sys/ioctl.h>
 
 JNIEXPORT jintArray JNICALL Java_cn_codex_android_NativeShell_spawn(JNIEnv *env, jobject self, jstring command, jstring directory) {
     (void)self;
@@ -57,6 +60,65 @@ JNIEXPORT void JNICALL Java_cn_codex_android_NativeShell_killGroup(JNIEnv *env, 
     (void)env; (void)self;
     kill(-pid, SIGKILL);
     // SIGKILL 后回收直接子进程；若已被 poll 回收，waitpid 返回 ECHILD。
+    int status;
+    while (waitpid(pid, &status, 0) < 0 && errno == EINTR) {}
+}
+
+/* Android 交互终端：/dev/ptmx -> /dev/pts/N，独立会话、前台控制终端。 */
+JNIEXPORT jintArray JNICALL Java_cn_codex_android_NativePty_openSession(JNIEnv *env, jobject self, jstring directory, jint rows, jint columns) {
+    (void)self;
+    const char *cwd = (*env)->GetStringUTFChars(env, directory, 0);
+    int master = posix_openpt(O_RDWR | O_NOCTTY | O_CLOEXEC);
+    if (master < 0 || grantpt(master) != 0 || unlockpt(master) != 0) {
+        if (master >= 0) close(master);
+        (*env)->ReleaseStringUTFChars(env, directory, cwd);
+        (*env)->ThrowNew(env, (*env)->FindClass(env, "java/io/IOException"), "无法打开安卓 PTY");
+        return NULL;
+    }
+    char slave_name[128];
+    if (ptsname_r(master, slave_name, sizeof(slave_name)) != 0) {
+        close(master);
+        (*env)->ReleaseStringUTFChars(env, directory, cwd);
+        (*env)->ThrowNew(env, (*env)->FindClass(env, "java/io/IOException"), "无法确定 PTY 设备");
+        return NULL;
+    }
+    struct winsize size = { (unsigned short)rows, (unsigned short)columns, 0, 0 };
+    pid_t pid = fork();
+    if (pid == 0) {
+        if (setsid() < 0) _exit(126);
+        int slave = open(slave_name, O_RDWR);
+        if (slave < 0 || ioctl(slave, TIOCSCTTY, 0) < 0 || ioctl(slave, TIOCSWINSZ, &size) < 0) _exit(126);
+        if (dup2(slave, STDIN_FILENO) < 0 || dup2(slave, STDOUT_FILENO) < 0 || dup2(slave, STDERR_FILENO) < 0) _exit(126);
+        if (slave > STDERR_FILENO) close(slave);
+        close(master);
+        if (chdir(cwd) != 0) _exit(126);
+        setenv("TERM", "dumb", 1);
+        char *const argv[] = {"sh", "-i", NULL};
+        execv("/system/bin/sh", argv);
+        _exit(127);
+    }
+    (*env)->ReleaseStringUTFChars(env, directory, cwd);
+    if (pid < 0) {
+        close(master);
+        (*env)->ThrowNew(env, (*env)->FindClass(env, "java/io/IOException"), "无法创建 PTY 进程");
+        return NULL;
+    }
+    ioctl(master, TIOCSWINSZ, &size);
+    jint result[2] = {(jint)pid, (jint)master};
+    jintArray array = (*env)->NewIntArray(env, 2);
+    (*env)->SetIntArrayRegion(env, array, 0, 2, result);
+    return array;
+}
+
+JNIEXPORT void JNICALL Java_cn_codex_android_NativePty_resizeFd(JNIEnv *env, jobject self, jint fd, jint pid, jint rows, jint columns) {
+    (void)env; (void)self;
+    struct winsize size = {(unsigned short)rows, (unsigned short)columns, 0, 0};
+    if (ioctl(fd, TIOCSWINSZ, &size) == 0) kill(-pid, SIGWINCH);
+}
+
+JNIEXPORT void JNICALL Java_cn_codex_android_NativePty_terminateGroup(JNIEnv *env, jobject self, jint pid) {
+    (void)env; (void)self;
+    kill(-pid, SIGKILL);
     int status;
     while (waitpid(pid, &status, 0) < 0 && errno == EINTR) {}
 }
