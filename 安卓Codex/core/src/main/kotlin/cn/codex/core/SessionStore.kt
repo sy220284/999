@@ -12,7 +12,7 @@ class SessionStore(private val directory: File) {
     @Synchronized fun save(session: Session) {
         require(session.id.matches(Regex("[a-zA-Z0-9-]+")))
         atomic(File(directory, "${session.id}.json"), codec.encodeToString(session))
-        val summaries = summaries().filterNot { it.id == session.id } + SessionSummary(session.id, session.title, session.project, session.archived, session.updated)
+        val summaries = summaries().filterNot { it.id == session.id } + SessionSummary(session.id, session.title, session.project, session.archived, session.updated, session.sectionId)
         atomic(index, codec.encodeToString(summaries))
     }
     @Synchronized fun list(includeArchived: Boolean = false) = summaries().filter { includeArchived || !it.archived }.sortedByDescending { it.updated }

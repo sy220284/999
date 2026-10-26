@@ -345,6 +345,34 @@ class RuntimeTest {
         }
     }
 
+
+    @Test fun `section CRUD and session assignment survive persistence`() {
+        val dir = Files.createTempDirectory("session-sections").toFile()
+        val sections = SessionSectionStore(dir)
+        val store = SessionStore(dir)
+        val section = sections.create("项目一", "待审查")
+        assertEquals(1, sections.list("项目一").size)
+        assertTrue(sections.list("项目二").isEmpty())
+        val session = Session(project = "项目一", sectionId = section.id, title = "问题分析")
+        store.save(session)
+        assertEquals(section.id, SessionStore(dir).list().single().sectionId)
+        assertEquals(section.id, store.load(session.id).sectionId)
+        assertFails { sections.remove(section.id, store.list(includeArchived = true)) }
+        sections.rename(section.id, "已分析")
+        assertEquals("已分析", SessionSectionStore(dir).list("项目一").single().name)
+        store.save(store.load(session.id).copy(sectionId = null))
+        sections.remove(section.id, store.list(includeArchived = true))
+        assertTrue(sections.list("项目一").isEmpty())
+        assertEquals(1, store.list().size)
+    }
+
+    @Test fun `section names are unique within each project`() {
+        val sections = SessionSectionStore(Files.createTempDirectory("section-names").toFile())
+        sections.create("项目一", "重要")
+        assertFails { sections.create("项目一", "重要") }
+        assertEquals("重要", sections.create("项目二", "重要").name)
+    }
+
     @Test fun `change history never leaks across projects and survives restart`() {
         val dir = Files.createTempDirectory("changes").toFile()
         val store = ChangeStore(dir)

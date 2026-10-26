@@ -40,11 +40,12 @@ data class Session(
     val archived: Boolean = false,
     val goal: String = "",
     val consumedSteeringIds: List<String> = emptyList(),
-    val updated: Long = System.currentTimeMillis()
+    val updated: Long = System.currentTimeMillis(),
+    val sectionId: String? = null
 )
 
 @Serializable
-data class SessionSummary(val id: String, val title: String, val project: String, val archived: Boolean, val updated: Long)
+data class SessionSummary(val id: String, val title: String, val project: String, val archived: Boolean, val updated: Long, val sectionId: String? = null)
 @Serializable
 data class FileChange(val path: String, val before: String?, val after: String?)
 data class Approval(val title: String, val detail: String, val changes: List<FileChange> = emptyList(), val shell: Boolean = false)

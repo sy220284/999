@@ -12,7 +12,7 @@ import java.io.File
 // 前台服务持有任务；旋转、切换页面不会重建或重放正在执行的工作。
 data class ScreenState(
     val config: ApiConfig = ApiConfig(), val session: Session? = null,
-    val sessions: List<SessionSummary> = emptyList(), val projects: List<String> = emptyList(),
+    val sessions: List<SessionSummary> = emptyList(), val sections: List<SessionSection> = emptyList(), val projects: List<String> = emptyList(),
     val project: String = "默认项目", val busy: Boolean = false, val canSteer: Boolean = false, val stream: String = "",
     val thinking: String = "", val tool: String = "", val terminal: String = "",
     val interactiveTerminal: Boolean = false,
@@ -23,6 +23,7 @@ class RuntimeController(private val context: Context) {
     private val settings = SecureSettings(context)
     private val home = File(context.filesDir, "工作区").apply { mkdirs() }
     val store = SessionStore(File(context.filesDir, "会话"))
+    private val sectionStore = SessionSectionStore(File(context.filesDir, "会话"))
     private val changeStore = ChangeStore(File(context.filesDir, "修改历史"))
     private val steeringInbox = SteeringInbox(File(context.filesDir, "追加指令"))
     private val toolJournal = ToolAttemptJournal(File(context.filesDir, "工具执行日志"))
@@ -48,8 +49,11 @@ class RuntimeController(private val context: Context) {
         return Workspace(File(home, project))
     }
     suspend fun refresh() {
-        val data = withContext(Dispatchers.IO) { home.listFiles()?.filter { it.isDirectory }?.map { it.name }?.sorted().orEmpty() to store.list(includeArchived = true) }
-        mutable.update { it.copy(projects = data.first, sessions = data.second) }
+        val data = withContext(Dispatchers.IO) {
+            Triple(home.listFiles()?.filter { it.isDirectory }?.map { it.name }?.sorted().orEmpty(),
+                store.list(includeArchived = true), sectionStore.list())
+        }
+        mutable.update { it.copy(projects = data.first, sessions = data.second, sections = data.third) }
     }
     fun newSession(project: String = state.value.project) {
         if (state.value.busy) return
@@ -68,6 +72,34 @@ class RuntimeController(private val context: Context) {
             if (state.value.session?.id == id) newSession(state.value.project)
             refresh()
         }.onFailure { fail("删除会话失败：${it.message}") }
+    }
+    fun createSection(name: String) = scope.launch {
+        if (state.value.busy) return@launch
+        val project = state.value.project
+        runSuspendCatching { withContext(Dispatchers.IO) { sectionStore.create(project, name) } }
+            .onSuccess { refresh() }.onFailure { fail("创建分类失败：${it.message}") }
+    }
+    fun renameSection(id: String, name: String) = scope.launch {
+        if (state.value.busy) return@launch
+        runSuspendCatching { withContext(Dispatchers.IO) { sectionStore.rename(id, name) } }
+            .onSuccess { refresh() }.onFailure { fail("修改分类失败：${it.message}") }
+    }
+    fun deleteSection(id: String) = scope.launch {
+        if (state.value.busy) return@launch
+        runSuspendCatching { withContext(Dispatchers.IO) { sectionStore.remove(id, store.list(includeArchived = true)) } }
+            .onSuccess { refresh() }.onFailure { fail("删除分类失败：${it.message}") }
+    }
+    fun moveSession(id: String, sectionId: String?) = scope.launch {
+        if (state.value.busy) return@launch
+        runSuspendCatching {
+            val changed = withContext(Dispatchers.IO) {
+                val current = store.load(id)
+                if (sectionId != null) require(sectionStore.list(current.project).any { it.id == sectionId }) { "目标分类不属于当前项目" }
+                current.copy(sectionId = sectionId, updated = System.currentTimeMillis()).also { store.save(it) }
+            }
+            mutable.update { old -> if (old.session?.id == id) old.copy(session = changed) else old }
+            refresh()
+        }.onFailure { fail("移动会话失败：${it.message}") }
     }
     fun fork() = scope.launch { if (!state.value.busy) state.value.session?.let { s -> withContext(Dispatchers.IO) { store.save(s); store.fork(s.id) }.let { mutable.update { old -> old.copy(session = it) }; refresh() } } }
     fun rename(title: String) = updateSession { it.copy(title = title.trim().ifBlank { "新对话" }) }

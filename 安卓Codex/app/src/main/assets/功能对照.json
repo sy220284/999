@@ -81,8 +81,8 @@
   },
   {
     "method": "thread/section/move",
-    "status": "待移植",
-    "detail": "尚未实现，不能视为 Android 本身不支持"
+    "status": "安卓等价实现",
+    "detail": "按项目分类移动会话，持久化 sectionId，中文界面入口；非上游 RPC"
   },
   {
     "method": "thread/unarchive",
@@ -116,23 +116,23 @@
   },
   {
     "method": "threadSection/list",
-    "status": "待移植",
-    "detail": "尚未实现，不能视为 Android 本身不支持"
+    "status": "安卓等价实现",
+    "detail": "显示当前项目的持久化会话分类"
   },
   {
     "method": "threadSection/create",
-    "status": "待移植",
-    "detail": "尚未实现，不能视为 Android 本身不支持"
+    "status": "安卓等价实现",
+    "detail": "创建项目分类，禁止重名"
   },
   {
     "method": "threadSection/update",
-    "status": "待移植",
-    "detail": "尚未实现，不能视为 Android 本身不支持"
+    "status": "安卓等价实现",
+    "detail": "重命名已存在分类，禁止重名"
   },
   {
     "method": "threadSection/delete",
-    "status": "待移植",
-    "detail": "尚未实现，不能视为 Android 本身不支持"
+    "status": "安卓等价实现",
+    "detail": "分类删除前检查其下没有会话，不会误删聊天历史"
   },
   {
     "method": "thread/loaded/list",

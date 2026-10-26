@@ -50,6 +50,11 @@ private object NoMotion: MotionDurationScale { override val scaleFactor = 0f }
     var projectDialog by remember { mutableStateOf(false) }
     var editDialog by remember { mutableStateOf("") }
     var deleteTarget by remember { mutableStateOf<SessionSummary?>(null) }
+    var moveTarget by remember { mutableStateOf<SessionSummary?>(null) }
+    var sectionManager by remember { mutableStateOf(false) }
+    var renameSectionTarget by remember { mutableStateOf<SessionSection?>(null) }
+    var newSectionName by remember { mutableStateOf("") }
+    var selectedSection by rememberSaveable(state.project) { mutableStateOf("") }
     var menu by remember { mutableStateOf(false) }
     var newValue by remember { mutableStateOf("") }
     val scope = rememberCoroutineScope()
@@ -85,11 +90,26 @@ private object NoMotion: MotionDurationScale { override val scaleFactor = 0f }
                 }
                 OutlinedTextField(search, { search = it }, placeholder = { Text("搜索会话标题") }, leadingIcon = { Icon(Icons.Outlined.Search, null, Modifier.size(18.dp)) }, singleLine = true, shape = RoundedCornerShape(14.dp), modifier = Modifier.fillMaxWidth())
                 Spacer(Modifier.height(8.dp))
-                val visible = state.sessions.filter { it.project == state.project && it.archived == archived && it.title.contains(search, true) }
+                Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                    Text("会话分类", style = MaterialTheme.typography.labelMedium, modifier = Modifier.weight(1f), color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    TextButton(onClick = { sectionManager = true; newSectionName = "" }, enabled = !state.busy) { Text("管理分类") }
+                }
+                val sections = state.sections.filter { it.project == state.project }
+                LazyRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                    item { FilterChip(selected = selectedSection == "", onClick = { selectedSection = "" }, label = { Text("全部") }) }
+                    item { FilterChip(selected = selectedSection == "__ungrouped__", onClick = { selectedSection = "__ungrouped__" }, label = { Text("未分类") }) }
+                    items(sections, key = { it.id }) { section ->
+                        FilterChip(selected = selectedSection == section.id, onClick = { selectedSection = section.id }, label = { Text(section.name, maxLines = 1) })
+                    }
+                }
+                val visible = state.sessions.filter { it.project == state.project && it.archived == archived && it.title.contains(search, true) && (
+                    selectedSection == "" || (selectedSection == "__ungrouped__" && it.sectionId == null) || selectedSection == it.sectionId
+                ) }
                 LazyColumn(Modifier.weight(1f), contentPadding = PaddingValues(bottom = 12.dp)) {
                     items(visible, key = { it.id }) { s ->
                         ListItem(headlineContent = { Text(s.title, maxLines = 1, overflow = TextOverflow.Ellipsis, style = MaterialTheme.typography.bodyMedium) }, leadingContent = { Icon(Icons.Outlined.ChatBubbleOutline, null, Modifier.size(17.dp)) }, trailingContent = { Row(verticalAlignment = Alignment.CenterVertically) {
                             IconButton(onClick = { controller.archive(s.id) }, enabled = !state.busy) { Icon(if (s.archived) Icons.Outlined.Unarchive else Icons.Outlined.Archive, if (s.archived) "恢复会话" else "归档会话", Modifier.size(17.dp)) }
+                            IconButton(onClick = { moveTarget = s }, enabled = !state.busy) { Icon(Icons.Outlined.FolderOpen, "移动到分类", Modifier.size(17.dp)) }
                             IconButton(onClick = { deleteTarget = s }, enabled = !state.busy) { Icon(Icons.Outlined.DeleteOutline, "删除会话", Modifier.size(17.dp)) }
                         } }, colors = ListItemDefaults.colors(containerColor = if (state.session?.id == s.id && page == "chat") MaterialTheme.colorScheme.surfaceContainerHigh else MaterialTheme.colorScheme.surfaceContainerLow), modifier = Modifier.clip(RoundedCornerShape(12.dp)).clickable(enabled = !state.busy) { controller.openSession(s.id); navigate("chat") })
                     }
@@ -154,6 +174,34 @@ private object NoMotion: MotionDurationScale { override val scaleFactor = 0f }
         else ModalNavigationDrawer(drawerState = drawer, gesturesEnabled = drawer.isOpen, drawerContent = { ModalDrawerSheet(drawerContainerColor = MaterialTheme.colorScheme.surfaceContainerLow) { side() } }) { content() }
     }
     state.approval?.let { approval -> ApprovalSheet(approval, controller::decide) }
+    moveTarget?.let { target ->
+        AlertDialog(onDismissRequest = { moveTarget = null }, title = { Text("移动到分类") }, text = {
+            Column {
+                TextButton(onClick = { controller.moveSession(target.id, null); moveTarget = null }) { Text("未分类") }
+                state.sections.filter { it.project == target.project }.forEach { section ->
+                    TextButton(onClick = { controller.moveSession(target.id, section.id); moveTarget = null }) { Text(section.name) }
+                }
+            }
+        }, confirmButton = { TextButton(onClick = { moveTarget = null }) { Text("取消") } })
+    }
+    if (sectionManager) AlertDialog(onDismissRequest = { sectionManager = false }, title = { Text("管理会话分类") }, text = {
+        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            OutlinedTextField(newSectionName, { newSectionName = it }, label = { Text("新分类名称") }, singleLine = true)
+            state.sections.filter { it.project == state.project }.forEach { section ->
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text(section.name, Modifier.weight(1f))
+                    IconButton(onClick = { renameSectionTarget = section; newValue = section.name; sectionManager = false }) { Icon(Icons.Outlined.Edit, "重命名分类") }
+                    IconButton(onClick = { controller.deleteSection(section.id) }, enabled = !state.busy) { Icon(Icons.Outlined.DeleteOutline, "删除分类") }
+                }
+            }
+            Text("分类下仍有会话时，需先将会话移出才可删除。", color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.labelSmall)
+        }
+    }, confirmButton = { TextButton(onClick = { controller.createSection(newSectionName); newSectionName = "" }, enabled = newSectionName.isNotBlank() && !state.busy) { Text("新建分类") } }, dismissButton = { TextButton(onClick = { sectionManager = false }) { Text("关闭") } })
+    renameSectionTarget?.let { section ->
+        AlertDialog(onDismissRequest = { renameSectionTarget = null }, title = { Text("重命名分类") }, text = {
+            OutlinedTextField(newValue, { newValue = it }, singleLine = true, label = { Text("分类名称") })
+        }, confirmButton = { TextButton(onClick = { controller.renameSection(section.id, newValue); renameSectionTarget = null }, enabled = newValue.isNotBlank() && !state.busy) { Text("保存") } }, dismissButton = { TextButton(onClick = { renameSectionTarget = null }) { Text("取消") } })
+    }
     deleteTarget?.let { target ->
         AlertDialog(onDismissRequest = { deleteTarget = null }, title = { Text("删除会话？") }, text = { Text("将永久删除「${target.title}」的会话记录。已修改的项目文件不会删除。") }, confirmButton = {
             TextButton(onClick = { controller.deleteSession(target.id); deleteTarget = null }, enabled = !state.busy) { Text("确认删除") }
