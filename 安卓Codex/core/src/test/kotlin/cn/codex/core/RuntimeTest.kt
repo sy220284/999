@@ -256,6 +256,53 @@ class RuntimeTest {
         }
     }
 
+
+    @Test fun `binary copy and recursive directory copy stay inside the workspace`() {
+        val fs = workspace()
+        fs.resolve("原始").mkdirs()
+        val bytes = byteArrayOf(0, 1, 2, -1, 127)
+        fs.resolve("原始/资源.bin").writeBytes(bytes)
+        fs.copyPath("原始", "副本")
+        assertContentEquals(bytes, fs.resolve("副本/资源.bin").readBytes())
+        assertFails { fs.copyPath("原始", "原始/子目录") }
+        assertFails { fs.copyPath("../", "错误") }
+        assertFails { fs.copyPath("原始", "副本") }
+    }
+
+    @Test fun `copy rejects symbolic links and leaves no partially copied directory`() {
+        val fs = workspace()
+        fs.resolve("源").mkdirs()
+        fs.resolve("源/普通.txt").writeText("文本")
+        val outside = Files.createTempFile("outside", ".txt")
+        Files.createSymbolicLink(fs.resolve("源/链接").toPath(), outside)
+        assertFails { fs.copyPath("源", "目标") }
+        assertFalse(fs.resolve("目标").exists())
+    }
+
+    @Test fun `recursive removal requires explicit flag and cannot remove project root`() {
+        val fs = workspace()
+        fs.resolve("待删除").mkdirs()
+        fs.write("待删除/文件", "内容")
+        assertFails { fs.removePath("待删除") }
+        assertFails { fs.removePath(". ", recursive = true) }
+        assertFails { fs.removePath(".", recursive = true) }
+        assertEquals("内容", fs.read("待删除/文件"))
+        fs.removePath("待删除", recursive = true)
+        assertFalse(fs.resolve("待删除").exists())
+    }
+
+    @Test fun `tool denied copy and delete have no side effects`() = runBlocking<Unit> {
+        val fs = workspace()
+        fs.write("a", "安全")
+        val tools = LocalTools(fs, ShellRunner("/bin/sh", fs.root))
+        val copy = ToolCall("copy-1", "copy_path", obj("source" to "a", "destination" to "b"))
+        val del = ToolCall("delete-1", "remove_path", obj("path" to "a"))
+        assertTrue(tools.execute(copy, { false }, {}).contains("拒绝"))
+        assertTrue(tools.execute(del, { false }, {}).contains("拒绝"))
+        assertEquals("安全", fs.read("a"))
+        assertFalse(fs.resolve("b").exists())
+    }
+
     @Test fun `change history never leaks across projects and survives restart`() {
         val dir = Files.createTempDirectory("changes").toFile()
         val store = ChangeStore(dir)

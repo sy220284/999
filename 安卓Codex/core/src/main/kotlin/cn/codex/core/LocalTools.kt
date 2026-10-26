@@ -23,7 +23,10 @@ class LocalTools(
         spec("search_files", "搜索项目文件名和文本内容，最多返回 200 处", "query" to "string", "content" to "boolean", required = listOf("query")),
         spec("write_file", "写入 UTF-8 文件。向用户展示差异并获得批准后才生效", "path" to "string", "content" to "string"),
         spec("apply_patch", "修改项目文件。使用 *** Begin Patch / *** Add File: / *** Update File: / *** Delete File: / @@ / +/-/空格 / *** End Patch 格式；不支持 Move to", "patch" to "string"),
-        spec("delete_file", "获得用户批准后删除一个文件", "path" to "string"),
+        spec("delete_file", "获得用户批准后删除一个文本文件", "path" to "string"),
+        spec("stat_path", "获取项目文件或目录的存在状态、类型、大小和修改时间", "path" to "string"),
+        spec("copy_path", "在项目内复制文件或整个目录，支持二进制内容；需要用户批准，目标不能存在", "source" to "string", "destination" to "string"),
+        spec("remove_path", "删除项目内文件或目录，非空目录必须显式 recursive=true；需要用户批准", "path" to "string", "recursive" to "boolean", required = listOf("path")),
         spec("shell", "在手机应用权限内执行 /system/bin/sh 命令。没有 Linux 桌面沙箱，不能假设安装了 git/python/node。执行前需用户批准", "command" to "string", "timeout_seconds" to "integer", required = listOf("command")),
         spec("update_plan", "更新工作计划，使用简洁中文说明步骤、当前状态", "plan" to "string"),
         spec("list_skills", "列出项目内 技能/ 或 .agents/skills/ 中的 SKILL.md", required = emptyList()),
@@ -41,6 +44,23 @@ class LocalTools(
                 "write_file" -> apply(listOf(fs.previewWrite(path, a.string("content"))), approve)
                 "apply_patch" -> apply(fs.previewPatch(a.string("patch")), approve)
                 "delete_file" -> { require(fs.resolve(path).isFile) { "文件不存在" }; apply(listOf(fs.previewWrite(path, null)), approve) }
+                "stat_path" -> fs.metadata(path).let { "路径：${it.path}\n类型：${if (it.directory) "目录" else "文件"}\n大小：${it.size} 字节\n修改时间戳：${it.modified}" }
+                "copy_path" -> {
+                    val source = a.string("source")
+                    val target = a.string("destination")
+                    // 复制前校验来源和目标，审批后由 Workspace 再次校验并执行原子复制。
+                    fs.metadata(source)
+                    require(!fs.resolve(target).exists()) { "目标已存在" }
+                    if (!approve(Approval("确认复制项目内容", "$source → $target"))) "用户拒绝复制"
+                    else { fs.copyPath(source, target); "已复制：$source → $target" }
+                }
+                "remove_path" -> {
+                    val target = fs.metadata(path)
+                    val recursive = a["recursive"]?.jsonPrimitive?.booleanOrNull ?: false
+                    if (target.directory && !recursive && !fs.resolve(path).listFiles().isNullOrEmpty()) error("非空目录需显式 recursive=true")
+                    if (!approve(Approval("确认删除项目内容", "删除：$path\n类型：${if (target.directory) "目录" else "文件"}\n递归删除：$recursive"))) "用户拒绝删除"
+                    else { fs.removePath(path, recursive); "已删除：$path" }
+                }
                 "shell" -> {
                     val command = a.string("command")
                     if (!approve(Approval("执行手机命令", command, shell = true))) "用户拒绝执行命令"

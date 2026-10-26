@@ -3,6 +3,10 @@ package cn.codex.core
 import java.io.File
 import java.nio.file.Files
 import java.nio.file.StandardCopyOption
+import java.nio.file.Path
+import java.nio.file.SimpleFileVisitor
+import java.nio.file.FileVisitResult
+import java.nio.file.attribute.BasicFileAttributes
 
 /** 文件工具范围限制，不是内核级沙箱。shell 在 Android 应用 UID 权限内运行。 */
 class Workspace(val root: File, val maxTextBytes: Long = 2 * 1024 * 1024) {
@@ -79,7 +83,73 @@ class Workspace(val root: File, val maxTextBytes: Long = 2 * 1024 * 1024) {
         }
         return hits.joinToString("\n")
     }
+    fun metadata(path: String): FileEntry {
+        val file = resolve(path)
+        require(file.exists()) { "路径不存在：$path" }
+        return FileEntry(path.ifBlank { "." }, file.name, file.isDirectory, file.length(), file.lastModified())
+    }
+
+    /**
+     * 支持二进制文件和目录的原子复制。禁止目标覆盖与目录自包含。
+     * 写入同级临时路径并完成所有文件后才移动到最终目标。
+     */
+    fun copyPath(source: String, destination: String) {
+        val from = resolve(source)
+        val to = resolve(destination)
+        require(from.exists() && from != root.canonicalFile) { "源路径不存在或为项目根目录" }
+        require(!to.exists() && to != root.canonicalFile) { "目标已存在或为项目根目录" }
+        require(!to.toPath().startsWith(from.toPath())) { "目标不能位于源目录内" }
+        require(!Files.isSymbolicLink(from.toPath())) { "不能复制符号链接" }
+        val parent = to.parentFile
+        require(parent.isDirectory) { "目标父目录不存在" }
+        val temp = if (from.isDirectory) Files.createTempDirectory(parent.toPath(), ".codex-copy-").toFile()
+                   else Files.createTempFile(parent.toPath(), ".codex-copy-", ".tmp").toFile()
+        try {
+            if (from.isDirectory) {
+                Files.walkFileTree(from.toPath(), object : SimpleFileVisitor<Path>() {
+                    override fun preVisitDirectory(dir: Path, attrs: BasicFileAttributes): FileVisitResult {
+                        val relative = from.toPath().relativize(dir)
+                        Files.createDirectories(temp.toPath().resolve(relative))
+                        return FileVisitResult.CONTINUE
+                    }
+                    override fun visitFile(file: Path, attrs: BasicFileAttributes): FileVisitResult {
+                        require(attrs.isRegularFile && !Files.isSymbolicLink(file)) { "源目录包含符号链接或特殊文件" }
+                        val destinationFile = temp.toPath().resolve(from.toPath().relativize(file))
+                        Files.copy(file, destinationFile)
+                        return FileVisitResult.CONTINUE
+                    }
+                })
+            } else Files.copy(from.toPath(), temp.toPath(), StandardCopyOption.REPLACE_EXISTING)
+            require(!to.exists()) { "目标在复制期间发生变化" }
+            Files.move(temp.toPath(), to.toPath(), StandardCopyOption.ATOMIC_MOVE)
+        } finally {
+            if (temp.exists()) temp.deleteRecursively()
+        }
+    }
+
+    /**
+     * 删除文件或显式批准的目录。默认不递归，避免模型误删整个项目；
+     * 目录删除不跟随符号链接，绝不越过工作区。
+     */
+    fun removePath(path: String, recursive: Boolean = false) {
+        val target = resolve(path)
+        require(target != root.canonicalFile && target.exists()) { "不能删除项目根目录或不存在的路径" }
+        if (target.isDirectory) {
+            require(recursive || target.listFiles().isNullOrEmpty()) { "非空文件夹需要显式设置 recursive=true" }
+            Files.walkFileTree(target.toPath(), object : SimpleFileVisitor<Path>() {
+                override fun visitFile(file: Path, attrs: BasicFileAttributes): FileVisitResult {
+                    Files.delete(file)
+                    return FileVisitResult.CONTINUE
+                }
+                override fun postVisitDirectory(dir: Path, exc: java.io.IOException?): FileVisitResult {
+                    if (exc != null) throw exc
+                    Files.delete(dir)
+                    return FileVisitResult.CONTINUE
+                }
+            })
+        } else Files.delete(target.toPath())
+    }
     fun previewPatch(patch: String): List<FileChange> = PatchParser(this).parse(patch)
     fun applyPatch(patch: String) = commitAll(previewPatch(patch))
 }
-data class FileEntry(val path: String, val name: String, val directory: Boolean, val size: Long)
+data class FileEntry(val path: String, val name: String, val directory: Boolean, val size: Long, val modified: Long = 0)

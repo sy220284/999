@@ -115,7 +115,7 @@ import kotlinx.serialization.json.*
         else -> Column { AssistantLabel(); Spacer(Modifier.height(10.dp)); MarkdownText(message.text) }
     }
 }
-fun toolTitle(name: String) = mapOf("list_files" to "查看项目文件", "read_file" to "读取文件", "search_files" to "搜索项目", "write_file" to "写入文件", "apply_patch" to "应用文件修改", "delete_file" to "删除文件", "shell" to "执行本机命令", "git" to "Git 操作", "update_plan" to "工作计划", "mcp" to "扩展工具", "list_skills" to "查找技能", "read_skill" to "读取技能")[name] ?: name
+fun toolTitle(name: String) = mapOf("list_files" to "查看项目文件", "read_file" to "读取文件", "search_files" to "搜索项目", "write_file" to "写入文件", "apply_patch" to "应用文件修改", "delete_file" to "删除文件", "stat_path" to "查看文件信息", "copy_path" to "复制文件或目录", "remove_path" to "删除项目内容", "shell" to "执行本机命令", "git" to "Git 操作", "update_plan" to "工作计划", "mcp" to "扩展工具", "list_skills" to "查找技能", "read_skill" to "读取技能")[name] ?: name
 @Composable fun ExpandableCard(title: String, detail: String, icon: androidx.compose.ui.graphics.vector.ImageVector) {
     var open by remember { mutableStateOf(false) }
     Surface(color = MaterialTheme.colorScheme.surfaceContainerLow, shape = RoundedCornerShape(14.dp), border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)) {

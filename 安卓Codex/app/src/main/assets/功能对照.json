@@ -271,8 +271,8 @@
   },
   {
     "method": "fs/getMetadata",
-    "status": "部分适配",
-    "detail": "界面已有文件名、类型和大小；完整上游元数据字段尚未适配"
+    "status": "安卓等价实现",
+    "detail": "文件和目录的大小、类型、修改时间；本机工具 stat_path，无上游 RPC"
   },
   {
     "method": "fs/readDirectory",
@@ -281,13 +281,13 @@
   },
   {
     "method": "fs/remove",
-    "status": "待移植",
-    "detail": "尚未实现，不能视为 Android 本身不支持"
+    "status": "安卓等价实现",
+    "detail": "文件或目录删除审批；非空目录需 recursive=true，不支持根目录删除"
   },
   {
     "method": "fs/copy",
-    "status": "待移植",
-    "detail": "尚未实现，不能视为 Android 本身不支持"
+    "status": "安卓等价实现",
+    "detail": "二进制文件或目录原子复制；不覆盖已存在的目标；需用户审批"
   },
   {
     "method": "fs/watch",
