@@ -14,6 +14,7 @@ import androidx.compose.material.icons.automirrored.outlined.ArrowBack
 import androidx.compose.material.icons.outlined.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -33,9 +34,10 @@ import kotlinx.coroutines.*
     var loading by remember { mutableStateOf(true) }
     var revision by remember { mutableIntStateOf(0) }
     var query by rememberSaveable { mutableStateOf("") }
-    var selected by rememberSaveable(state.project) { mutableStateOf<String?>(null) }
-    var text by rememberSaveable { mutableStateOf("") }
-    var original by rememberSaveable { mutableStateOf("") }
+    val editor: FileEditorState = viewModel(key = "editor:${state.project}")
+    var selected by editor.selected
+    var text by editor.text
+    var original by editor.original
     var newDialog by remember { mutableStateOf(false) }
     var newName by remember { mutableStateOf("") }
     var directory by remember { mutableStateOf(false) }
@@ -45,16 +47,16 @@ import kotlinx.coroutines.*
     BackHandler(selected != null || path.isNotBlank()) { if (selected != null) closeEditor() else path = path.substringBeforeLast('/', "") }
     LaunchedEffect(state.project, path, revision, state.busy) {
         loading = true
-        runCatching { withContext(Dispatchers.IO) { controller.workspace().list(path) } }.onSuccess { entries = it }.onFailure { controller.fail("目录读取失败：${it.message}") }
+        runSuspendCatching { withContext(Dispatchers.IO) { controller.workspace(state.project).list(path) } }.onSuccess { entries = it }.onFailure { controller.fail("目录读取失败：${it.message}") }
         loading = false
     }
-    val export = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("text/plain")) { uri -> if (uri != null) scope.launch { runCatching { withContext(Dispatchers.IO) { context.contentResolver.openOutputStream(uri, "wt")!!.use { it.write(text.toByteArray()) } } }.onFailure { controller.fail("导出失败：${it.message}") } } }
+    val export = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("text/plain")) { uri -> if (uri != null) scope.launch { runSuspendCatching { withContext(Dispatchers.IO) { context.contentResolver.openOutputStream(uri, "wt")!!.use { it.write(text.toByteArray()) } } }.onFailure { controller.fail("导出失败：${it.message}") } } }
     val import = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri -> if (uri != null) scope.launch {
         working = true
-        runCatching { withContext(Dispatchers.IO) {
+        runSuspendCatching { withContext(Dispatchers.IO) {
             val name = context.contentResolver.query(uri, arrayOf(OpenableColumns.DISPLAY_NAME), null, null, null)?.use { if (it.moveToFirst()) it.getString(0) else "导入文件" } ?: "导入文件"
             require(name.isNotBlank() && '/' !in name && '\\' !in name && name !in setOf(".", "..")) { "文件名称无效" }
-            val target = controller.workspace().resolve(if (path.isBlank()) name else "$path/$name")
+            val target = controller.workspace(state.project).resolve(if (path.isBlank()) name else "$path/$name")
             require(!target.exists()) { "同名文件已存在，请先重命名或选择其他目录" }
             val temp = java.io.File.createTempFile("导入-", ".tmp", context.cacheDir)
             try {
@@ -70,7 +72,7 @@ import kotlinx.coroutines.*
                 IconButton(onClick = ::closeEditor) { Icon(Icons.AutoMirrored.Outlined.ArrowBack, "关闭编辑器") }
                 Text(selected!!.substringAfterLast('/') + if (text != original) " · 未保存" else "", Modifier.weight(1f), maxLines = 1, overflow = TextOverflow.Ellipsis, style = MaterialTheme.typography.bodyMedium)
                 IconButton(onClick = { export.launch(selected!!.substringAfterLast('/')) }) { Icon(Icons.Outlined.IosShare, "导出文件") }
-                TextButton(onClick = { scope.launch { working = true; runCatching { controller.writeFile(selected!!, text) }.onSuccess { original = text; revision++ }.onFailure { controller.fail("保存失败：${it.message}") }; working = false } }, enabled = !state.busy && !working && text != original) { Text("保存") }
+                TextButton(onClick = { scope.launch { working = true; runSuspendCatching { controller.writeFile(selected!!, text, state.project) }.onSuccess { original = text; revision++ }.onFailure { controller.fail("保存失败：${it.message}") }; working = false } }, enabled = !state.busy && !working && text != original) { Text("保存") }
             }
             OutlinedTextField(text, { text = it }, modifier = Modifier.fillMaxSize().padding(12.dp), textStyle = LocalTextStyle.current.copy(fontFamily = FontFamily.Monospace, fontSize = 14.sp, lineHeight = 23.sp), enabled = !state.busy && !working, shape = RoundedCornerShape(14.dp), label = { Text("UTF-8 文本") })
         } else {
@@ -90,7 +92,7 @@ import kotlinx.coroutines.*
                     ListItem(headlineContent = { Text(entry.name, maxLines = 1, overflow = TextOverflow.Ellipsis) }, supportingContent = { Text(if (entry.directory) "文件夹" else formatSize(entry.size)) }, leadingContent = { Surface(color = MaterialTheme.colorScheme.surfaceContainerHigh, shape = RoundedCornerShape(12.dp)) { Icon(if (entry.directory) Icons.Outlined.Folder else Icons.Outlined.Description, null, Modifier.padding(12.dp).size(22.dp), tint = if (entry.directory) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant) } }, trailingContent = { if (entry.directory) Icon(Icons.Outlined.ChevronRight, null) }, colors = ListItemDefaults.colors(containerColor = MaterialTheme.colorScheme.background), modifier = Modifier.clip(RoundedCornerShape(14.dp)).clickable(enabled = !working) {
                         if (entry.directory) path = entry.path else scope.launch {
                             working = true
-                            runCatching { withContext(Dispatchers.IO) { controller.workspace().read(entry.path).also { require('\u0000' !in it) { "二进制文件不支持文本编辑" } } } }.onSuccess { text = it; original = it; selected = entry.path }.onFailure { controller.fail("无法打开：${it.message}") }
+                            runSuspendCatching { withContext(Dispatchers.IO) { controller.workspace(state.project).read(entry.path).also { require('\u0000' !in it) { "二进制文件不支持文本编辑" } } } }.onSuccess { text = it; original = it; selected = entry.path }.onFailure { controller.fail("无法打开：${it.message}") }
                             working = false
                         }
                     })
@@ -99,7 +101,7 @@ import kotlinx.coroutines.*
             Text("${entries.size} 项 · 文件保存在本应用的工作区，可通过系统文件选择器导入导出", Modifier.padding(16.dp), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
     }
-    if (newDialog) AlertDialog(onDismissRequest = { newDialog = false }, title = { Text("新建") }, text = { Column { OutlinedTextField(newName, { newName = it }, label = { Text("名称，例如：说明.md") }, singleLine = true); Row(verticalAlignment = Alignment.CenterVertically) { Switch(directory, { directory = it }); Spacer(Modifier.width(12.dp)); Text("创建文件夹") } } }, confirmButton = { TextButton(onClick = { scope.launch { runCatching { withContext(Dispatchers.IO) { require(newName.isNotBlank() && '/' !in newName && '\\' !in newName && newName !in setOf(".", "..")); val relative = if (path.isBlank()) newName else "$path/$newName"; val file = controller.workspace().resolve(relative); require(!file.exists()) { "同名项目已存在" }; if (directory) check(file.mkdirs()) else controller.writeFile(relative, "") } }.onSuccess { newDialog = false; revision++ }.onFailure { controller.fail("创建失败：${it.message}") } } }) { Text("创建") } }, dismissButton = { TextButton(onClick = { newDialog = false }) { Text("取消") } })
+    if (newDialog) AlertDialog(onDismissRequest = { newDialog = false }, title = { Text("新建") }, text = { Column { OutlinedTextField(newName, { newName = it }, label = { Text("名称，例如：说明.md") }, singleLine = true); Row(verticalAlignment = Alignment.CenterVertically) { Switch(directory, { directory = it }); Spacer(Modifier.width(12.dp)); Text("创建文件夹") } } }, confirmButton = { TextButton(onClick = { scope.launch { runSuspendCatching { withContext(Dispatchers.IO) { require(newName.isNotBlank() && '/' !in newName && '\\' !in newName && newName !in setOf(".", "..")); val relative = if (path.isBlank()) newName else "$path/$newName"; val file = controller.workspace(state.project).resolve(relative); require(!file.exists()) { "同名项目已存在" }; if (directory) check(file.mkdirs()) else controller.writeFile(relative, "", state.project) } }.onSuccess { newDialog = false; revision++ }.onFailure { controller.fail("创建失败：${it.message}") } } }) { Text("创建") } }, dismissButton = { TextButton(onClick = { newDialog = false }) { Text("取消") } })
     if (dirtyClose) AlertDialog(onDismissRequest = { dirtyClose = false }, title = { Text("保留未保存的修改？") }, text = { Text("返回后将放弃本次编辑，已保存的文件不会变化。") }, confirmButton = { TextButton(onClick = { dirtyClose = false; selected = null }) { Text("放弃编辑") } }, dismissButton = { TextButton(onClick = { dirtyClose = false }) { Text("继续编辑") } })
 }
 fun formatSize(size: Long) = when { size < 1024 -> "$size B"; size < 1024 * 1024 -> "${size / 1024} KB"; else -> "${"%.1f".format(size / 1048576.0)} MB" }
@@ -111,7 +113,7 @@ fun formatSize(size: Long) = when { size < 1024 -> "$size B"; size < 1024 * 1024
     LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(16.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
         itemsIndexed(state.changes.asReversed()) { _, change -> Column { DiffView(change); Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) { TextButton(onClick = { undo = change }, enabled = !state.busy) { Icon(Icons.Outlined.Undo, null, Modifier.size(17.dp)); Spacer(Modifier.width(6.dp)); Text("撤销这次修改") } } } }
     }
-    undo?.let { change -> AlertDialog(onDismissRequest = { undo = null }, title = { Text("撤销修改？") }, text = { Text("${change.path}\n文件若已再次变化，撤销会停止，避免覆盖后续编辑。") }, confirmButton = { TextButton(onClick = { scope.launch { runCatching { controller.undo(change) }.onFailure { controller.fail("撤销失败：${it.message}") }; undo = null } }) { Text("撤销") } }, dismissButton = { TextButton(onClick = { undo = null }) { Text("取消") } }) }
+    undo?.let { change -> AlertDialog(onDismissRequest = { undo = null }, title = { Text("撤销修改？") }, text = { Text("${change.path}\n文件若已再次变化，撤销会停止，避免覆盖后续编辑。") }, confirmButton = { TextButton(onClick = { scope.launch { runSuspendCatching { controller.undo(change) }.onFailure { controller.fail("撤销失败：${it.message}") }; undo = null } }) { Text("撤销") } }, dismissButton = { TextButton(onClick = { undo = null }) { Text("取消") } }) }
 }
 @Composable fun TerminalScreen(state: ScreenState, send: (String) -> Unit) {
     var command by rememberSaveable { mutableStateOf("") }

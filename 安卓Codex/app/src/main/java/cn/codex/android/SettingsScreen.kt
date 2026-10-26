@@ -38,7 +38,7 @@ import kotlinx.serialization.json.*
         OutlinedTextField(model, { model = it }, label = { Text("模型名称") }, placeholder = { Text("从服务获取，或填写准确模型 ID") }, trailingIcon = { IconButton(onClick = { modelPicker = true }, enabled = models.isNotEmpty()) { Icon(Icons.Outlined.ExpandMore, "选择模型") } }, modifier = Modifier.fillMaxWidth(), singleLine = true, shape = RoundedCornerShape(14.dp))
         OutlinedButton(onClick = { scope.launch {
             loading = true; message = ""
-            runCatching { ResponsesClient(ApiConfig(endpoint.trim(), key.trim(), model.trim(), reasoning, loopback)).models() }.onSuccess { models = it; message = "连接成功，获取到 ${it.size} 个模型"; modelPicker = true }.onFailure { message = "连接失败：${it.message}" }
+            runSuspendCatching { ResponsesClient(ApiConfig(endpoint.trim(), key.trim(), model.trim(), reasoning, loopback)).models() }.onSuccess { models = it; message = "连接成功，获取到 ${it.size} 个模型"; modelPicker = true }.onFailure { message = "连接失败：${it.message}" }
             loading = false
         } }, enabled = !loading && !state.busy, modifier = Modifier.fillMaxWidth()) { if (loading) CircularProgressIndicator(Modifier.size(18.dp), strokeWidth = 2.dp) else Icon(Icons.Outlined.Sync, null, Modifier.size(18.dp)); Spacer(Modifier.width(8.dp)); Text(if (loading) "正在连接" else "测试连接并获取模型") }
         if (message.isNotBlank()) Text(message, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.primary)
@@ -62,7 +62,7 @@ import kotlinx.serialization.json.*
     var skills by remember { mutableStateOf(emptyList<Pair<String, String>>()) }
     var loading by remember { mutableStateOf(true) }
     LaunchedEffect(state.project, state.busy) {
-        runCatching { withContext(Dispatchers.IO) {
+        runSuspendCatching { withContext(Dispatchers.IO) {
             val fs = controller.workspace()
             listOf("技能", ".agents/skills").flatMap { dir -> fs.resolve(dir).takeIf { it.isDirectory }?.walkTopDown()?.maxDepth(3)?.filter { it.name == "SKILL.md" && it.isFile }?.map { f -> f.relativeTo(fs.root).path to fs.read(f.relativeTo(fs.root).path) }?.toList().orEmpty() }
         } }.onSuccess { skills = it }.onFailure { controller.fail("技能读取失败：${it.message}") }
@@ -84,14 +84,14 @@ import kotlinx.serialization.json.*
     var url by rememberSaveable { mutableStateOf("") }
     var result by remember { mutableStateOf("") }
     var loading by remember { mutableStateOf(false) }
-    LaunchedEffect(Unit) { runCatching { withContext(Dispatchers.IO) { tools.connections() } }.onSuccess { connections = it }.onFailure { controller.fail("连接配置读取失败：${it.message}") } }
+    LaunchedEffect(Unit) { runSuspendCatching { withContext(Dispatchers.IO) { tools.connections() } }.onSuccess { connections = it }.onFailure { controller.fail("连接配置读取失败：${it.message}") } }
     Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).imePadding().padding(20.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
         Text("扩展你的工具箱", style = MaterialTheme.typography.titleLarge)
         Text("支持无需登录的 HTTPS Streamable HTTP MCP 服务。OAuth、stdio 本地进程和交互式网页工具尚未移植。连接外部服务需要网络。", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
-        connections.forEach { c -> Surface(shape = RoundedCornerShape(14.dp), color = MaterialTheme.colorScheme.surfaceContainer) { Column(Modifier.fillMaxWidth().padding(14.dp)) { Text(c.name, fontWeight = FontWeight.Medium); Text(c.url, style = MaterialTheme.typography.labelSmall); Row { TextButton(onClick = { scope.launch { loading = true; runCatching { tools.execute(ToolCall("manual", "mcp", obj("server" to c.name, "action" to "list_tools"))) }.onSuccess { result = it }.onFailure { result = "连接失败：${it.message}" }; loading = false } }, enabled = !loading) { Text("检查工具列表") }; TextButton(onClick = { scope.launch { runCatching { withContext(Dispatchers.IO) { tools.save(connections.filterNot { it.name == c.name }) } }.onSuccess { connections = connections.filterNot { it.name == c.name } }.onFailure { controller.fail(it.message.orEmpty()) } } }) { Text("移除连接") } } } } }
+        connections.forEach { c -> Surface(shape = RoundedCornerShape(14.dp), color = MaterialTheme.colorScheme.surfaceContainer) { Column(Modifier.fillMaxWidth().padding(14.dp)) { Text(c.name, fontWeight = FontWeight.Medium); Text(c.url, style = MaterialTheme.typography.labelSmall); Row { TextButton(onClick = { scope.launch { loading = true; runSuspendCatching { tools.execute(ToolCall("manual", "mcp", obj("server" to c.name, "action" to "list_tools"))) }.onSuccess { result = it }.onFailure { result = "连接失败：${it.message}" }; loading = false } }, enabled = !loading) { Text("检查工具列表") }; TextButton(onClick = { scope.launch { runSuspendCatching { withContext(Dispatchers.IO) { tools.save(connections.filterNot { it.name == c.name }) } }.onSuccess { connections = connections.filterNot { it.name == c.name } }.onFailure { controller.fail(it.message.orEmpty()) } } }) { Text("移除连接") } } } } }
         OutlinedTextField(name, { name = it }, label = { Text("连接标识，例如 my_tools") }, singleLine = true, modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(14.dp))
         OutlinedTextField(url, { url = it }, label = { Text("HTTPS MCP 地址") }, singleLine = true, modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(14.dp))
-        Button(onClick = { scope.launch { val updated = connections.filterNot { it.name == name.trim() } + McpConnection(name.trim(), url.trim()); runCatching { withContext(Dispatchers.IO) { tools.save(updated) } }.onSuccess { connections = updated; name = ""; url = "" }.onFailure { controller.fail(it.message.orEmpty()) } } }, enabled = name.isNotBlank() && url.isNotBlank(), modifier = Modifier.fillMaxWidth().height(48.dp)) { Text("保存连接") }
+        Button(onClick = { scope.launch { val updated = connections.filterNot { it.name == name.trim() } + McpConnection(name.trim(), url.trim()); runSuspendCatching { withContext(Dispatchers.IO) { tools.save(updated) } }.onSuccess { connections = updated; name = ""; url = "" }.onFailure { controller.fail(it.message.orEmpty()) } } }, enabled = name.isNotBlank() && url.isNotBlank(), modifier = Modifier.fillMaxWidth().height(48.dp)) { Text("保存连接") }
         if (loading) LinearProgressIndicator(Modifier.fillMaxWidth())
         if (result.isNotBlank()) ExpandableCard("服务返回结果", result, Icons.Outlined.Extension)
     }

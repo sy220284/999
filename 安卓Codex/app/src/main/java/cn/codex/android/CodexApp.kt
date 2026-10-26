@@ -13,6 +13,7 @@ import androidx.compose.material.icons.automirrored.outlined.*
 import androidx.compose.material.icons.outlined.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.*
 import androidx.compose.ui.draw.clip
@@ -41,7 +42,8 @@ private val destinations = listOf(
 private object NoMotion: MotionDurationScale { override val scaleFactor = 0f }
 @Composable private fun CodexLayout(controller: RuntimeController, state: ScreenState, send: (String, Boolean) -> Unit) {
     var page by rememberSaveable { mutableStateOf("chat") }
-    var draft by rememberSaveable { mutableStateOf("") }
+    val composer: ComposerState = viewModel(key = "composer:${state.project}")
+    var draft by composer.draft
     var search by rememberSaveable { mutableStateOf("") }
     var archived by rememberSaveable { mutableStateOf(false) }
     var projectDialog by remember { mutableStateOf(false) }
@@ -68,7 +70,7 @@ private object NoMotion: MotionDurationScale { override val scaleFactor = 0f }
                 FilledTonalButton(onClick = { controller.newSession(); draft = ""; navigate("chat") }, enabled = !state.busy, modifier = Modifier.fillMaxWidth().height(52.dp), shape = RoundedCornerShape(14.dp)) {
                     Icon(Icons.Outlined.Add, null); Spacer(Modifier.width(8.dp)); Text("开启新对话"); Spacer(Modifier.weight(1f)); Icon(Icons.AutoMirrored.Outlined.ArrowForward, null, Modifier.size(18.dp))
                 }
-                TextButton(onClick = { projectDialog = true }, modifier = Modifier.fillMaxWidth()) {
+                TextButton(onClick = { newValue = ""; projectDialog = true }, modifier = Modifier.fillMaxWidth()) {
                     Icon(Icons.Outlined.Folder, null, Modifier.size(18.dp)); Spacer(Modifier.width(8.dp)); Text(state.project, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f)); Icon(Icons.Outlined.UnfoldMore, "切换项目", Modifier.size(18.dp))
                 }
                 destinations.forEach { d ->

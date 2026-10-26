@@ -32,7 +32,7 @@ class RuntimeController(private val context: Context) {
     private val attachmentInputs = mutableListOf<JsonObject>()
     init {
         scope.launch {
-            val config = withContext(Dispatchers.IO) { runCatching { settings.load() } }
+            val config = withContext(Dispatchers.IO) { runSuspendCatching { settings.load() } }
             config.onSuccess { mutable.update { s -> s.copy(config = it) } }.onFailure { fail("无法读取已保存的连接设置，请重新填写：${it.message}") }
             refresh()
             newSession("默认项目")
@@ -54,14 +54,14 @@ class RuntimeController(private val context: Context) {
         attachmentInputs.clear()
         scope.launch { val p = state.value.project; val changes = withContext(Dispatchers.IO) { changeStore.list(p) }; mutable.update { it.copy(changes = changes) }; refresh() }
     }
-    fun openSession(id: String) { if (!state.value.busy) scope.launch { runCatching { withContext(Dispatchers.IO) { store.load(id) } }.onSuccess { s -> mutable.update { it.copy(session = s, project = s.project, stream = "", thinking = "", error = null, attachments = emptyList(), changes = emptyList()) }; attachmentInputs.clear(); mutable.update { it.copy(changes = changeStore.list(s.project)) } }.onFailure { fail(it.message ?: "会话读取失败") } } }
-    fun archive(id: String) = scope.launch { if (!state.value.busy) runCatching { withContext(Dispatchers.IO) { val s = store.load(id); store.save(s.copy(archived = !s.archived)) }; refresh() }.onFailure { fail(it.message.orEmpty()) } }
+    fun openSession(id: String) { if (!state.value.busy) scope.launch { runSuspendCatching { withContext(Dispatchers.IO) { store.load(id) } }.onSuccess { s -> mutable.update { it.copy(session = s, project = s.project, stream = "", thinking = "", error = null, attachments = emptyList(), changes = emptyList()) }; attachmentInputs.clear(); mutable.update { it.copy(changes = changeStore.list(s.project)) } }.onFailure { fail(it.message ?: "会话读取失败") } } }
+    fun archive(id: String) = scope.launch { if (!state.value.busy) runSuspendCatching { withContext(Dispatchers.IO) { val s = store.load(id); store.save(s.copy(archived = !s.archived)) }; refresh() }.onFailure { fail(it.message.orEmpty()) } }
     fun fork() = scope.launch { if (!state.value.busy) state.value.session?.let { s -> withContext(Dispatchers.IO) { store.save(s); store.fork(s.id) }.let { mutable.update { old -> old.copy(session = it) }; refresh() } } }
     fun rename(title: String) = updateSession { it.copy(title = title.trim().ifBlank { "新对话" }) }
     fun goal(goal: String) = updateSession { it.copy(goal = goal) }
     private fun updateSession(transform: (Session) -> Session) = scope.launch { if (!state.value.busy) state.value.session?.let { s -> val next = transform(s); withContext(Dispatchers.IO) { store.save(next) }; mutable.update { it.copy(session = next) }; refresh() } }
     fun saveConfig(config: ApiConfig) = scope.launch {
-        runCatching { withContext(Dispatchers.IO) { settings.save(config) } }.onSuccess { mutable.update { it.copy(config = config, error = null) } }.onFailure { fail("设置保存失败：${it.message}") }
+        runSuspendCatching { withContext(Dispatchers.IO) { settings.save(config) } }.onSuccess { mutable.update { it.copy(config = config, error = null) } }.onFailure { fail("设置保存失败：${it.message}") }
     }
     fun fail(message: String) { mutable.update { it.copy(error = message) } }
     fun dismissError() { mutable.update { it.copy(error = null) } }
@@ -77,10 +77,9 @@ class RuntimeController(private val context: Context) {
         attachmentInputs += input; mutable.update { it.copy(attachments = it.attachments + name) }
     }
     fun clearAttachments() { if (!state.value.busy) { attachmentInputs.clear(); mutable.update { it.copy(attachments = emptyList()) } } }
-    private fun record(changes: List<FileChange>) {
-        val project = state.value.project
+    private fun record(changes: List<FileChange>, project: String = state.value.project) {
         changeStore.append(project, changes)
-        mutable.update { s -> s.copy(changes = changeStore.list(project)) }
+        mutable.update { s -> if (s.project == project) s.copy(changes = changeStore.list(project)) else s }
     }
     fun reserveTask(): Boolean {
         if (state.value.busy) return false
@@ -106,13 +105,13 @@ class RuntimeController(private val context: Context) {
             } else {
                 require(snapshot.config.model.isNotBlank()) { "请先在设置中选择模型并填写 API 密钥" }
                 val extras = listOf(GitTools(fs), McpTools(context))
-                val tools = LocalTools(fs, runner, extras, ::record)
+                val tools = LocalTools(fs, runner, extras) { record(it, snapshot.project) }
                 val runtime = AgentRuntime(ResponsesClient(snapshot.config), tools, ::approve)
                 val attachments = attachmentInputs.toList()
                 withContext(Dispatchers.IO) { runtime.run(initial, prompt, attachments) { event ->
                     when (event) {
                         is AgentEvent.Delta -> mutable.update { s -> if (event.reasoning) s.copy(thinking = (s.thinking + event.text).takeLast(64000)) else s.copy(stream = s.stream + event.text) }
-                        is AgentEvent.Tool -> mutable.update { it.copy(tool = if (event.running) "${event.name} · 处理中" else "", stream = if (event.running) "" else it.stream) }
+                        is AgentEvent.Tool -> mutable.update { it.copy(tool = if (event.running) "${toolTitle(event.name)} · 处理中" else "", stream = if (event.running) "" else it.stream) }
                         is AgentEvent.Usage -> mutable.update { it.copy(usage = "输入 ${event.input} · 输出 ${event.output}") }
                         is AgentEvent.Updated -> {
                             mutable.update { it.copy(session = event.session, stream = "") }
@@ -133,9 +132,9 @@ class RuntimeController(private val context: Context) {
         }
     }
     fun stop() { answer?.cancel(); shell?.stop(); active?.cancel() }
-    suspend fun writeFile(path: String, text: String) = withContext(Dispatchers.IO) {
+    suspend fun writeFile(path: String, text: String, project: String = state.value.project) = withContext(Dispatchers.IO) {
         check(!state.value.busy) { "任务正在运行，请先停止后编辑" }
-        val fs = workspace(); val c = fs.previewWrite(path, text); fs.commit(c); record(listOf(c))
+        val fs = workspace(project); val c = fs.previewWrite(path, text); fs.commit(c); record(listOf(c), project)
     }
     suspend fun undo(change: FileChange) = withContext(Dispatchers.IO) {
         check(!state.value.busy) { "任务正在运行" }

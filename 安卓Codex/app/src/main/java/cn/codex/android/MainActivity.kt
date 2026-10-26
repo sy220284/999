@@ -8,6 +8,9 @@ import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.SideEffect
+import androidx.compose.foundation.isSystemInDarkTheme
+import androidx.core.view.WindowCompat
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 
 class MainActivity: ComponentActivity() {
@@ -18,6 +21,13 @@ class MainActivity: ComponentActivity() {
         val controller = (application as CodexApplication).controller
         setContent {
             val state by controller.state.collectAsStateWithLifecycle()
+            val dark = if (state.config.theme == "system") isSystemInDarkTheme() else state.config.theme == "dark"
+            SideEffect {
+                WindowCompat.getInsetsController(window, window.decorView).apply {
+                    isAppearanceLightStatusBars = !dark
+                    isAppearanceLightNavigationBars = !dark
+                }
+            }
             CodexTheme(state.config.theme) {
                 CodexApp(controller, state) { prompt, terminal ->
                     if (controller.reserveTask()) {

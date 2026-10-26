@@ -39,7 +39,7 @@ import kotlinx.serialization.json.*
     val attachment = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
         if (uri != null) scope.launch {
             attachLoading = true
-            runCatching { withContext(Dispatchers.IO) {
+            runSuspendCatching { withContext(Dispatchers.IO) {
                 val mime = context.contentResolver.getType(uri).orEmpty()
                 val bytes = context.contentResolver.openInputStream(uri)!!.use { it.readNBytes(10 * 1024 * 1024 + 1) }
                 require(bytes.size <= 10 * 1024 * 1024) { "附件不能超过 10MB" }
