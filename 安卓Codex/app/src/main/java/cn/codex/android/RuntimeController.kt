@@ -132,9 +132,9 @@ class RuntimeController(private val context: Context) {
         }
     }
     fun stop() { answer?.cancel(); shell?.stop(); active?.cancel() }
-    suspend fun writeFile(path: String, text: String, project: String = state.value.project) = withContext(Dispatchers.IO) {
+    suspend fun writeFile(path: String, text: String, project: String = state.value.project, expectedContent: String? = null) = withContext(Dispatchers.IO) {
         check(!state.value.busy) { "任务正在运行，请先停止后编辑" }
-        val fs = workspace(project); val c = fs.previewWrite(path, text); fs.commit(c); record(listOf(c), project)
+        val fs = workspace(project); val c = FileChange(path, expectedContent, text); fs.commit(c); record(listOf(c), project)
     }
     suspend fun undo(change: FileChange) = withContext(Dispatchers.IO) {
         check(!state.value.busy) { "任务正在运行" }
