@@ -303,6 +303,48 @@ class RuntimeTest {
         assertFalse(fs.resolve("b").exists())
     }
 
+
+    @Test fun `tool attempt journal persists state transitions and removes only acknowledged calls`() {
+        val dir = Files.createTempDirectory("attempts").toFile()
+        val journal = ToolAttemptJournal(dir)
+        val call = ToolCall("call-1", "write_file", obj("path" to "test", "content" to "hello"))
+        journal.begin("session-1", listOf(call))
+        assertEquals("pending", ToolAttemptJournal(dir).read("session-1").single().status)
+        journal.started("session-1", "call-1")
+        assertEquals("started", ToolAttemptJournal(dir).read("session-1").single().status)
+        journal.completed("session-1", "call-1", "修改成功")
+        assertEquals("修改成功", ToolAttemptJournal(dir).read("session-1").single().output)
+        journal.acknowledge("session-1", "call-1")
+        assertTrue(journal.read("session-1").isEmpty())
+    }
+
+    @Test fun `interrupted side effect is recovered as unknown and never replayed`() = runBlocking<Unit> {
+        MockWebServer().use { server ->
+            val finish = Json.parseToJsonElement("""[{"type":"message","content":[{"type":"output_text","text":"请人工核对修改结果"}]}]""").jsonArray
+            server.enqueue(stream(finish))
+            val originalCall = buildJsonObject {
+                put("type", "function_call")
+                put("call_id", "interrupted-1")
+                put("name", "write_file")
+                put("arguments", """{"path":"target","content":"danger"}""")
+            }
+            val start = Session(project = "工程", wire = JsonArray(listOf(obj("role" to "user", "content" to "旧任务"), originalCall)))
+            val journal = ToolAttemptJournal(Files.createTempDirectory("interrupted").toFile())
+            journal.begin(start.id, listOf(ToolCall("interrupted-1", "write_file", obj("path" to "target", "content" to "danger"))))
+            journal.started(start.id, "interrupted-1")
+            val fs = workspace()
+            val runtime = AgentRuntime(
+                ResponsesClient(ApiConfig(server.url("/").toString(), "test", "test", allowLoopbackHttp = true)),
+                LocalTools(fs, ShellRunner("/bin/sh", fs.root)), { fail("不能请求重放审批") }, journal = journal
+            )
+            val final = runtime.run(start, "上一轮结果如何") {}
+            assertFalse(fs.resolve("target").exists())
+            assertTrue(final.messages.any { it.detail.contains("执行状态未知") })
+            assertTrue(journal.read(start.id).isEmpty())
+            assertTrue(server.takeRequest().body.readUtf8().contains("执行状态未知"))
+        }
+    }
+
     @Test fun `change history never leaks across projects and survives restart`() {
         val dir = Files.createTempDirectory("changes").toFile()
         val store = ChangeStore(dir)

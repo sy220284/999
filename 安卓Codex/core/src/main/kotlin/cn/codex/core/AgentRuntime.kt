@@ -4,14 +4,32 @@ import kotlinx.coroutines.*
 import kotlinx.serialization.json.*
 
 /** 同一进程内执行模型 → 工具 → 审批 → 结果回注；不连接桌面 app-server。 */
-class AgentRuntime(private val client: ResponsesClient, private val tools: LocalTools, private val approve: suspend (Approval) -> Boolean, private val steeringInbox: SteeringInbox? = null) {
+class AgentRuntime(private val client: ResponsesClient, private val tools: LocalTools, private val approve: suspend (Approval) -> Boolean, private val steeringInbox: SteeringInbox? = null, private val journal: ToolAttemptJournal? = null) {
     suspend fun run(initial: Session, prompt: String, attachments: List<JsonObject> = emptyList(), emit: (AgentEvent) -> Unit): Session {
-        var session = initial.copy(
-            title = if (initial.messages.isEmpty()) prompt.take(30) else initial.title,
-            messages = initial.messages + Message(role = "user", text = prompt),
+        var session = initial
+        val input = initial.wire.toMutableList()
+        // 上次执行中断时可能留下尚未配对的调用；绝不自动重放副作用。
+        val returned = input.mapNotNull { (it as? JsonObject)?.takeIf { x -> x.string("type") == "function_call_output" }?.string("call_id") }.toSet()
+        val orphaned = input.mapNotNull { (it as? JsonObject)?.takeIf { x -> x.string("type") == "function_call" && x.string("call_id") !in returned } }
+        for (orphan in orphaned) {
+            val callId = orphan.string("call_id")
+            val old = journal?.read(session.id)?.firstOrNull { it.callId == callId }
+            val output = if (old?.status == "completed" && old.output != null) old.output
+                else "工具执行状态未知：上次进程在调用过程中中断。未自动重放；请先核查文件和命令的实际结果。"
+            input += obj("type" to "function_call_output", "call_id" to callId, "output" to output)
+            session = session.copy(
+                wire = JsonArray(input),
+                messages = session.messages + Message(role = "tool", text = orphan.string("name"), detail = output),
+                updated = System.currentTimeMillis()
+            )
+            emit(AgentEvent.Updated(session))
+            journal?.acknowledge(session.id, callId)
+        }
+        session = session.copy(
+            title = if (session.messages.isEmpty()) prompt.take(30) else session.title,
+            messages = session.messages + Message(role = "user", text = prompt),
             updated = System.currentTimeMillis()
         )
-        val input = initial.wire.toMutableList()
         input += buildJsonObject {
             put("role", "user")
             put("content", buildJsonArray { add(obj("type" to "input_text", "text" to prompt)); attachments.forEach(::add) })
@@ -38,18 +56,30 @@ class AgentRuntime(private val client: ResponsesClient, private val tools: Local
             } }.filter { it.isNotBlank() }.joinToString("\n")
             if (text.isNotBlank()) session = session.copy(messages = session.messages + Message(role = "assistant", text = text))
             val calls = output.map { it.jsonObject }.filter { it.string("type") == "function_call" }
-            // 不在所有工具结果回注前保存悬空的 function_call；重启后绝不自动重放副作用。
+            // 先保存模型的函数调用和待执行日志，再运行任何有副作用的工具。
+            if (calls.isNotEmpty()) {
+                journal?.begin(session.id, calls.map { wireCall ->
+                    ToolCall(wireCall.string("call_id"), wireCall.string("name"),
+                        Json.parseToJsonElement(wireCall.string("arguments")).jsonObject)
+                })
+                session = session.copy(wire = JsonArray(input), updated = System.currentTimeMillis())
+                emit(AgentEvent.Updated(session))
+            }
             for (wireCall in calls) {
                 currentCoroutineContext().ensureActive()
                 val name = wireCall.string("name")
                 emit(AgentEvent.Tool(name, wireCall.string("arguments"), true))
+                journal?.started(session.id, wireCall.string("call_id"))
                 val result = try {
                     val args = Json.parseToJsonElement(wireCall.string("arguments")).jsonObject
                     tools.execute(ToolCall(wireCall.string("call_id"), name, args), approve, emit)
                 } catch (e: CancellationException) { throw e }
                 catch (e: Exception) { "工具参数错误：${e.message}" }
+                journal?.completed(session.id, wireCall.string("call_id"), result)
                 input += obj("type" to "function_call_output", "call_id" to wireCall.string("call_id"), "output" to result)
-                session = session.copy(messages = session.messages + Message(role = "tool", text = name, detail = result))
+                session = session.copy(wire = JsonArray(input), messages = session.messages + Message(role = "tool", text = name, detail = result), updated = System.currentTimeMillis())
+                emit(AgentEvent.Updated(session))
+                journal?.acknowledge(session.id, wireCall.string("call_id"))
                 emit(AgentEvent.Tool(name, result, false))
             }
             session = session.copy(wire = JsonArray(input), updated = System.currentTimeMillis())

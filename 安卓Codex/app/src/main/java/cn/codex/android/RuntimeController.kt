@@ -24,6 +24,7 @@ class RuntimeController(private val context: Context) {
     val store = SessionStore(File(context.filesDir, "会话"))
     private val changeStore = ChangeStore(File(context.filesDir, "修改历史"))
     private val steeringInbox = SteeringInbox(File(context.filesDir, "追加指令"))
+    private val toolJournal = ToolAttemptJournal(File(context.filesDir, "工具执行日志"))
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate + CoroutineExceptionHandler { _, error -> fail("数据操作失败：${error.message}") })
     private val mutable = MutableStateFlow(ScreenState())
     val state = mutable.asStateFlow()
@@ -60,7 +61,7 @@ class RuntimeController(private val context: Context) {
     fun deleteSession(id: String) = scope.launch {
         if (state.value.busy) return@launch
         runSuspendCatching {
-            withContext(Dispatchers.IO) { store.delete(id); steeringInbox.clear(id) }
+            withContext(Dispatchers.IO) { store.delete(id); steeringInbox.clear(id); toolJournal.clear(id) }
             if (state.value.session?.id == id) newSession(state.value.project)
             refresh()
         }.onFailure { fail("删除会话失败：${it.message}") }
@@ -154,7 +155,7 @@ class RuntimeController(private val context: Context) {
                 require(snapshot.config.model.isNotBlank()) { "请先在设置中选择模型并填写 API 密钥" }
                 val extras = listOf(GitTools(fs), McpTools(context))
                 val tools = LocalTools(fs, runner, extras) { record(it, snapshot.project) }
-                val runtime = AgentRuntime(ResponsesClient(snapshot.config), tools, ::approve, steeringInbox)
+                val runtime = AgentRuntime(ResponsesClient(snapshot.config), tools, ::approve, steeringInbox, toolJournal)
                 val attachments = attachmentInputs.toList()
                 withContext(Dispatchers.IO) { runtime.run(initial, prompt, attachments) { event ->
                     when (event) {
