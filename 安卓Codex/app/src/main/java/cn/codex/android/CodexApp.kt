@@ -190,7 +190,7 @@ private object NoMotion: MotionDurationScale { override val scaleFactor = 0f }
         }, confirmButton = { TextButton(onClick = { moveTarget = null }) { Text("取消") } })
     }
     if (sectionManager) AlertDialog(onDismissRequest = { sectionManager = false }, title = { Text("管理会话分类") }, text = {
-        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        Column(Modifier.heightIn(max = 400.dp).verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             OutlinedTextField(newSectionName, { newSectionName = it }, label = { Text("新分类名称") }, singleLine = true)
             state.sections.filter { it.project == state.project }.forEach { section ->
                 Row(verticalAlignment = Alignment.CenterVertically) {

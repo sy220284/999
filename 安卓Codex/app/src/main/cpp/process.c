@@ -110,10 +110,12 @@ JNIEXPORT jintArray JNICALL Java_cn_codex_android_NativePty_openSession(JNIEnv *
     return array;
 }
 
-JNIEXPORT void JNICALL Java_cn_codex_android_NativePty_resizeFd(JNIEnv *env, jobject self, jint fd, jint pid, jint rows, jint columns) {
+JNIEXPORT jboolean JNICALL Java_cn_codex_android_NativePty_resizeFd(JNIEnv *env, jobject self, jint fd, jint pid, jint rows, jint columns) {
     (void)env; (void)self;
     struct winsize size = {(unsigned short)rows, (unsigned short)columns, 0, 0};
-    if (ioctl(fd, TIOCSWINSZ, &size) == 0) kill(-pid, SIGWINCH);
+    if (ioctl(fd, TIOCSWINSZ, &size) != 0) return JNI_FALSE;
+    kill(-pid, SIGWINCH);
+    return JNI_TRUE;
 }
 
 JNIEXPORT void JNICALL Java_cn_codex_android_NativePty_terminateGroup(JNIEnv *env, jobject self, jint pid) {

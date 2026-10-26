@@ -14,7 +14,7 @@ import java.io.OutputStream
 object NativePty {
     init { System.loadLibrary("codex_process") }
     private external fun openSession(directory: String, rows: Int, columns: Int): IntArray
-    private external fun resizeFd(fd: Int, pid: Int, rows: Int, columns: Int)
+    private external fun resizeFd(fd: Int, pid: Int, rows: Int, columns: Int): Boolean
     private external fun terminateGroup(pid: Int)
 
     class Session internal constructor(private val pid: Int, private val descriptor: ParcelFileDescriptor) : AutoCloseable {
@@ -29,7 +29,7 @@ object NativePty {
         fun resize(rows: Int, columns: Int) {
             require(rows in 2..300 && columns in 10..500) { "终端窗口尺寸无效" }
             check(!closed) { "终端已关闭" }
-            resizeFd(descriptor.fd, pid, rows, columns)
+            check(resizeFd(descriptor.fd, pid, rows, columns)) { "PTY 窗口尺寸调整失败" }
         }
         @Synchronized override fun close() {
             if (closed) return

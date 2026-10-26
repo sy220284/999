@@ -64,7 +64,7 @@ class RuntimeController(private val context: Context) {
         attachmentInputs.clear()
         scope.launch { val p = state.value.project; val changes = withContext(Dispatchers.IO) { changeStore.list(p) }; mutable.update { it.copy(changes = changes) }; refresh() }
     }
-    fun openSession(id: String) { if (!state.value.busy) scope.launch { runSuspendCatching { withContext(Dispatchers.IO) { store.load(id) } }.onSuccess { s -> mutable.update { it.copy(session = s, project = s.project, stream = "", thinking = "", error = null, attachments = emptyList(), changes = emptyList()) }; attachmentInputs.clear(); mutable.update { it.copy(changes = changeStore.list(s.project)) } }.onFailure { fail(it.message ?: "会话读取失败") } } }
+    fun openSession(id: String) { if (!state.value.busy) scope.launch { runSuspendCatching { withContext(Dispatchers.IO) { store.load(id) } }.onSuccess { s -> if (s.project != state.value.project) closeInteractiveTerminal(); mutable.update { it.copy(session = s, project = s.project, stream = "", thinking = "", error = null, attachments = emptyList(), changes = emptyList()) }; attachmentInputs.clear(); mutable.update { it.copy(changes = changeStore.list(s.project)) } }.onFailure { fail(it.message ?: "会话读取失败") } } }
     fun archive(id: String) = scope.launch { if (!state.value.busy) runSuspendCatching { withContext(Dispatchers.IO) { val s = store.load(id); store.save(s.copy(archived = !s.archived)) }; refresh() }.onFailure { fail(it.message.orEmpty()) } }
     fun deleteSession(id: String) = scope.launch {
         if (state.value.busy) return@launch

@@ -59,6 +59,7 @@ import kotlinx.serialization.json.*
     if (modelPicker) AlertDialog(onDismissRequest = { modelPicker = false }, title = { Text("选择模型") }, text = { LazyColumn(Modifier.heightIn(max = 400.dp)) { items(models) { id -> TextButton(onClick = { model = id; modelPicker = false }, modifier = Modifier.fillMaxWidth()) { Text(id, Modifier.fillMaxWidth()) } } } }, confirmButton = { TextButton(onClick = { modelPicker = false }) { Text("关闭") } })
 }
 @Composable fun SkillsScreen(controller: RuntimeController, state: ScreenState) {
+    val scope = rememberCoroutineScope()
     var skills by remember { mutableStateOf(emptyList<Pair<String, String>>()) }
     var additionalRoots by rememberSaveable(state.project) { mutableStateOf("") }
     var reload by remember { mutableIntStateOf(0) }
@@ -77,7 +78,7 @@ import kotlinx.serialization.json.*
         item { Text("让项目带着自己的经验", style = MaterialTheme.typography.titleLarge); Spacer(Modifier.height(8.dp)); Text("支持项目内的“技能”、“.agents/skills”及自定义技能目录。只发现 SKILL.md，不自动安装执行程序。", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant) }
         item {
             OutlinedTextField(additionalRoots, { additionalRoots = it }, label = { Text("额外技能目录（逗号分隔的项目相对路径）") }, modifier = Modifier.fillMaxWidth())
-            TextButton(onClick = { controller.setSkillRoots(additionalRoots.split(",").map { it.trim() }); reload++ }, enabled = !state.busy) { Text("保存技能目录") }
+            TextButton(onClick = { scope.launch { controller.setSkillRoots(additionalRoots.split(",").map { it.trim() }).join(); reload++ } }, enabled = !state.busy) { Text("保存技能目录") }
         }
         if (loading) item { LinearProgressIndicator(Modifier.fillMaxWidth()) }
         if (!loading && skills.isEmpty()) item { EmptyPanel("还没有项目技能", "在文件页创建技能目录并导入 SKILL.md。", Icons.Outlined.AutoAwesome) }
