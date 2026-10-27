@@ -6,6 +6,8 @@ import argparse
 import hashlib
 import json
 import os
+import platform
+import re
 from pathlib import Path
 import shlex
 import shutil
@@ -59,6 +61,22 @@ def archive(url, pin, cache, dest):
 
 
 def prepare(work, ndk, target):
+    # CIPD 的版本标签来自固定 DEPS，但仅靠标签不足以证明二进制内容。
+    # 必须提供经独立核实的 SHA 锁，禁止首次下载时信任并自动回填哈希。
+    if platform.system() != 'Linux' or platform.machine() != 'x86_64':
+        raise ValueError('当前固定 GN/clang/NDK 入口仅支持 Linux x86_64 构建机')
+    lock_file = os.environ.get('CODEX_ANDROID_V8_TOOL_LOCK')
+    if not lock_file:
+        raise ValueError('需要 CODEX_ANDROID_V8_TOOL_LOCK：包含 GN/Ninja 的独立 SHA-256 锁定记录')
+    lock = json.loads(Path(lock_file).read_text())
+    for key, expected in {'source_commit': REVISION, 'host': 'linux-x86_64',
+                          'gn_version': '641ace93dd9560e75e7add0d08f77b446fbb3b78',
+                          'ninja_version': '1.12.1.chromium.4'}.items():
+        if lock.get(key) != expected:
+            raise ValueError(f'V8 工具锁定记录 {key} 与固定源版本不匹配')
+    for name in ('gn_sha256', 'ninja_sha256'):
+        if not isinstance(lock.get(name), str) or not re.fullmatch('[0-9a-f]{64}', lock[name]):
+            raise ValueError(f'工具锁定记录缺少有效 {name}')
     if not os.environ.get('LIBCLANG_PATH'):
         raise ValueError('请先设置构建机 LIBCLANG_PATH，供 bindgen 使用')
     source = work / 'rusty_v8'
@@ -90,6 +108,12 @@ def prepare(work, ndk, target):
     tools = work / 'gn-ninja'
     if not (tools / 'gn/gn').exists() or not (tools / 'ninja/ninja').exists():
         run('python3', source / 'tools/ninja_gn_binaries.py', '--dir', tools, cwd=source)
+    for name, relative in (('gn', 'gn/gn'), ('ninja', 'ninja/ninja')):
+        executable = tools / relative
+        with executable.open('rb') as stream:
+            digest = hashlib.file_digest(stream, 'sha256').hexdigest()
+        if digest != lock[name + '_sha256']:
+            raise ValueError(f'{name} 与独立锁定哈希不匹配；拒绝复用或执行 CIPD 下载的工具')
     libclang = os.environ.get('LIBCLANG_PATH')
     if not libclang:
         raise ValueError('请设置构建机 LIBCLANG_PATH，供 bindgen 使用；不能用 Android 目标库充当宿主 libclang')
@@ -107,7 +131,7 @@ def prepare(work, ndk, target):
         with path.open('rb') as stream:
             tool_digests[str(path)] = hashlib.file_digest(stream, 'sha256').hexdigest()
     modules = subprocess.check_output(['git', '-C', str(source), 'submodule', 'status', '--recursive']).decode()
-    (work / 'source-provenance.json').write_text(json.dumps({'rusty_v8': REVISION, 'extra': EXTRA, 'submodules': modules, 'rust_sha256': RUST_SHA, 'clang_sha256': CLANG_SHA, 'target': target, 'ndk': '28.2.13676358', 'gn': '641ace93dd9560e75e7add0d08f77b446fbb3b78', 'ninja': '1.12.1.chromium.4', 'tool_binary_sha256': tool_digests}, ensure_ascii=False, indent=2) + '\n')
+    (work / 'source-provenance.json').write_text(json.dumps({'rusty_v8': REVISION, 'extra': EXTRA, 'submodules': modules, 'rust_sha256': RUST_SHA, 'clang_sha256': CLANG_SHA, 'target': target, 'ndk': '28.2.13676358', 'gn': '641ace93dd9560e75e7add0d08f77b446fbb3b78', 'ninja': '1.12.1.chromium.4', 'tool_binary_sha256': tool_digests, 'tool_lock': str(Path(lock_file).resolve()), 'tool_lock_sha256': hashlib.sha256(Path(lock_file).read_bytes()).hexdigest()}, ensure_ascii=False, indent=2) + '\n')
     print('已准备固定源码与工具；V8 尚须 Cargo/GN 编译和 Android 验证。')
 
 
