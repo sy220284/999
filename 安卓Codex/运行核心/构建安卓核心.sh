@@ -5,8 +5,6 @@ upstream_commit=970111f6cb62cc02fe36a82ea7d71b37a2889c97
 script_dir="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 app_root="$(cd -- "$script_dir/.." && pwd)"
 v8_mode="${CODEX_ANDROID_V8_MODE:-source}"
-work_root="${CODEX_ANDROID_BUILD_DIR:-$app_root/build/original-engine-$v8_mode}"
-source_root="$work_root/source"
 : "${ANDROID_NDK_ROOT:?请设置 ANDROID_NDK_ROOT，使用 NDK 28.2.13676358}"
 [[ -f "$ANDROID_NDK_ROOT/source.properties" ]] && grep -Eq '^Pkg.Revision[[:space:]]*=[[:space:]]*28\.2\.13676358[[:space:]]*$' "$ANDROID_NDK_ROOT/source.properties" || { echo '需要 NDK 28.2.13676358' >&2; exit 2; }
 abi="${1:-arm64-v8a}"
@@ -21,6 +19,9 @@ case "$abi" in
   x86_64) target=x86_64-linux-android; cc=x86_64-linux-android35-clang ;;
   *) echo '支持的 ABI：arm64-v8a、x86_64' >&2; exit 2 ;;
 esac
+# 不同 ABI 使用独立 Cargo/GN 输出，避免切换目标时复用错误的 V8 归档或绑定。
+work_root="${CODEX_ANDROID_BUILD_DIR:-$app_root/build/original-engine-$v8_mode-$abi}"
+source_root="$work_root/source"
 # 默认从固定源码构建 V8；supply 模式用于复用已核对的同批 Android 库和绑定。
 unset V8_FORCE_DEBUG V8_FROM_SOURCE RUSTY_V8_SKIP_DOWNLOAD DOCS_RS DENO_TRYBUILD RUSTY_V8_SRC_BINDING_URL RUSTY_V8_ARCHIVE RUSTY_V8_ARCHIVE_SHA256 RUSTY_V8_SRC_BINDING_PATH
 case "$v8_mode" in
