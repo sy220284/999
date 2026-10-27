@@ -23,15 +23,24 @@ import kotlinx.serialization.json.*
 @Composable fun OriginalCoreScreen(host: OriginalCoreHost) {
     val state by host.state.collectAsState()
     val extensionState by host.extensions.state.collectAsState()
+    val mcpState by host.mcp.state.collectAsState()
+    var mcpManager by remember { mutableStateOf(false) }
+    val imports = remember(host) { host.mcpImports() }
     var extensions by remember { mutableStateOf(false) }
     var consent by remember { mutableStateOf(false) }
     var draft by remember { mutableStateOf("") }
-    var mcpName by remember { mutableStateOf("") }
     var renamed by remember { mutableStateOf<String?>(null) }
     val context = LocalContext.current
-    if (extensions) { OriginalExtensionsScreen(host.extensions, allowChanges = !state.working && state.turnId == null && !state.loading, onBack = { extensions = false }); return }
+    if (mcpManager) {
+        OriginalMcpScreen(host.mcp, allowChanges = !state.working && state.turnId == null && !state.loading && !extensionState.mutating,
+            imports = imports, authorizationUrl = state.mcpAuthorizationUrl, authorizationName = state.mcpAuthorizationName,
+            hostError = state.error, onDismissHostError = host::dismissError, onLogin = { host.startMcpLogin(it) },
+            onDismissAuthorization = host::dismissMcpLogin, onBack = { mcpManager = false })
+        return
+    }
+    if (extensions) { OriginalExtensionsScreen(host.extensions, allowChanges = !state.working && state.turnId == null && !state.loading && !mcpState.mutating, onBack = { extensions = false }); return }
     val active = state.working || state.turnId != null
-    val editable = state.connected && !state.loading && !extensionState.mutating && !active
+    val editable = state.connected && !state.loading && !extensionState.mutating && !mcpState.mutating && !active
     Column(Modifier.fillMaxSize().imePadding()) {
         LazyColumn(Modifier.weight(1f).fillMaxWidth(), contentPadding = PaddingValues(20.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
             item {
@@ -52,6 +61,7 @@ import kotlinx.serialization.json.*
             if (state.connected) {
                 item {
                     OutlinedButton(onClick = { extensions = true; host.extensions.refresh() }, enabled = !state.loading) { Icon(Icons.Outlined.Extension, null); Spacer(Modifier.width(8.dp)); Text("插件与自动规则") }
+                    OutlinedButton(onClick = { mcpManager = true; host.mcp.refresh() }, enabled = !state.loading) { Icon(Icons.Outlined.Hub, null); Spacer(Modifier.width(8.dp)); Text("MCP 服务管理") }
                     Text(state.account, style = MaterialTheme.typography.titleSmall)
                     Text("账号与 MCP 凭证由 Android Keystore 加密保存在手机，退出核心后仍可恢复。", style = MaterialTheme.typography.bodySmall)
                     Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -59,20 +69,16 @@ import kotlinx.serialization.json.*
                         OutlinedButton(onClick = { host.login(false) }, enabled = !state.loading && !active) { Text("浏览器登录") }
                         TextButton(onClick = { host.loginSavedApiKey() }, enabled = editable) { Text("使用设置中的密钥") }
                         TextButton(onClick = { host.logout() }, enabled = editable) { Text("退出账号") }
-                        TextButton(onClick = host::close, enabled = !state.loading && !extensionState.mutating && !active) { Text("关闭核心") }
+                        TextButton(onClick = host::close, enabled = !state.loading && !extensionState.mutating && !mcpState.mutating && !active) { Text("关闭核心") }
                     }
                 }
-                item {
-                    OutlinedTextField(mcpName, { mcpName = it }, label = { Text("需要登录的 MCP 连接标识") }, singleLine = true, modifier = Modifier.fillMaxWidth())
-                    TextButton(onClick = { host.startMcpLogin(mcpName) }, enabled = editable && mcpName.isNotBlank() && state.mcpAuthorizationUrl == null) { Text("登录 MCP 服务") }
-                    state.mcpAuthorizationUrl?.let { url ->
-                        Text("请在服务页面完成 ${state.mcpAuthorizationName.orEmpty()} 授权。")
-                        Row {
-                            OutlinedButton(onClick = { openOriginalLogin(context, url) }) { Text("打开服务授权") }
-                            TextButton(onClick = host::dismissMcpLogin) { Text("关闭提示") }
-                        }
+                state.mcpAuthorizationUrl?.let { url -> item {
+                    Text("请在服务页面完成 ${state.mcpAuthorizationName.orEmpty()} 授权。")
+                    Row {
+                        OutlinedButton(onClick = { openOriginalLogin(context, url) }) { Text("打开服务授权") }
+                        TextButton(onClick = host::dismissMcpLogin) { Text("关闭提示") }
                     }
-                }
+                } }
                 if (state.loginUrl != null) item {
                     Surface(shape = RoundedCornerShape(14.dp), color = MaterialTheme.colorScheme.surfaceContainer) {
                         Column(Modifier.fillMaxWidth().padding(14.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {

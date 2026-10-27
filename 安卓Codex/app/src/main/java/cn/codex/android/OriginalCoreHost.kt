@@ -52,11 +52,16 @@ class OriginalCoreHost(
     private var stopping: Job? = null
     private val workspace = File(context.filesDir, "工作区/原版项目").apply { mkdirs() }
     private val engineHome = File(context.filesDir, "原版核心数据").apply { mkdirs() }
-    val extensions = OriginalExtensionsController(scope, workspace.absolutePath) { state.value.working || state.value.turnId != null || state.value.loading || otherTaskRunning() }
+    val extensions: OriginalExtensionsController = OriginalExtensionsController(scope, workspace.absolutePath) { state.value.working || state.value.turnId != null || state.value.loading || otherTaskRunning() || mcp.state.value.mutating }
+    val mcp: OriginalMcpController = OriginalMcpController(scope, workspace.absolutePath,
+        activeTask = { state.value.working || state.value.turnId != null || state.value.loading || state.value.closing || otherTaskRunning() || extensions.state.value.mutating },
+        threadId = { state.value.threadId })
+    val configurationChanging get() = extensions.state.value.mutating || mcp.state.value.mutating
+    fun mcpImports() = McpTools(context).connections().map { it.name to it.url }
     private fun error(error: Throwable) { mutable.update { it.copy(error = error.message ?: "原版核心操作失败") } }
     fun dismissError() { mutable.update { it.copy(error = null) } }
     private fun operation(block: suspend (OriginalCodexClient) -> Unit): Job? {
-        if (state.value.loading || state.value.closing || extensions.state.value.mutating) return null
+        if (state.value.loading || state.value.closing || configurationChanging) return null
         val api = client ?: run { error(IllegalStateException("请先启动原版核心")); return null }
         mutable.update { it.copy(loading = true, error = null) }
         return scope.launch {
@@ -108,7 +113,7 @@ class OriginalCoreHost(
         ensureCurrent(epoch, rpc)
         if (config.apiKey.isNotBlank() && config.endpoint.trimEnd('/') == "https://api.openai.com/v1" && api.account().jsonObject["account"] == JsonNull) api.loginApiKey(config.apiKey)
         ensureCurrent(epoch, rpc)
-        client = api; extensions.bind(api)
+        client = api; extensions.bind(api); mcp.bind(api)
         mutable.update { it.copy(connected = true, status = "原版核心已连接 · 凭证由手机 Keystore 加密保存", model = config.model) }
         refreshThreads(api, false); readAccount(api, epoch)
     }
@@ -119,7 +124,7 @@ class OriginalCoreHost(
         if (cancelStartup) startupJob?.cancel()
         operationJob?.cancel(); operationJob = null
         stopping?.cancel(); stopping = null
-        extensions.bind(null)
+        extensions.bind(null); mcp.bind(null)
         turnWaiter?.finished?.completeExceptionally(IllegalStateException("原版核心已停止")); turnWaiter = null
         listener?.cancel(); listener = null
         val session = engine
@@ -207,7 +212,7 @@ class OriginalCoreHost(
         if (current(epoch, api.connection) && client === api) mutable.update { it.copy(account = label) }
     }
     fun send(text: String) {
-        if (text.isBlank() || state.value.loading || state.value.working || extensions.state.value.mutating || !state.value.connected) return
+        if (text.isBlank() || state.value.loading || state.value.working || configurationChanging || !state.value.connected) return
         if (state.value.turnId != null) { error(IllegalStateException("已恢复的回合仍在运行，请先停止或追加指令")); return }
         if (otherTaskRunning()) { error(IllegalStateException("另一个任务正在运行")); return }
         mutable.update { it.copy(working = true, error = null) }
@@ -313,6 +318,10 @@ class OriginalCoreHost(
     }
     private suspend fun notification(epoch: Long, rpc: AppServerConnection, method: String, params: JsonObject) {
         if (!current(epoch, rpc)) return
+        if (method == "mcpServer/startupStatus/updated") {
+            mcp.runtimeChanged(params.string("threadId").ifBlank { null }, params.string("name"), params.string("status"), params.string("error").ifBlank { null })
+            return
+        }
         if (method == "hook/started" || method == "hook/completed") {
             (params["run"] as? JsonObject)?.let { run -> extensions.recordHook(JsonObject(run + mapOf("threadId" to (params["threadId"] ?: JsonNull)))) }
             return

@@ -8,6 +8,7 @@ ROOT = Path(__file__).resolve().parents[1]
 client_path = "core/src/main/kotlin/cn/codex/core/original/OriginalCodexClient.kt"
 host_path = "app/src/main/java/cn/codex/android/OriginalCoreHost.kt"
 extension_path = "core/src/main/kotlin/cn/codex/core/original/OriginalExtensionsController.kt"
+mcp_path = "core/src/main/kotlin/cn/codex/core/original/OriginalMcpController.kt"
 client = (ROOT / client_path).read_text()
 host = (ROOT / host_path).read_text()
 facade = set(re.findall(r'call\("([^"]+)"', client)) | {"thread/archive", "thread/unarchive"}
@@ -29,6 +30,8 @@ for kind, file in [("客户端请求", "ClientRequest.ts"), ("服务端请求", 
                     status = "仅客户端封装，界面待接入"
                 if method.startswith("plugin/") or method in {"hooks/list", "config/read", "config/batchWrite"}:
                     entry += ";" + extension_path
+                if method in {"mcpServerStatus/list", "config/mcpServer/reload", "config/read", "config/batchWrite"}:
+                    entry += ";" + mcp_path
                 phase = "待运行验证/继续语义审阅"
             elif method.startswith(("plugin/", "skills/", "mcpServer/", "config/mcpServer")):
                 phase = "P2"

@@ -86,7 +86,10 @@ class OriginalExtensionsController(private val scope: CoroutineScope, private va
     }
     private suspend fun writeAndReload(api: OriginalCodexClient, stamp: Long, snapshot: OriginalConfigSnapshot, edit: JsonObject) {
         // 冲突/超时不重试，不从新版本自动覆盖；失败由 operation 显示并要求刷新。
-        val result = api.writeConfig(snapshot, edit).jsonObject
+        writeAndReload(api, stamp, snapshot, listOf(edit))
+    }
+    private suspend fun writeAndReload(api: OriginalCodexClient, stamp: Long, snapshot: OriginalConfigSnapshot, edits: List<JsonObject>) {
+        val result = api.writeConfig(snapshot, edits).jsonObject
         if (stamp != generation) return
         val warning = when (result.string("status")) {
             "ok" -> null
@@ -104,13 +107,15 @@ class OriginalExtensionsController(private val scope: CoroutineScope, private va
         require(current.summary.string("availability") == "AVAILABLE") { "当前插件可用策略不允许修改" }
         writeAndReload(api, stamp, snapshot, OriginalConfigEdits.plugin(current.id, !current.enabled))
     }
-    fun changeHook(approved: JsonObject, trust: Boolean) = operation(mutating = true) { api, stamp ->
+    fun changeHook(approved: JsonObject, trust: Boolean, revoke: Boolean = false) = operation(mutating = true) { api, stamp ->
         val snapshot = state.value.configSnapshot ?: error("缺少用户配置版本，请刷新")
         val groups = (api.hooks(cwd, null).jsonObject["data"] as? JsonArray).orEmpty()
         val matches = groups.mapNotNull { it as? JsonObject }.flatMap { (it["hooks"] as? JsonArray).orEmpty().mapNotNull { hook -> hook as? JsonObject } }
             .filter { it.string("key") == approved.string("key") }
         val current = matches.singleOrNull() ?: error("规则身份缺失或不唯一，请刷新")
-        writeAndReload(api, stamp, snapshot, OriginalConfigEdits.hook(approved, current, trust))
+        if (revoke) writeAndReload(api, stamp, snapshot, OriginalConfigEdits.revokeHook(approved, current))
+        else writeAndReload(api, stamp, snapshot, OriginalConfigEdits.hook(approved, current, trust))
+        if (revoke && stamp == generation) mutable.update { it.copy(status = "请核查刷新后的规则状态；其他配置来源仍可能保留信任或覆盖停用设置") }
     }
     fun recordHook(run: JsonObject) {
         val item = OriginalExtensions.hookRun(run)

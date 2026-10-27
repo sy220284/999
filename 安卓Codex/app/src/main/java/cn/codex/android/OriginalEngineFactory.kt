@@ -34,12 +34,9 @@ object NativeOriginalEngineFactory : OriginalEngineFactory {
         require(endpoint.scheme == "https" || config.allowLoopbackHttp && endpoint.scheme == "http" && endpoint.host in setOf("localhost", "127.0.0.1", "[::1]", "::1")) { "原版核心仅接受 HTTPS 或已允许的本机 HTTP 地址" }
         require(!endpoint.host.isNullOrBlank() && endpoint.rawUserInfo == null && endpoint.rawQuery == null && endpoint.rawFragment == null) { "模型地址需要有效主机名，且不可包含凭证、查询或片段" }
         val args = mutableListOf("--listen", "stdio://", "-c", "cli_auth_credentials_store=\"keyring\"", "-c", "mcp_oauth_credentials_store=\"keyring\"", "-c", "shell_environment_policy.inherit=\"core\"")
-        for (server in McpTools(context).connections()) {
-            val url = URI(server.url)
-            require(url.scheme == "https" && !url.host.isNullOrBlank() && url.rawUserInfo == null) { "MCP 连接需要不含凭证的 HTTPS 地址" }
-            require(server.name.matches(Regex("[A-Za-z0-9_-]{1,32}"))) { "MCP 连接标识不适用于原版配置" }
-            args += listOf("-c", "mcp_servers.${server.name}.url=${JsonPrimitive(server.url)}")
-        }
+        // 原版 MCP 配置由管理页版本化保存，不再用每次启动的 CLI override 覆盖用户编辑。
+        // 空文件仅首次创建；createNewFile 原子地保留已经存在的配置。
+        File(home, "config.toml").createNewFile()
         val trust = AndroidTrustBundle.write(home)
         val vault = OriginalVaultServer(context, scope)
         var child: NativeCoreProcess? = null

@@ -48,7 +48,10 @@ class OriginalCodexClient(val connection: AppServerConnection) {
     suspend fun models(cursor: String? = null) = call("model/list", buildJsonObject { cursor?.let { put("cursor", it) }; put("limit", 100) })
     suspend fun rateLimits() = call("account/rateLimits/read")
     suspend fun skills(cwd: String) = call("skills/list", buildJsonObject { put("cwds", buildJsonArray { add(cwd) }) })
-    suspend fun mcp(cursor: String? = null) = call("mcpServerStatus/list", buildJsonObject { cursor?.let { put("cursor", it) } })
+    suspend fun mcp(cursor: String? = null, threadId: String? = null) = call("mcpServerStatus/list", buildJsonObject {
+        cursor?.let { put("cursor", it) }; threadId?.let { put("threadId", it) }; put("limit", 30); put("detail", "full")
+    })
+    suspend fun reloadMcp() = call("config/mcpServer/reload")
     suspend fun hooks(cwd: String, threadId: String?) = call("hooks/list", buildJsonObject {
         if (threadId == null) put("cwds", buildJsonArray { add(cwd) }) else put("threadId", threadId)
     })
@@ -64,8 +67,9 @@ class OriginalCodexClient(val connection: AppServerConnection) {
     suspend fun mcpLogin(name: String, threadId: String?) = call("mcpServer/oauth/login", buildJsonObject {
         put("name", name); threadId?.let { put("threadId", it) }; put("timeoutSecs", 180)
     })
-    suspend fun config() = call("config/read", buildJsonObject { put("includeLayers", true) })
+    suspend fun config(cwd: String? = null) = call("config/read", buildJsonObject { put("includeLayers", true); cwd?.let { put("cwd", it) } })
     suspend fun writeConfig(snapshot: OriginalConfigSnapshot, edit: JsonObject) = call("config/batchWrite", OriginalConfigEdits.request(snapshot, edit))
+    suspend fun writeConfig(snapshot: OriginalConfigSnapshot, edits: List<JsonObject>) = call("config/batchWrite", OriginalConfigEdits.request(snapshot, edits))
     private fun id(threadId: String) = buildJsonObject { put("threadId", threadId) }
     companion object {
         fun textInput(text: String) = buildJsonArray { add(buildJsonObject { put("type", "text"); put("text", text); put("text_elements", buildJsonArray {}) }) }

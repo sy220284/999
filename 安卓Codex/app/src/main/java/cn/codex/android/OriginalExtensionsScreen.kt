@@ -20,6 +20,8 @@ import cn.codex.core.string
 import cn.codex.core.original.*
 import kotlinx.serialization.json.*
 
+private data class HookConfirmation(val hook: JsonObject, val trust: Boolean, val revoke: Boolean = false)
+
 @Composable fun OriginalExtensionsScreen(controller: OriginalExtensionsController, allowChanges: Boolean, onBack: () -> Unit) {
     val state by controller.state.collectAsState()
     var tab by remember { mutableStateOf("插件") }
@@ -27,7 +29,7 @@ import kotlinx.serialization.json.*
     var search by remember { mutableStateOf("") }
     var confirm by remember { mutableStateOf<Pair<OriginalPlugin, Boolean>?>(null) }
     var togglePlugin by remember { mutableStateOf<OriginalPlugin?>(null) }
-    var hookConfirm by remember { mutableStateOf<Pair<JsonObject, Boolean>?>(null) }
+    var hookConfirm by remember { mutableStateOf<HookConfirmation?>(null) }
     val context = LocalContext.current
     val motion = LocalMotionEnabled.current
     BackHandler(onBack = onBack)
@@ -92,8 +94,9 @@ import kotlinx.serialization.json.*
                             val managed = hook["isManaged"]?.jsonPrimitive?.booleanOrNull != false || hook.string("trustStatus") == "managed"
                             Row(Modifier.horizontalScroll(rememberScrollState())) {
                                 val canEdit = !state.busy && state.connected && allowChanges && state.configSnapshot != null && !managed && hook.string("currentHash").isNotBlank() && hook.string("trustStatus") in setOf("trusted", "untrusted", "modified")
-                                TextButton(onClick = { hookConfirm = hook to false }, enabled = canEdit) { Text(if (enabled) "停用规则" else "启用规则") }
-                                if (hook.string("trustStatus") in setOf("untrusted", "modified")) TextButton(onClick = { hookConfirm = hook to true }, enabled = canEdit) { Text("查看并信任") }
+                                TextButton(onClick = { hookConfirm = HookConfirmation(hook, false) }, enabled = canEdit) { Text(if (enabled) "停用规则" else "启用规则") }
+                                if (hook.string("trustStatus") in setOf("untrusted", "modified")) TextButton(onClick = { hookConfirm = HookConfirmation(hook, true) }, enabled = canEdit) { Text("查看并信任") }
+                                if (hook.string("trustStatus") in setOf("trusted", "modified")) TextButton(onClick = { hookConfirm = HookConfirmation(hook, false, true) }, enabled = canEdit) { Text("移除信任并停用") }
                             }
                             if (managed) Text("由策略管理或状态未知，不能在此修改", style = MaterialTheme.typography.bodySmall)
 
@@ -114,17 +117,17 @@ import kotlinx.serialization.json.*
             Text("${plugin.displayName}\n市场：${plugin.marketplace}\n标识：${plugin.id}\n\n修改用户配置并重新读取有效状态。更高优先级策略可能覆盖此设置。")
         }, confirmButton = { TextButton(onClick = { togglePlugin = null; controller.togglePlugin(plugin) }, enabled = state.connected && !state.busy && allowChanges && state.configSnapshot != null) { Text("确认修改") } }, dismissButton = { TextButton(onClick = { togglePlugin = null }) { Text("取消") } })
     }
-    hookConfirm?.let { (hook, trust) ->
-        AlertDialog(onDismissRequest = { hookConfirm = null }, title = { Text(if (trust) "信任此版本的规则" else "修改规则启用状态") }, text = {
+    hookConfirm?.let { (hook, trust, revoke) ->
+        AlertDialog(onDismissRequest = { hookConfirm = null }, title = { Text(if (revoke) "移除用户信任并停用" else if (trust) "信任此版本的规则" else "修改规则启用状态") }, text = {
             Column(Modifier.heightIn(max = 430.dp).verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(10.dp)) {
                 Text(hookEventTitle(hook.string("eventName")))
                 Text("来源：${hook.string("sourcePath")}\n标识：${hook.string("key")}\n处理器：${hook.string("handlerType")}")
                 Text(hook.string("command").ifBlank { "此处理器的完整内容需在来源文件中核查，请确认了解其行为后再信任。" })
-                if (trust) Text(Json { prettyPrint = true }.encodeToString(JsonObject.serializer(), hook), style = MaterialTheme.typography.bodySmall)
+                if (trust || revoke) Text(Json { prettyPrint = true }.encodeToString(JsonObject.serializer(), hook), style = MaterialTheme.typography.bodySmall)
                 Text("内容哈希：${hook.string("currentHash")}", style = MaterialTheme.typography.bodySmall)
-                Text(if (trust) "信任后，这一版本的规则可参与自动执行，可能运行命令或调用服务。请核查来源与行为。此操作只记录信任，不自动启用规则；内容变化后需要再次确认。" else "修改启用状态不会授予信任。运行仍受原版信任检查与配置策略限制。")
+                Text(if (revoke) "移除当前用户配置记录的两类信任哈希，并同时停用规则。其他配置来源可能仍保留信任或覆盖此设置；提交后请核查刷新后的实际状态。" else if (trust) "信任后，这一版本的规则可参与自动执行，可能运行命令或调用服务。请核查来源与行为。此操作只记录信任，不自动启用规则；内容变化后需要再次确认。" else "修改启用状态不会授予信任。运行仍受原版信任检查与配置策略限制。")
             }
-        }, confirmButton = { TextButton(onClick = { hookConfirm = null; controller.changeHook(hook, trust) }, enabled = state.connected && !state.busy && allowChanges && state.configSnapshot != null) { Text(if (trust) "信任此哈希" else "确认修改") } }, dismissButton = { TextButton(onClick = { hookConfirm = null }) { Text("取消") } })
+        }, confirmButton = { TextButton(onClick = { hookConfirm = null; controller.changeHook(hook, trust, revoke) }, enabled = state.connected && !state.busy && allowChanges && state.configSnapshot != null) { Text(if (revoke) "移除并停用" else if (trust) "信任此哈希" else "确认修改") } }, dismissButton = { TextButton(onClick = { hookConfirm = null }) { Text("取消") } })
     }
     confirm?.let { (plugin, install) ->
         val detail = state.detail?.takeIf { state.detailKey == plugin.key }

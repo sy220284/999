@@ -10,9 +10,9 @@ class OriginalConfigEditsTest {
         put("name", buildJsonObject { put("type", type); put("file", "/config/$version.toml") })
         put("version", version); put("disabledReason", if (disabled) JsonPrimitive("policy") else JsonNull)
     }
-    @Test fun lastUserLayerMatchesUpstreamProfileSelection() {
+    @Test fun firstWireUserLayerMatchesUpstreamActiveProfileSelection() {
         val snapshot = OriginalConfigEdits.snapshot(buildJsonObject { put("layers", buildJsonArray {
-            add(layer("user", "base")); add(layer("project", "project")); add(layer("user", "profile"))
+            add(layer("project", "project")); add(layer("user", "profile")); add(layer("user", "base"))
         }) })!!
         assertEquals("profile", snapshot.version)
         assertEquals("/config/profile.toml", snapshot.file)
@@ -22,6 +22,10 @@ class OriginalConfigEditsTest {
         for (entry in listOf(layer("user", "", false), layer("user", "disabled", true))) {
             assertNull(OriginalConfigEdits.snapshot(buildJsonObject { put("layers", buildJsonArray { add(entry) }) }))
         }
+        // 不能跳过活动但禁用的 profile，误写到较低优先级的 base。
+        assertNull(OriginalConfigEdits.snapshot(buildJsonObject { put("layers", buildJsonArray {
+            add(layer("user", "profile", true)); add(layer("user", "base"))
+        }) }))
     }
     @Test fun pluginKeysAreNestedDataAndWritesCarryExactVersion() {
         val snapshot = OriginalConfigSnapshot("/user/config.toml", "revision-3")
@@ -47,4 +51,14 @@ class OriginalConfigEditsTest {
         val unknown = JsonObject(hook() + ("trustStatus" to JsonPrimitive("future")))
         assertFailsWith<IllegalArgumentException> { OriginalConfigEdits.hook(unknown, unknown, false) }
     }
+    @Test fun revokingUserTrustAtomicallyRemovesBothHashesAndDisablesWithoutErasingOtherFields() {
+        val hook = buildJsonObject { put("key", "file.with.dots/key"); put("currentHash", "abc"); put("isManaged", false); put("trustStatus", "trusted") }
+        val edits = OriginalConfigEdits.revokeHook(hook, hook)
+        val request = OriginalConfigEdits.request(OriginalConfigSnapshot("/config.toml", "v1"), edits)
+        assertEquals(3, request.getValue("edits").jsonArray.size)
+        assertEquals("hooks.state.\"file.with.dots/key\".trusted_hash", edits[0].getValue("keyPath").jsonPrimitive.content)
+        assertEquals(JsonNull, edits[0]["value"]); assertEquals(JsonNull, edits[1]["value"])
+        assertFalse(edits[2].getValue("value").jsonObject.getValue("file.with.dots/key").jsonObject.getValue("enabled").jsonPrimitive.boolean)
+    }
+
 }
