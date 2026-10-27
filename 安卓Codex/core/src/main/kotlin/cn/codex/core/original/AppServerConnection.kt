@@ -38,8 +38,11 @@ class AppServerConnection(
                 val id = message["id"]
                 if (method != null) {
                     val params = message["params"] ?: JsonNull
-                    incoming.send(if (id != null && id != JsonNull) ServerMessage.Request(id, method, params)
-                        else ServerMessage.Notification(method, params))
+                    // 不能阻塞协议 reader：否则 UI 回调等待 RPC 响应时，满队列会造成双向死锁。
+                    // 保留有界队列；处理速度不足时明确断开并清理 pending，绝不无限积压。
+                    val event = if (id != null && id != JsonNull) ServerMessage.Request(id, method, params)
+                        else ServerMessage.Notification(method, params)
+                    if (!incoming.trySend(event).isSuccess) throw IOException("原版通知队列已满，已断开连接以避免协议死锁")
                 } else if (id != null && id != JsonNull) {
                     val waiter = pending.remove(id.toString()) ?: continue
                     val error = message["error"] as? JsonObject
@@ -104,7 +107,10 @@ class AppServerConnection(
                 if (bytes.size() != 0) throw EOFException("原版核心在协议帧结束前退出")
                 return null
             }
-            if (value == 10) return bytes.toString(Charsets.UTF_8.name())
+            if (value == 10) return Charsets.UTF_8.newDecoder()
+                .onMalformedInput(java.nio.charset.CodingErrorAction.REPORT)
+                .onUnmappableCharacter(java.nio.charset.CodingErrorAction.REPORT)
+                .decode(java.nio.ByteBuffer.wrap(bytes.toByteArray())).toString()
             if (bytes.size() >= maxFrameBytes) throw IOException("原版核心协议帧超过上限")
             bytes.write(value)
         }
