@@ -257,4 +257,45 @@ class OriginalCoreHostTest {
         } finally { withContext(Dispatchers.Main) { host.close() };session.dispose();scope.cancel() }
     }
 
+    @Test fun legacyCallbacksUseTheSameQueueAndResolvedRequestsCannotBeAnswered() = runBlocking {
+        val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
+        lateinit var session: FakeSession
+        val host = host(scope, OriginalEngineFactory { launch -> FakeSession(launch.scope).also { session = it } })
+        try {
+            withContext(Dispatchers.Main) { host.connect() }; ready(host)
+            session.emit(buildJsonObject { put("id", "legacy"); put("method", "execCommandApproval"); put("params", buildJsonObject {
+                put("conversationId", "thread"); put("callId", "call"); put("command", buildJsonArray { add("pwd") }); put("cwd", "/project")
+            }) })
+            val request = withTimeout(5000) { host.state.first { it.requests.isNotEmpty() } }.requests.single()
+            session.notify("serverRequest/resolved", buildJsonObject { put("threadId", "thread"); put("requestId", "legacy") })
+            withTimeout(5000) { host.state.first { it.requests.isEmpty() } }
+            withContext(Dispatchers.Main) { host.answer(request, OriginalLegacyApproval.decision(true)) }.join()
+            session.connection.request("test/barrier")
+            assertEquals(0, session.clientResponses.get())
+        } finally { withContext(Dispatchers.Main) { host.close() }; session.dispose(); scope.cancel() }
+    }
+    @Test fun liveProgressIgnoresOtherThreadsAndClearsOnViewChangeAndDisconnect() = runBlocking {
+        val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
+        lateinit var session: FakeSession
+        val host = host(scope, OriginalEngineFactory { launch -> FakeSession(launch.scope).also { session = it } })
+        fun plan(thread: String, turn: String) = buildJsonObject {
+            put("threadId", thread); put("turnId", turn); put("plan", buildJsonArray {})
+        }
+        try {
+            withContext(Dispatchers.Main) { host.connect() }; ready(host)
+            withContext(Dispatchers.Main) { host.openThread("thread") }
+            withTimeout(5000) { host.state.first { !it.loading && it.threadId == "thread" } }
+            session.notify("turn/plan/updated", plan("other", "foreign"))
+            session.notify("turn/plan/updated", plan("thread", "current"))
+            val state = withTimeout(5000) { host.state.first { "current" in it.turnProgress } }
+            assertFalse("foreign" in state.turnProgress)
+            withContext(Dispatchers.Main) { host.openThread("thread") }
+            withTimeout(5000) { host.state.first { !it.loading && it.turnProgress.isEmpty() } }
+            session.notify("turn/plan/updated", plan("thread", "again"))
+            withTimeout(5000) { host.state.first { "again" in it.turnProgress } }
+            withContext(Dispatchers.Main) { host.close() }; closed(host)
+            assertTrue(host.state.value.turnProgress.isEmpty())
+        } finally { withContext(Dispatchers.Main) { host.close() }; session.dispose(); scope.cancel() }
+    }
+
 }

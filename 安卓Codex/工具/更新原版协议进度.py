@@ -16,8 +16,12 @@ client = (ROOT / client_path).read_text()
 host = (ROOT / host_path).read_text()
 facade = set(re.findall(r'call\("([^"]+)"', client)) | {"thread/archive", "thread/unarchive"}
 notifications = set(re.findall(r'"method": "([^"]+)"', (ROOT / "源码对照/ServerNotification.ts").read_text()))
-handled = {m for m in notifications if f'"{m}" ->' in host or f'method == "{m}"' in host}
-queued = {"item/commandExecution/requestApproval", "item/fileChange/requestApproval", "item/tool/requestUserInput", "mcpServer/elicitation/request", "item/permissions/requestApproval"}
+# when 的同一分支可列出多个方法；不能漏计其中非最后一个方法。
+branches = set()
+for group in re.findall(r'((?:"[^"\n]+"\s*,\s*)*"[^"\n]+")\s*->', host):
+    branches.update(re.findall(r'"([^"\n]+)"', group))
+handled = {m for m in notifications if m in branches or f'method == "{m}"' in host}
+queued = {"item/commandExecution/requestApproval", "item/fileChange/requestApproval", "item/tool/requestUserInput", "mcpServer/elicitation/request", "item/permissions/requestApproval", "execCommandApproval", "applyPatchApproval"}
 closure = {r['method']: r for r in json.loads((ROOT / "文档/剩余31项闭环映射.json").read_text())} if (ROOT / "文档/剩余31项闭环映射.json").exists() else {}
 rows = []
 for kind, file in [("客户端请求", "ClientRequest.ts"), ("服务端请求", "ServerRequest.ts"), ("服务端通知", "ServerNotification.ts")]:

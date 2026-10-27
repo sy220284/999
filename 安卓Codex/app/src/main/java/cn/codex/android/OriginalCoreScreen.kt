@@ -208,6 +208,9 @@ import kotlinx.serialization.json.*
                         }
                     }
                 }
+                state.turnProgress.entries.toList().takeLast(3).forEach { (turnId, progress) ->
+                    item(key = "progress:$turnId") { ExpandableCard("运行进展 · ${turnId.takeLast(8)}", OriginalLiveUpdates.describe(progress), Icons.Outlined.Info) }
+                }
                 if (state.report.isNotBlank()) item { ExpandableCard("核心返回详情", state.report, Icons.Outlined.Info) }
             }
         }
@@ -236,6 +239,7 @@ internal fun openOriginalLogin(context: android.content.Context, url: String) {
 
 @Composable private fun OriginalRequestDialog(request: ServerMessage.Request, items: List<OriginalItem>, respond: (JsonElement) -> Unit) {
     val params = request.params as? JsonObject ?: buildJsonObject {}
+    if (request.method in setOf("execCommandApproval", "applyPatchApproval")) { OriginalLegacyApprovalDialog(request, respond); return }
     if (request.method == "item/permissions/requestApproval") { OriginalPermissionDialog(params, respond); return }
     var answers by remember(request.id) { mutableStateOf(emptyMap<String, String>()) }
     val question = request.method == "item/tool/requestUserInput"
@@ -307,4 +311,16 @@ internal fun openOriginalLogin(context: android.content.Context, url: String) {
             respond(result)
         }, enabled = if (question) questions.all { !answers[it.string("id")].isNullOrBlank() } else canReview) { Text(if (question) "提交回答" else "允许此次操作") }
     }, dismissButton = { TextButton(onClick = ::decline) { Text(if (question) "暂不回答" else "拒绝") } })
+}
+
+@Composable private fun OriginalLegacyApprovalDialog(request: ServerMessage.Request, respond: (JsonElement) -> Unit) {
+    val preview = remember(request) { OriginalLegacyApproval.preview(request.method, request.params as? JsonObject ?: buildJsonObject {}) }
+    fun decline() = respond(OriginalLegacyApproval.decision(false))
+    AlertDialog(onDismissRequest = ::decline, title = { Text(preview.title) }, text = {
+        Column(Modifier.heightIn(max = 480.dp).verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            androidx.compose.foundation.text.selection.SelectionContainer { Text(preview.body, style = MaterialTheme.typography.bodySmall) }
+            if (!preview.reviewable) Text("无法完整核对内容，只能拒绝此次请求。", color = MaterialTheme.colorScheme.error)
+        }
+    }, confirmButton = { TextButton(onClick = { respond(OriginalLegacyApproval.decision(true)) }, enabled = preview.reviewable) { Text("允许此次请求") } },
+        dismissButton = { TextButton(onClick = ::decline) { Text("拒绝") } })
 }

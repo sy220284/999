@@ -30,6 +30,7 @@ data class OriginalState(
     val ownerType: String = "", val ownerKey: String = "",
     val threadStatuses: Map<String, JsonObject> = emptyMap(),
     val guardianReviews: List<JsonObject> = emptyList(),
+    val turnProgress: Map<String, OriginalTurnProgress> = emptyMap(),
     val sections: List<JsonObject> = emptyList(), val sectionCursor: String? = null,
     val turns: List<JsonObject> = emptyList(), val turnCursor: String? = null,
     val models: List<String> = emptyList(), val model: String = "", val report: String = ""
@@ -191,7 +192,7 @@ class OriginalCoreHost(
         val items = OriginalThreadView.history(thread)
         lifecycle.accept(lifecycle.state.connectionEpoch, OriginalLifecycleEvent.ThreadSelected(thread.string("id"), active))
         syncLifecycle()
-        mutable.update { it.copy(items = items, threadGitInfo = thread["gitInfo"] as? JsonObject, attachmentOwners = OriginalSessionPage(), ownerType = "", ownerKey = "", goal = null, attachments = emptyList(), attachmentCursor = null, turns = emptyList(), turnCursor = null, historyCursor = null, model = thread.string("model", it.model), status = if (lifecycle.state.turnId == null) "会话已恢复" else "已恢复正在运行的回合") }
+        mutable.update { it.copy(items = items, turnProgress = emptyMap(), threadGitInfo = thread["gitInfo"] as? JsonObject, attachmentOwners = OriginalSessionPage(), ownerType = "", ownerKey = "", goal = null, attachments = emptyList(), attachmentCursor = null, turns = emptyList(), turnCursor = null, historyCursor = null, model = thread.string("model", it.model), status = if (lifecycle.state.turnId == null) "会话已恢复" else "已恢复正在运行的回合") }
     }
     fun loadHistory() = operation { api ->
         val snapshot = state.value
@@ -314,7 +315,7 @@ class OriginalCoreHost(
         val thread = idleThread()
         if (delete) api.deleteThread(thread) else api.unsubscribe(thread)
         lifecycle.accept(lifecycle.state.connectionEpoch, OriginalLifecycleEvent.ThreadCleared); syncLifecycle()
-        mutable.update { it.copy(items = emptyList(), goal = null, attachments = emptyList(), turns = emptyList(), historyCursor = null, attachmentCursor = null, turnCursor = null, status = if (delete) "会话已删除" else "已关闭当前会话视图") }
+        mutable.update { it.copy(items = emptyList(), turnProgress = emptyMap(), goal = null, attachments = emptyList(), turns = emptyList(), historyCursor = null, attachmentCursor = null, turnCursor = null, status = if (delete) "会话已删除" else "已关闭当前会话视图") }
         refreshThreads(api, state.value.archived)
     }
     fun inspect(kind: String) = operation { api ->
@@ -478,7 +479,7 @@ class OriginalCoreHost(
         if (!current(epoch, rpc)) return
         when (message) {
             is ServerMessage.Request -> {
-                if (message.method in setOf("item/commandExecution/requestApproval", "item/fileChange/requestApproval", "item/tool/requestUserInput", "mcpServer/elicitation/request", "item/permissions/requestApproval")) {
+                if (message.method in setOf("item/commandExecution/requestApproval", "item/fileChange/requestApproval", "item/tool/requestUserInput", "mcpServer/elicitation/request", "item/permissions/requestApproval", "execCommandApproval", "applyPatchApproval")) {
                     if (state.value.requests.size >= 32) rpc.reject(message.id, -32000, "待处理交互数量达到上限")
                     else mutable.update { it.copy(requests = it.requests + message) }
                 } else rpc.reject(message.id)
@@ -539,6 +540,11 @@ class OriginalCoreHost(
         if (method == "serverRequest/resolved") { mutable.update { it.copy(requests = it.requests.filterNot { r -> r.id == params["requestId"] }) }; return }
         if (params.string("threadId").isNotBlank() && params.string("threadId") != state.value.threadId) return
         when (method) {
+            "turn/plan/updated", "thread/tokenUsage/updated", "item/mcpToolCall/progress", "item/commandExecution/terminalInteraction", "item/fileChange/outputDelta" -> {
+                // 非当前会话/未知会话的通知不得进入正在查看的对话。
+                if (params.string("threadId") != state.value.threadId) return
+                mutable.update { it.copy(turnProgress = OriginalLiveUpdates.reduce(it.turnProgress, method, params)) }
+            }
             "turn/started" -> {
                 val id = (params["turn"] as? JsonObject)?.string("id").orEmpty()
                 if (id.isNotBlank() && id !in lifecycle.state.completedTurnIds) turnWaiter?.takeIf { it.epoch == epoch && it.threadId == params.string("threadId") }?.observedStart?.complete(id)
