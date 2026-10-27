@@ -35,19 +35,23 @@ import kotlinx.serialization.json.*
             OutlinedButton(onClick = {
                 mutate { current ->
                     require(command.isNotBlank()) { "命令不能为空" }
-                    val group = buildJsonObject {
-                        if (matcher.isNotBlank()) put("matcher", matcher)
-                        put("hooks", buildJsonArray { add(buildJsonObject { put("type", "command"); put("command", command) }) })
-                    }
                     val selected = editing
                     val groups = (current[event] as? JsonArray).orEmpty().toMutableList()
-                    if (selected != null) {
+                    val previous = if (selected == null) null else {
                         require(selected.first == event && selected.second in groups.indices) { "要编辑的匹配组已变化，请重新选择" }
-                        // 其他类型处理器只能在完整 JSON 中编辑，防止结构化表单覆盖其高级字段。
-                        val old = groups[selected.second] as? JsonObject
-                        require((old?.get("hooks") as? JsonArray)?.let { handlers -> handlers.size == 1 && (handlers.firstOrNull() as? JsonObject)?.get("type")?.jsonPrimitive?.content == "command" } == true) { "此匹配组含高级处理器，请在下方完整 JSON 中编辑" }
-                        groups[selected.second] = group
-                    } else groups.add(group)
+                        groups[selected.second] as? JsonObject ?: error("匹配组格式已变化")
+                    }
+                    // 修改已存在的命令时保留高级组字段和处理器字段（如超时），只改变明确编辑的值。
+                    val handler = (previous?.get("hooks") as? JsonArray)?.singleOrNull() as? JsonObject
+                    if (previous != null) require(handler?.get("type")?.jsonPrimitive?.content == "command") { "此匹配组含高级处理器，请在下方完整 JSON 中编辑" }
+                    val fields = previous?.toMutableMap() ?: mutableMapOf()
+                    if (matcher.isNotBlank()) fields["matcher"] = JsonPrimitive(matcher) else fields.remove("matcher")
+                    fields["hooks"] = buildJsonArray {
+                        add(JsonObject((handler?.toMutableMap() ?: mutableMapOf()) + mapOf(
+                            "type" to JsonPrimitive("command"), "command" to JsonPrimitive(command))))
+                    }
+                    val group = JsonObject(fields)
+                    if (selected != null) groups[selected.second] = group else groups.add(group)
                     JsonObject(current + (event to JsonArray(groups)))
                 }
                 if (localError == null) { command = ""; matcher = ""; editing = null }
