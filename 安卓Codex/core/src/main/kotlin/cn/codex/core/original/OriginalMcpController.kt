@@ -5,7 +5,7 @@ import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.*
 import kotlinx.serialization.json.*
 
-data class OriginalMcpEditor(val generation: Long, val snapshot: OriginalConfigSnapshot, val name: String?, val original: JsonObject, val suggestedName: String = "")
+data class OriginalMcpEditor(val generation: Long, val snapshot: OriginalConfigSnapshot, val name: String?, val original: JsonObject, val suggestedName: String = "", val advanced: Boolean = false)
 data class OriginalMcpState(
     val connected: Boolean = false, val busy: Boolean = false, val mutating: Boolean = false,
     val config: JsonObject? = null, val snapshot: OriginalConfigSnapshot? = null,
@@ -31,12 +31,12 @@ class OriginalMcpController(private val scope: CoroutineScope, private val cwd: 
     }
     fun dismissError() { mutable.update { it.copy(error = null) } }
     fun closeEditor() { if (!state.value.mutating) mutable.update { it.copy(editor = null) } }
-    fun edit(name: String? = null) {
+    fun edit(name: String? = null, advanced: Boolean = false) {
         val snapshot = state.value.snapshot ?: return
         if (state.value.busy) return
         val entry = name?.let { value -> state.value.entries.singleOrNull { it.name == value } }
         if (name != null && entry?.editable != true) return
-        mutable.update { it.copy(editor = OriginalMcpEditor(generation, snapshot, name, entry?.userConfig ?: buildJsonObject {}), error = null) }
+        mutable.update { it.copy(editor = OriginalMcpEditor(generation, snapshot, name, entry?.userConfig ?: buildJsonObject {}, advanced = advanced), error = null) }
     }
     fun importConnection(name: String, url: String) {
         val snapshot = state.value.snapshot ?: return

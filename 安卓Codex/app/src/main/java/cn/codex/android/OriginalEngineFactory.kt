@@ -43,6 +43,7 @@ object NativeOriginalEngineFactory : OriginalEngineFactory {
         var rpc: AppServerConnection? = null
         return try {
             val env = System.getenv().toMutableMap().apply {
+                put("PATH", (context.applicationContext as CodexApplication).toolPath)
                 put("CODEX_HOME", home.absolutePath); put("HOME", home.absolutePath)
                 put("CODEX_ANDROID_VAULT_SOCKET", vault.path); put("CODEX_ANDROID_VAULT_HOST_PID", android.os.Process.myPid().toString())
                 put("TMPDIR", context.cacheDir.absolutePath); put("SHELL", "/system/bin/sh")

@@ -14,6 +14,7 @@ object OriginalThreadView {
             "reasoning" -> (value["summary"] as? JsonArray).orEmpty().joinToString("\n") { it.jsonPrimitive.content }
             "commandExecution" -> value.string("command") + "\n" + value.string("aggregatedOutput")
             "fileChange" -> (value["changes"] as? JsonArray).orEmpty().mapNotNull { it as? JsonObject }.joinToString("\n") { it.string("path") + ((it["kind"] as? JsonObject)?.string("move_path")?.takeIf { path -> path.isNotBlank() }?.let { path -> " → $path" } ?: "") + "\n" + it.string("diff") }
+            "collabAgentToolCall" -> listOf("协作：${value.string("tool")}", "状态：${value.string("status")}", value.string("prompt"), (value["agentsStates"] as? JsonObject)?.entries?.joinToString("\n") { (id, state) -> "$id：$state" }.orEmpty()).filter(String::isNotBlank).joinToString("\n")
             "mcpToolCall" -> value.string("server") + " / " + value.string("tool")
             else -> type
         }

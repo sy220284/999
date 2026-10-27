@@ -22,8 +22,36 @@ class ElicitationFormTest {
         assertFailsWith<IllegalArgumentException> { form.content(mapOf("name" to "bad")) }
         assertFailsWith<IllegalArgumentException> { form.content(mapOf("name" to "OK")) }
     }
-    @Test fun nestedAndConditionalFormsAreExplicitlyUnsupported() {
-        assertFalse(schema("""{"type":"object","properties":{"nested":{"type":"object"}}}""").supported)
-        assertFalse(schema("""{"type":"object","oneOf":[{},{}],"properties":{}}""").supported)
+    @Test fun nestedAndConditionalFormsAreAcceptedButExternalReferencesAreNot() {
+        assertTrue(schema("""{"type":"object","properties":{"nested":{"type":"object"}}}""").supported)
+        assertTrue(schema("""{"type":"object","oneOf":[{},{}],"properties":{}}""").supported)
+        assertFalse(schema("""{"type":"object","${'$'}ref":"https://example.com/schema"}""").supported)
     }
+    @Test fun nestedArraysAndConditionalDependenciesValidateActualValues() {
+        val form = schema("""{"type":"object","required":["rows"],"properties":{"rows":{"type":"array","minItems":1,"uniqueItems":true,"items":{"type":"object","required":["count"],"additionalProperties":false,"properties":{"count":{"type":"integer","minimum":1}}}}}}""")
+        assertTrue(form.supported)
+        assertEquals(2, form.content(mapOf("rows" to "[{\"count\":2}]")).getValue("rows").jsonArray.single().jsonObject.getValue("count").jsonPrimitive.int)
+        assertFailsWith<IllegalArgumentException> { form.content(mapOf("rows" to "[]")) }
+        assertFailsWith<IllegalArgumentException> { form.content(mapOf("rows" to "[{\"count\":0}]")) }
+        assertFailsWith<IllegalArgumentException> { form.content(mapOf("rows" to "[{\"count\":1},{\"count\":1.0}]")) }
+    }
+    @Test fun localReferencesAndChoiceTitlesAreResolvedWithoutNetwork() {
+        val form = schema("""{"type":"object","${'$'}defs":{"positive":{"type":"integer","minimum":1}},"properties":{"count":{"${'$'}ref":"#/${'$'}defs/positive"},"choice":{"oneOf":[{"const":"a","title":"甲"},{"const":"b","title":"乙"}]}}}""")
+        assertTrue(form.supported)
+        assertEquals("甲", form.fields.last().label(0))
+        assertEquals("a", form.content(mapOf("count" to "1", "choice" to "a")).getValue("choice").jsonPrimitive.content)
+        assertFailsWith<IllegalArgumentException> { form.content(mapOf("count" to "0")) }
+    }
+    @Test fun rootConditionalFormCanSupplyBranchFieldsAsStructuredJson() {
+        val form = schema("""{"type":"object","properties":{"kind":{"type":"string"}},"if":{"properties":{"kind":{"const":"work"}}},"then":{"required":["hours"],"properties":{"hours":{"type":"number","multipleOf":0.5}}}}""")
+        assertTrue(form.rawInput)
+        form.content(mapOf("__form_json" to "{\"kind\":\"work\",\"hours\":1.5}"))
+        assertFailsWith<IllegalArgumentException> { form.content(mapOf("__form_json" to "{\"kind\":\"work\"}")) }
+        assertFailsWith<IllegalArgumentException> { form.content(mapOf("__form_json" to "{\"kind\":\"work\",\"hours\":1.2}")) }
+    }
+    @Test fun unknownValidationVocabularyIsNotSilentlyAccepted() {
+        assertFalse(schema("""{"type":"object","unevaluatedProperties":false}""").supported)
+        assertFalse(schema("""{"type":"object","${'$'}ref":"#"}""").supported)
+    }
+
 }

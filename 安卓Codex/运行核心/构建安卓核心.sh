@@ -4,7 +4,8 @@ set -euo pipefail
 upstream_commit=970111f6cb62cc02fe36a82ea7d71b37a2889c97
 script_dir="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 app_root="$(cd -- "$script_dir/.." && pwd)"
-work_root="${CODEX_ANDROID_BUILD_DIR:-$app_root/build/original-engine}"
+v8_mode="${CODEX_ANDROID_V8_MODE:-source}"
+work_root="${CODEX_ANDROID_BUILD_DIR:-$app_root/build/original-engine-$v8_mode}"
 source_root="$work_root/source"
 : "${ANDROID_NDK_ROOT:?请设置 ANDROID_NDK_ROOT，使用 NDK 28.2.13676358}"
 [[ -f "$ANDROID_NDK_ROOT/source.properties" ]] && grep -Eq '^Pkg.Revision[[:space:]]*=[[:space:]]*28\.2\.13676358[[:space:]]*$' "$ANDROID_NDK_ROOT/source.properties" || { echo '需要 NDK 28.2.13676358' >&2; exit 2; }
@@ -20,14 +21,26 @@ case "$abi" in
   x86_64) target=x86_64-linux-android; cc=x86_64-linux-android35-clang ;;
   *) echo '支持的 ABI：arm64-v8a、x86_64' >&2; exit 2 ;;
 esac
-# 当前原版依赖图包含 V8；必须由供应方提供匹配 Android 的真实归档和同批绑定。
-: "${CODEX_ANDROID_V8_MANIFEST:?请提供 V8 152.2.0 Android 供应清单，参见 V8与搜索依赖.md}"
-v8_output="$work_root/v8/$target"
-python3 "$script_dir/核对V8供应.py" --manifest "$CODEX_ANDROID_V8_MANIFEST" --target "$target" --ndk "$ANDROID_NDK_ROOT" --output "$v8_output"
-unset V8_FORCE_DEBUG V8_FROM_SOURCE RUSTY_V8_SKIP_DOWNLOAD DOCS_RS DENO_TRYBUILD RUSTY_V8_SRC_BINDING_URL
-export RUSTY_V8_ARCHIVE="$v8_output/librusty_v8.a"
-export RUSTY_V8_SRC_BINDING_PATH="$v8_output/src_binding.rs"
-export RUSTY_V8_ARCHIVE_SHA256="$(sha256sum "$RUSTY_V8_ARCHIVE" | cut -d ' ' -f 1)"
+# 默认从固定源码构建 V8；supply 模式用于复用已核对的同批 Android 库和绑定。
+unset V8_FORCE_DEBUG V8_FROM_SOURCE RUSTY_V8_SKIP_DOWNLOAD DOCS_RS DENO_TRYBUILD RUSTY_V8_SRC_BINDING_URL RUSTY_V8_ARCHIVE RUSTY_V8_ARCHIVE_SHA256 RUSTY_V8_SRC_BINDING_PATH
+case "$v8_mode" in
+  source)
+    v8_work="$work_root/v8-source"
+    python3 "$script_dir/准备V8源码.py" --work "$v8_work" --ndk "$ANDROID_NDK_ROOT" --target "$target"
+    source "$v8_work/environment.sh"
+    cargo_v8=(--config "$v8_work/cargo-v8.toml")
+    ;;
+  supply)
+    : "${CODEX_ANDROID_V8_MANIFEST:?请提供 V8 152.2.0 Android 供应清单}"
+    v8_output="$work_root/v8/$target"
+    python3 "$script_dir/核对V8供应.py" --manifest "$CODEX_ANDROID_V8_MANIFEST" --target "$target" --ndk "$ANDROID_NDK_ROOT" --output "$v8_output"
+    export RUSTY_V8_ARCHIVE="$v8_output/librusty_v8.a"
+    export RUSTY_V8_SRC_BINDING_PATH="$v8_output/src_binding.rs"
+    export RUSTY_V8_ARCHIVE_SHA256="$(sha256sum "$RUSTY_V8_ARCHIVE" | cut -d ' ' -f 1)"
+    cargo_v8=()
+    ;;
+  *) echo 'V8 模式支持 source / supply' >&2; exit 2 ;;
+esac
 mkdir -p "$work_root"
 if [[ ! -d "$source_root/.git" ]]; then
   git init "$source_root"
@@ -47,6 +60,22 @@ if [[ -f "$source_root/codex-rs/keyring-store/src/android.rs" ]] && ! cmp -s "$s
   exit 2
 fi
 install -m 644 "$script_dir/补充源码/android_keyring.rs" "$source_root/codex-rs/keyring-store/src/android.rs"
+if [[ "$v8_mode" == source ]]; then
+  # local patch 只改变 v8 来源；其他包版本和校验和沿用固定上游锁文件。
+  python3 - "$source_root/codex-rs/Cargo.lock" <<'PYLOCK'
+import re, sys
+from pathlib import Path
+path = Path(sys.argv[1])
+text = path.read_text()
+blocks = text.split('[[package]]')
+for index, block in enumerate(blocks):
+    if re.search(r'^name = "v8"$', block, re.M):
+        if not re.search(r'^version = "152\.2\.0"$', block, re.M):
+            raise ValueError('V8 锁定版本不匹配')
+        blocks[index] = re.sub(r'^(source|checksum) = .*\n', '', block, flags=re.M)
+path.write_text('[[package]]'.join(blocks))
+PYLOCK
+fi
 export RUSTUP_TOOLCHAIN=1.99.1
 rustup toolchain install "$RUSTUP_TOOLCHAIN" --profile minimal
 rustup target add --toolchain "$RUSTUP_TOOLCHAIN" "$target"
@@ -61,7 +90,7 @@ export "CARGO_TARGET_${cargo_target}_RUSTFLAGS=-C link-arg=-Wl,-z,max-page-size=
 export "CC_${target//-/_}=$ndk_bin/$cc"
 export "AR_${target//-/_}=$ndk_bin/llvm-ar"
 export PATH="$ndk_bin:$PATH"
-cargo build --manifest-path "$source_root/codex-rs/Cargo.toml" -p "$package" \
+cargo "${cargo_v8[@]}" build --manifest-path "$source_root/codex-rs/Cargo.toml" -p "$package" \
   --bin "$program" --target "$target" --profile dev-small --locked
 binary="$CARGO_TARGET_DIR/$target/dev-small/$program"
 "$ndk_bin/llvm-readelf" -l "$binary"

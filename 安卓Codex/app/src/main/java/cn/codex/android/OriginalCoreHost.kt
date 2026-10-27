@@ -22,6 +22,10 @@ data class OriginalState(
     val loginUrl: String? = null, val loginCode: String? = null, val loginId: String? = null,
     val historyCursor: String? = null,
     val mcpAuthorizationUrl: String? = null, val mcpAuthorizationName: String? = null, val mcpLoginId: String? = null,
+    val agent: JsonObject? = null, val agentItems: List<OriginalItem> = emptyList(), val agentCursor: String? = null,
+    val goal: JsonObject? = null, val attachments: List<JsonObject> = emptyList(), val attachmentCursor: String? = null,
+    val sections: List<JsonObject> = emptyList(), val sectionCursor: String? = null,
+    val turns: List<JsonObject> = emptyList(), val turnCursor: String? = null,
     val models: List<String> = emptyList(), val model: String = "", val report: String = ""
 )
 class OriginalCoreHost(
@@ -171,7 +175,7 @@ class OriginalCoreHost(
         val items = OriginalThreadView.history(thread)
         lifecycle.accept(lifecycle.state.connectionEpoch, OriginalLifecycleEvent.ThreadSelected(thread.string("id"), active))
         syncLifecycle()
-        mutable.update { it.copy(items = items, historyCursor = null, model = thread.string("model", it.model), status = if (lifecycle.state.turnId == null) "会话已恢复" else "已恢复正在运行的回合") }
+        mutable.update { it.copy(items = items, goal = null, attachments = emptyList(), attachmentCursor = null, turns = emptyList(), turnCursor = null, historyCursor = null, model = thread.string("model", it.model), status = if (lifecycle.state.turnId == null) "会话已恢复" else "已恢复正在运行的回合") }
     }
     fun loadHistory() = operation { api ->
         val snapshot = state.value
@@ -184,6 +188,84 @@ class OriginalCoreHost(
     fun rename(title: String) = operation { api -> api.rename(requireNotNull(state.value.threadId), title); refreshThreads(api, state.value.archived) }
     fun archive(id: String, archived: Boolean) = operation { api -> check(!state.value.working && state.value.turnId == null); api.archive(id, archived); refreshThreads(api, state.value.archived) }
     fun compact() = operation { it.compact(requireNotNull(state.value.threadId)) }
+    fun inspectAgent(threadId: String) = operation { api ->
+        val thread = api.read(threadId).jsonObject.getValue("thread").jsonObject
+        mutable.update { it.copy(agent = thread, agentItems = OriginalThreadView.history(thread), agentCursor = null) }
+    }
+    fun closeAgent() { mutable.update { it.copy(agent = null, agentItems = emptyList(), agentCursor = null) } }
+    fun loadAgentTurns(more: Boolean = false) = operation { api ->
+        val id = state.value.agent?.string("id") ?: return@operation
+        val cursor = if (more) state.value.agentCursor ?: return@operation else null
+        val page = api.turns(id, cursor).jsonObject
+        val items = objects(page).reversed().flatMap { turn -> (turn["items"] as? JsonArray).orEmpty().mapNotNull { it as? JsonObject }.map(OriginalThreadView::item) }
+        if (state.value.agent?.string("id") == id) mutable.update { it.copy(agentItems = ((if (more) items + it.agentItems else items)).distinctBy { item -> item.id }, agentCursor = page.string("nextCursor").ifBlank { null }) }
+    }
+    private fun objects(page: JsonObject) = (page["data"] as? JsonArray).orEmpty().mapNotNull { it as? JsonObject }
+    private fun idleThread(): String {
+        check(!state.value.working && state.value.turnId == null && !otherTaskRunning()) { "请先停止任务" }
+        return requireNotNull(state.value.threadId) { "请先选择会话" }
+    }
+    fun loadGoal() = operation { api -> val thread = requireNotNull(state.value.threadId); val goal = api.goal(thread).jsonObject["goal"] as? JsonObject; if (state.value.threadId == thread) mutable.update { it.copy(goal = goal) } }
+    fun saveGoal(objective: String, status: String, budget: Long?) = operation { api ->
+        val thread = idleThread(); require(objective.isNotBlank()) { "请填写目标" }
+        val goal = api.setGoal(thread, objective, status, budget).jsonObject["goal"] as? JsonObject
+        mutable.update { it.copy(goal = goal, status = "目标已更新") }
+    }
+    fun clearGoal() = operation { api -> api.clearGoal(idleThread()); mutable.update { it.copy(goal = null, status = "目标已清除") } }
+    fun loadAttachments(more: Boolean = false) = operation { api ->
+        val thread = requireNotNull(state.value.threadId); val cursor = if (more) state.value.attachmentCursor ?: return@operation else null
+        val page = api.attachments(thread, cursor).jsonObject
+        if (state.value.threadId == thread) mutable.update { it.copy(attachments = ((if (more) it.attachments else emptyList()) + objects(page)).distinctBy { row -> row.string("id") }, attachmentCursor = page.string("nextCursor").ifBlank { null }) }
+    }
+    fun addAttachment(type: String, key: String, payload: JsonElement) = operation { api ->
+        val thread = idleThread(); require(type.isNotBlank() && key.isNotBlank()) { "请填写资料类型与标识" }
+        api.addAttachment(thread, type, key, payload)
+        val page = api.attachments(thread).jsonObject
+        mutable.update { it.copy(attachments = objects(page), attachmentCursor = page.string("nextCursor").ifBlank { null }, status = "资料记录已保存") }
+    }
+    fun removeAttachment(type: String, key: String) = operation { api ->
+        val thread = idleThread(); api.removeAttachment(thread, type, key)
+        val page = api.attachments(thread).jsonObject
+        mutable.update { it.copy(attachments = objects(page), attachmentCursor = page.string("nextCursor").ifBlank { null }) }
+    }
+    private suspend fun readSections(api: OriginalCodexClient, more: Boolean = false) {
+        val cursor = if (more) state.value.sectionCursor ?: return else null
+        val page = api.sections(cursor).jsonObject
+        mutable.update { it.copy(sections = ((if (more) it.sections else emptyList()) + objects(page)).distinctBy { row -> row.string("id") }, sectionCursor = page.string("nextCursor").ifBlank { null }) }
+    }
+    fun loadSections(more: Boolean = false) = operation { readSections(it, more) }
+    fun saveSection(sectionId: String?, name: String) = operation { api ->
+        require(name.isNotBlank()) { "请填写分区名称" }
+        if (sectionId == null) api.createSection(name) else api.updateSection(sectionId, name)
+        readSections(api)
+    }
+    fun deleteSection(sectionId: String) = operation { api -> api.deleteSection(sectionId); readSections(api); refreshThreads(api, state.value.archived) }
+    fun moveSection(sectionId: String?, beforeThreadId: String? = null) = operation { api -> api.moveSection(idleThread(), sectionId, beforeThreadId); refreshThreads(api, state.value.archived) }
+    fun loadTurns(more: Boolean = false) = operation { api ->
+        val thread = requireNotNull(state.value.threadId); val cursor = if (more) state.value.turnCursor ?: return@operation else null
+        val page = api.turns(thread, cursor).jsonObject
+        mutable.update { it.copy(turns = ((if (more) it.turns else emptyList()) + objects(page)).distinctBy { row -> row.string("id") }, turnCursor = page.string("nextCursor").ifBlank { null }) }
+    }
+    fun revert(beforeTurnId: String) = operation { api ->
+        val thread = idleThread(); val result = api.revert(thread, beforeTurnId).jsonObject
+        selectThread(result.getValue("thread").jsonObject)
+        val cursor = result.string("itemsBackwardsCursor").ifBlank { null }
+        if (cursor != null) {
+            val page = api.history(thread, cursor).jsonObject
+            val items = objects(page).mapNotNull { it["item"] as? JsonObject }.map(OriginalThreadView::item).reversed()
+            mutable.update { it.copy(items = items, historyCursor = page.string("nextCursor").ifBlank { null }) }
+        }
+        val page = api.turns(thread).jsonObject
+        mutable.update { it.copy(turns = objects(page), turnCursor = page.string("nextCursor").ifBlank { null }, status = "聊天记录已回退，项目文件未撤销") }
+        refreshThreads(api, state.value.archived)
+    }
+    fun removeThread(delete: Boolean) = operation { api ->
+        val thread = idleThread()
+        if (delete) api.deleteThread(thread) else api.unsubscribe(thread)
+        lifecycle.accept(lifecycle.state.connectionEpoch, OriginalLifecycleEvent.ThreadCleared); syncLifecycle()
+        mutable.update { it.copy(items = emptyList(), goal = null, attachments = emptyList(), turns = emptyList(), historyCursor = null, attachmentCursor = null, turnCursor = null, status = if (delete) "会话已删除" else "已关闭当前会话视图") }
+        refreshThreads(api, state.value.archived)
+    }
     fun inspect(kind: String) = operation { api ->
         val data = when (kind) { "配额" -> api.rateLimits(); "技能" -> api.skills(workspace.absolutePath); "MCP" -> api.mcp(); "钩子" -> api.hooks(workspace.absolutePath, state.value.threadId); "插件" -> api.installedPlugins(workspace.absolutePath); else -> throw IllegalArgumentException("未知检查类型") }
         mutable.update { it.copy(report = Json { prettyPrint = true }.encodeToString(JsonElement.serializer(), data)) }
@@ -318,6 +400,14 @@ class OriginalCoreHost(
     }
     private suspend fun notification(epoch: Long, rpc: AppServerConnection, method: String, params: JsonObject) {
         if (!current(epoch, rpc)) return
+        if (method == "thread/goal/updated") {
+            if (params.string("threadId") == state.value.threadId) mutable.update { it.copy(goal = params["goal"] as? JsonObject) }
+            return
+        }
+        if (method == "thread/goal/cleared") {
+            if (params.string("threadId") == state.value.threadId) mutable.update { it.copy(goal = null) }
+            return
+        }
         if (method == "mcpServer/startupStatus/updated") {
             mcp.runtimeChanged(params.string("threadId").ifBlank { null }, params.string("name"), params.string("status"), params.string("error").ifBlank { null })
             return

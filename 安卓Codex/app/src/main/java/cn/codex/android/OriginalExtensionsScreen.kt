@@ -81,6 +81,7 @@ private data class HookConfirmation(val hook: JsonObject, val trust: Boolean, va
                     }
                 }
             } else {
+                item { FilledTonalButton(onClick = controller::editRules, enabled = state.connected && !state.busy && allowChanges && state.configSnapshot != null) { Text("创建与编辑用户规则") } }
                 if (state.hooks.isEmpty()) item { Text("当前没有已加载的 Hook 配置。此页展示原版核心实际加载的规则。") }
                 items(state.hooks, key = { "hooks:${it.string("cwd")}" }) { entry ->
                     Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
@@ -112,6 +113,7 @@ private data class HookConfirmation(val hook: JsonObject, val trust: Boolean, va
             }
         }
     }
+    state.rulesEditor?.let { draft -> OriginalHookEditor(draft, state.busy, allowChanges && state.connected, state.error, controller::closeRules) { controller.saveRules(draft, it) } }
     togglePlugin?.let { plugin ->
         AlertDialog(onDismissRequest = { togglePlugin = null }, title = { Text(if (plugin.enabled) "停用插件" else "启用插件") }, text = {
             Text("${plugin.displayName}\n市场：${plugin.marketplace}\n标识：${plugin.id}\n\n修改用户配置并重新读取有效状态。更高优先级策略可能覆盖此设置。")
@@ -171,7 +173,7 @@ private data class HookConfirmation(val hook: JsonObject, val trust: Boolean, va
     }, confirmButton = { TextButton(onClick = controller::dismissAuth) { Text("稍后处理") } })
 }
 
-private fun hookEventTitle(event: String) = when (event) {
+fun hookEventTitle(event: String) = when (event) {
     "preModelRequest" -> "模型请求前"; "postModelRequest" -> "模型请求后"
     "preToolUse" -> "工具调用前"; "postToolUse" -> "工具调用后"; "permissionRequest" -> "申请权限时"
     "preCompact" -> "压缩上下文前"; "postCompact" -> "压缩上下文后"

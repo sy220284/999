@@ -70,6 +70,23 @@ class OriginalCodexClient(val connection: AppServerConnection) {
     suspend fun config(cwd: String? = null) = call("config/read", buildJsonObject { put("includeLayers", true); cwd?.let { put("cwd", it) } })
     suspend fun writeConfig(snapshot: OriginalConfigSnapshot, edit: JsonObject) = call("config/batchWrite", OriginalConfigEdits.request(snapshot, edit))
     suspend fun writeConfig(snapshot: OriginalConfigSnapshot, edits: List<JsonObject>) = call("config/batchWrite", OriginalConfigEdits.request(snapshot, edits))
+    suspend fun goal(threadId: String) = call("thread/goal/get", id(threadId))
+    suspend fun setGoal(threadId: String, objective: String, status: String, budget: Long?) = call("thread/goal/set", buildJsonObject {
+        put("threadId", threadId); put("origin", "user"); put("objective", objective); put("status", status); put("tokenBudget", budget?.let(::JsonPrimitive) ?: JsonNull)
+    })
+    suspend fun clearGoal(threadId: String) = call("thread/goal/clear", buildJsonObject { put("threadId", threadId); put("origin", "user") })
+    suspend fun attachments(threadId: String, cursor: String? = null) = call("thread/attachment/list", buildJsonObject { put("threadId", threadId); put("limit", 30); cursor?.let { put("cursor", it) } })
+    suspend fun addAttachment(threadId: String, type: String, key: String, payload: JsonElement) = call("thread/attachment/add", buildJsonObject { put("threadId", threadId); put("attachmentType", type); put("identityKey", key); put("payload", payload) })
+    suspend fun removeAttachment(threadId: String, type: String, key: String) = call("thread/attachment/remove", buildJsonObject { put("threadId", threadId); put("attachmentType", type); put("identityKey", key) })
+    suspend fun sections(cursor: String? = null) = call("threadSection/list", buildJsonObject { put("limit", 30); cursor?.let { put("cursor", it) } })
+    suspend fun createSection(name: String) = call("threadSection/create", buildJsonObject { put("name", name) })
+    suspend fun updateSection(sectionId: String, name: String) = call("threadSection/update", buildJsonObject { put("sectionId", sectionId); put("name", name) })
+    suspend fun deleteSection(sectionId: String) = call("threadSection/delete", buildJsonObject { put("sectionId", sectionId) })
+    suspend fun moveSection(threadId: String, sectionId: String?, beforeThreadId: String? = null) = call("thread/section/move", buildJsonObject { put("threadId", threadId); put("sectionId", sectionId?.let(::JsonPrimitive) ?: JsonNull); beforeThreadId?.let { put("beforeThreadId", it) } })
+    suspend fun turns(threadId: String, cursor: String? = null) = call("thread/turns/list", buildJsonObject { put("threadId", threadId); put("limit", 30); put("sortDirection", "desc"); put("itemsView", "full"); cursor?.let { put("cursor", it) } })
+    suspend fun revert(threadId: String, beforeTurnId: String) = call("thread/revert", buildJsonObject { put("threadId", threadId); put("beforeTurnId", beforeTurnId) })
+    suspend fun deleteThread(threadId: String) = call("thread/delete", id(threadId))
+    suspend fun unsubscribe(threadId: String) = call("thread/unsubscribe", id(threadId))
     private fun id(threadId: String) = buildJsonObject { put("threadId", threadId) }
     companion object {
         fun textInput(text: String) = buildJsonArray { add(buildJsonObject { put("type", "text"); put("text", text); put("text_elements", buildJsonArray {}) }) }

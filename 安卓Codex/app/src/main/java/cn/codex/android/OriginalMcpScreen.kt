@@ -94,6 +94,7 @@ private data class McpConfirmation(val entry: OriginalMcpEntry, val snapshot: Or
                         Row(Modifier.horizontalScroll(rememberScrollState())) {
                             val editable = state.snapshot != null && !state.busy && allowChanges && entry.editable
                             TextButton(onClick = { controller.edit(entry.name) }, enabled = editable) { Text("编辑") }
+                            TextButton(onClick = { controller.edit(entry.name, advanced = true) }, enabled = editable) { Text("高级配置") }
                             TextButton(onClick = { confirmation = McpConfirmation(entry, state.snapshot!!, false) }, enabled = editable) { Text(if (entry.enabled) "停用" else "启用") }
                             TextButton(onClick = { confirmation = McpConfirmation(entry, state.snapshot!!, true) }, enabled = editable) { Text("删除") }
                             if (runtime?.string("authStatus") in setOf("notLoggedIn", "oAuth")) TextButton(onClick = { onLogin(entry.name) }, enabled = state.connected && !state.busy && allowChanges && authorizationUrl == null) { Text("账号授权") }
@@ -117,7 +118,7 @@ private data class McpConfirmation(val entry: OriginalMcpEntry, val snapshot: Or
             imports.forEach { (name, url) -> TextButton(onClick = { showImports = false; controller.importConnection(name, url) }) { Text(name) } }
         }
     }, confirmButton = { TextButton(onClick = { showImports = false }) { Text("关闭") } })
-    state.editor?.let { editor -> OriginalMcpEditorSheet(editor, state.busy, allowChanges && state.connected, state.error, controller::closeEditor) { name, config -> controller.save(editor, name, config) } }
+    state.editor?.let { editor -> if (editor.advanced) OriginalMcpAdvancedEditor(editor, state.busy, allowChanges && state.connected, state.error, controller::closeEditor) { config -> controller.save(editor, requireNotNull(editor.name), config) } else OriginalMcpEditorSheet(editor, state.busy, allowChanges && state.connected, state.error, controller::closeEditor) { name, config -> controller.save(editor, name, config) } }
 }
 
 @Composable private fun McpError(message: String, dismiss: () -> Unit) {
@@ -183,4 +184,20 @@ private data class McpConfirmation(val entry: OriginalMcpEntry, val snapshot: Or
             TextButton(onClick = dismiss, enabled = !busy, modifier = Modifier.fillMaxWidth()) { Text("取消") }
         }
     }
+}
+
+
+@Composable private fun OriginalMcpAdvancedEditor(editor: OriginalMcpEditor, busy: Boolean, enabled: Boolean, error: String?, dismiss: () -> Unit, save: (JsonObject) -> Unit) {
+    var text by remember(editor) { mutableStateOf(Json { prettyPrint = true }.encodeToString(JsonObject.serializer(), editor.original)) }
+    var localError by remember(editor) { mutableStateOf<String?>(null) }
+    AlertDialog(onDismissRequest = { if (!busy) dismiss() }, title = { Text("${editor.name} · 高级配置") }, text = {
+        Column(Modifier.heightIn(max = 500.dp).verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            Text("编辑原版完整用户条目：工具允许/禁用名单、每工具审批与输出预算、环境、请求头及授权配置都在此处保存。原版负责校验字段，保存后重新连接。", style = MaterialTheme.typography.bodySmall)
+            Text("此处内容会写入用户配置文件。账号授权请优先使用服务卡片的授权入口。", style = MaterialTheme.typography.bodySmall)
+            OutlinedTextField(text, { text = it }, enabled = !busy, label = { Text("服务配置（JSON 对象）") }, modifier = Modifier.fillMaxWidth())
+            (localError ?: error)?.let { Text(it, color = MaterialTheme.colorScheme.error) }
+        }
+    }, confirmButton = { TextButton(onClick = {
+        runCatching { Json.parseToJsonElement(text).jsonObject }.onSuccess { localError = null; save(it) }.onFailure { localError = "请填写有效的 JSON 对象" }
+    }, enabled = !busy && enabled) { Text(if (busy) "正在保存…" else "保存并重新连接") } }, dismissButton = { TextButton(onClick = dismiss, enabled = !busy) { Text("取消") } })
 }

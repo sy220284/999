@@ -15,6 +15,7 @@ sealed interface OriginalLifecycleEvent {
     data class TurnCompleted(val threadId: String, val turnId: String) : OriginalLifecycleEvent
     data class StopRequested(val threadId: String, val turnId: String) : OriginalLifecycleEvent
     data class InterruptAccepted(val threadId: String, val turnId: String) : OriginalLifecycleEvent
+    data object ThreadCleared : OriginalLifecycleEvent
     data object Disconnected : OriginalLifecycleEvent
 }
 class OriginalRuntimeLifecycle {
@@ -32,6 +33,10 @@ class OriginalRuntimeLifecycle {
         if (!isCurrent(epoch)) return state
         val old = state
         state = when (event) {
+            OriginalLifecycleEvent.ThreadCleared -> {
+                check(old.turnId == null && old.pendingStartRequestId == null) { "活动任务尚未结束" }
+                old.copy(threadId = null, turnId = null, pendingStartRequestId = null, stoppingTurnId = null, completedTurnIds = emptySet())
+            }
             is OriginalLifecycleEvent.ThreadSelected -> {
                 require(event.threadId.isNotBlank())
                 check(old.turnId == null && old.pendingStartRequestId == null || old.threadId == event.threadId) { "活动任务尚未结束，不能切换线程" }

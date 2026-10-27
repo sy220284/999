@@ -61,4 +61,14 @@ class OriginalConfigEditsTest {
         assertFalse(edits[2].getValue("value").jsonObject.getValue("file.with.dots/key").jsonObject.getValue("enabled").jsonPrimitive.boolean)
     }
 
+    @Test fun ruleEditingDoesNotReplaceTrustStateAndCanDeleteOneEvent() {
+        val old = buildJsonObject { put("state", buildJsonObject { put("key", buildJsonObject { put("trusted_hash", "preserve") }) }); put("PreToolUse", buildJsonArray {}); put("Stop", buildJsonArray {}) }
+        val next = buildJsonObject { put("Stop", buildJsonArray {}) }
+        val edits = OriginalConfigEdits.hookRules(old, next)
+        assertEquals(2, edits.size)
+        assertTrue(edits.none { it.getValue("keyPath").jsonPrimitive.content.contains("state") })
+        assertEquals(JsonNull, edits.first { it.getValue("keyPath").jsonPrimitive.content.contains("PreToolUse") }["value"])
+        assertFailsWith<IllegalArgumentException> { OriginalConfigEdits.hookRules(old, buildJsonObject { put("state", buildJsonObject {}) }) }
+    }
+
 }

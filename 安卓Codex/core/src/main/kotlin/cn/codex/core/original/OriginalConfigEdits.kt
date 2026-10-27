@@ -63,4 +63,13 @@ object OriginalConfigEdits {
         )
     }
 
+    val hookEvents = setOf("PreModelRequest", "PostModelRequest", "PreToolUse", "PermissionRequest", "PostToolUse", "PreCompact", "PostCompact", "SessionStart", "SessionEnd", "UserPromptSubmit", "SubagentStart", "SubagentStop", "Stop", "Interrupt")
+    fun hookRules(previous: JsonObject, rules: JsonObject): List<JsonObject> {
+        require(rules.keys.all { it in hookEvents }) { "规则事件名不正确；信任状态请在规则卡片中修改" }
+        require(rules.values.all { it is JsonArray }) { "每个事件需要填写匹配组数组" }
+        return ((previous.keys - "state") + rules.keys).map { event -> buildJsonObject {
+            put("keyPath", childPath("hooks", event)); put("mergeStrategy", "replace"); put("value", rules[event] ?: JsonNull)
+        } }
+    }
+
 }

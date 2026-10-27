@@ -111,6 +111,25 @@ class OriginalExtensionsTest {
             assertEquals("管理员覆盖", effective.error)
         } } finally { scope.cancel(); dispatcher.close() }
     }
+    @Test fun sessionMutationsCarryExplicitGoalOriginStableAttachmentKeysAndNullSection() = runBlocking {
+        val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+        try { Wire(scope).use { wire ->
+            val api = OriginalCodexClient(wire.rpc)
+            val goal = async { api.setGoal("thread-1", "完成任务", "active", 1000) }
+            val g = wire.read().also { assertEquals("thread/goal/set", it.getValue("method").jsonPrimitive.content) }
+            assertEquals("user", g.getValue("params").jsonObject.getValue("origin").jsonPrimitive.content)
+            wire.reply(g.getValue("id"), buildJsonObject {}); goal.await()
+            val attachment = async { api.addAttachment("thread-1", "note", "stable-key", buildJsonObject { put("text", "正文") }) }
+            val a = wire.read(); assertEquals("stable-key", a.getValue("params").jsonObject.getValue("identityKey").jsonPrimitive.content)
+            wire.reply(a.getValue("id"), buildJsonObject {}); attachment.await()
+            val move = async { api.moveSection("thread-1", null) }
+            val m = wire.read(); assertEquals(JsonNull, m.getValue("params").jsonObject["sectionId"])
+            wire.reply(m.getValue("id"), buildJsonObject {}); move.await()
+            val revert = async { api.revert("thread-1", "turn-2") }
+            val r = wire.read(); assertEquals("turn-2", r.getValue("params").jsonObject.getValue("beforeTurnId").jsonPrimitive.content)
+            wire.reply(r.getValue("id"), buildJsonObject { put("itemsBackwardsCursor", "anchor") }); assertEquals("anchor", revert.await().jsonObject.getValue("itemsBackwardsCursor").jsonPrimitive.content)
+        } } finally { scope.cancel() }
+    }
     @Test fun offlineCatalogStillLoadsInstalledHooksAndReconnectIgnoresOldResponse() = runBlocking {
         val dispatcher = Executors.newSingleThreadExecutor().asCoroutineDispatcher()
         val scope = CoroutineScope(SupervisorJob() + dispatcher)

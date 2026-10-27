@@ -7,10 +7,13 @@ import kotlinx.serialization.json.*
 import java.util.UUID
 
 /** 主线程调用；每次绑定新连接递增代次，旧请求和旧详情不能覆盖新状态。 */
+data class OriginalHookDraft(val snapshot: OriginalConfigSnapshot, val hooks: JsonObject)
+
 data class OriginalExtensionsState(
     val connected: Boolean = false, val busy: Boolean = false, val mutating: Boolean = false,
     val plugins: List<OriginalPlugin> = emptyList(), val marketplaceErrors: List<String> = emptyList(),
     val hooks: List<JsonObject> = emptyList(), val hookRuns: List<OriginalItem> = emptyList(),
+    val userHooks: JsonObject = buildJsonObject {}, val rulesEditor: OriginalHookDraft? = null,
     val configSnapshot: OriginalConfigSnapshot? = null,
     val configNotice: String = "配置尚未读取",
     val detail: JsonObject? = null, val detailKey: String? = null,
@@ -59,8 +62,10 @@ class OriginalExtensionsController(private val scope: CoroutineScope, private va
         val installed = read("已安装插件") { api.installedPlugins(cwd) }?.let(OriginalExtensions::catalog) ?: OriginalCatalog(emptyList(), emptyList())
         val combined = OriginalExtensions.combine(catalog, installed)
         val hooks = (read("Hooks") { api.hooks(cwd, null) }?.get("data") as? JsonArray).orEmpty().mapNotNull { it as? JsonObject }
-        val config = read("用户配置") { api.config() }?.let(OriginalConfigEdits::snapshot)
-        if (stamp == generation) mutable.update { it.copy(configSnapshot = config, configNotice = if (config == null) "没有可写的用户配置版本，请刷新或在原版中初始化配置" else "配置修改将检查版本，防止覆盖其他修改", plugins = combined.plugins, marketplaceErrors = (combined.errors + errors).distinct(), hooks = hooks, status = "${combined.plugins.count { p -> p.installed }} 个已安装插件 · ${combined.plugins.size} 个目录条目" + if (errors.isNotEmpty()) " · 部分来源加载失败" else "") }
+        val configResponse = read("用户配置") { api.config() }
+        val config = configResponse?.let(OriginalConfigEdits::snapshot)
+        val userHooks = ((configResponse?.let(OriginalConfigEdits::userLayer)?.get("config") as? JsonObject)?.get("hooks") as? JsonObject) ?: buildJsonObject {}
+        if (stamp == generation) mutable.update { it.copy(userHooks = userHooks, configSnapshot = config, configNotice = if (config == null) "没有可写的用户配置版本，请刷新或在原版中初始化配置" else "配置修改将检查版本，防止覆盖其他修改", plugins = combined.plugins, marketplaceErrors = (combined.errors + errors).distinct(), hooks = hooks, status = "${combined.plugins.count { p -> p.installed }} 个已安装插件 · ${combined.plugins.size} 个目录条目" + if (errors.isNotEmpty()) " · 部分来源加载失败" else "") }
     }
     fun refresh(fresh: Boolean = false) = operation { api, stamp -> load(api, stamp, fresh) }
     fun detail(plugin: OriginalPlugin) = operation { api, stamp ->
@@ -116,6 +121,18 @@ class OriginalExtensionsController(private val scope: CoroutineScope, private va
         if (revoke) writeAndReload(api, stamp, snapshot, OriginalConfigEdits.revokeHook(approved, current))
         else writeAndReload(api, stamp, snapshot, OriginalConfigEdits.hook(approved, current, trust))
         if (revoke && stamp == generation) mutable.update { it.copy(status = "请核查刷新后的规则状态；其他配置来源仍可能保留信任或覆盖停用设置") }
+    }
+    fun editRules() { val snapshot = state.value.configSnapshot ?: return; if (!state.value.busy) mutable.update { it.copy(rulesEditor = OriginalHookDraft(snapshot, it.userHooks), error = null) } }
+    fun closeRules() { if (!state.value.mutating) mutable.update { it.copy(rulesEditor = null) } }
+    fun saveRules(draft: OriginalHookDraft, rules: JsonObject) = operation(mutating = true) { api, stamp ->
+        require(state.value.rulesEditor == draft && state.value.configSnapshot == draft.snapshot) { "配置已变化，请重新打开规则编辑" }
+        val edits = OriginalConfigEdits.hookRules(draft.hooks, rules)
+        if (edits.isEmpty()) { mutable.update { it.copy(rulesEditor = null) }; return@operation }
+        val result = api.writeConfig(draft.snapshot, edits).jsonObject
+        if (stamp != generation) return@operation
+        load(api, stamp, false)
+        if (stamp == generation && result.string("status") in setOf("ok", "okOverridden")) mutable.update { it.copy(rulesEditor = null, status = "用户规则已保存，请核查实际加载与信任状态", error = if (result.string("status") == "okOverridden") "规则可能被其他配置覆盖，请核查来源" else it.error) }
+        else if (stamp == generation) mutable.update { it.copy(error = "规则写入结果未知，请刷新核查") }
     }
     fun recordHook(run: JsonObject) {
         val item = OriginalExtensions.hookRun(run)

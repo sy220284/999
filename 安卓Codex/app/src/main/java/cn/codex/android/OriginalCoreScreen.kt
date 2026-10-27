@@ -26,11 +26,26 @@ import kotlinx.serialization.json.*
     val mcpState by host.mcp.state.collectAsState()
     var mcpManager by remember { mutableStateOf(false) }
     val imports = remember(host) { host.mcpImports() }
+    var sessionManager by remember { mutableStateOf(false) }
     var extensions by remember { mutableStateOf(false) }
     var consent by remember { mutableStateOf(false) }
     var draft by remember { mutableStateOf("") }
     var renamed by remember { mutableStateOf<String?>(null) }
     val context = LocalContext.current
+    if (state.agent != null) {
+        val agent = state.agent!!
+        AlertDialog(onDismissRequest = host::closeAgent, title = { Text("代理会话 ${agent.string("id").takeLast(8)}") }, text = {
+            Column(Modifier.heightIn(max = 480.dp).verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                Text("关闭此视图不会停止代理。任务仍由原版核心管理。", style = MaterialTheme.typography.bodySmall)
+                if (state.agentItems.isEmpty()) Text("尚未取得消息，可读取代理回合。")
+                state.agentItems.forEach { item -> Text(item.text) }
+                TextButton(onClick = { host.inspectAgent(agent.string("id")) }, enabled = !state.loading) { Text("刷新进展") }
+                TextButton(onClick = { host.loadAgentTurns(state.agentCursor != null) }, enabled = !state.loading) { Text(if (state.agentCursor == null) "读取代理回合" else "加载更早消息") }
+                state.error?.let { Text(it, color = MaterialTheme.colorScheme.error) }
+            }
+        }, confirmButton = { TextButton(onClick = { host.closeAgent(); host.openThread(agent.string("id")) }, enabled = !state.working && state.turnId == null && !state.loading) { Text("切换到此会话") } }, dismissButton = { TextButton(onClick = host::closeAgent) { Text("关闭查看") } })
+    }
+    if (sessionManager) { OriginalSessionScreen(host) { sessionManager = false }; return }
     if (mcpManager) {
         OriginalMcpScreen(host.mcp, allowChanges = !state.working && state.turnId == null && !state.loading && !extensionState.mutating,
             imports = imports, authorizationUrl = state.mcpAuthorizationUrl, authorizationName = state.mcpAuthorizationName,
@@ -114,6 +129,7 @@ import kotlinx.serialization.json.*
                 if (state.threadId != null) item {
                     HorizontalDivider()
                     Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                        TextButton(onClick = { sessionManager = true }, enabled = !state.loading) { Text("目标与会话管理") }
                         TextButton(onClick = { host.fork() }, enabled = editable) { Text("分叉") }
                         TextButton(onClick = { renamed = "" }, enabled = editable) { Text("重命名") }
                         TextButton(onClick = { host.compact() }, enabled = editable) { Text("压缩上下文") }
@@ -126,7 +142,12 @@ import kotlinx.serialization.json.*
                         Surface(shape = RoundedCornerShape(16.dp), color = if (item.type == "userMessage") MaterialTheme.colorScheme.surfaceContainer else MaterialTheme.colorScheme.background) {
                             Column(Modifier.fillMaxWidth().padding(14.dp)) { Text(if (item.type == "userMessage") "你" else "Codex", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.primary); Spacer(Modifier.height(8.dp)); Text(item.text) }
                         }
-                    } else ExpandableCard(originalItemTitle(item.type), item.text, Icons.Outlined.Code)
+                    } else Column {
+                        ExpandableCard(originalItemTitle(item.type), item.text, Icons.Outlined.Code)
+                        if (item.type == "collabAgentToolCall") (item.data["receiverThreadIds"] as? JsonArray).orEmpty().forEach { thread ->
+                            TextButton(onClick = { host.inspectAgent(thread.jsonPrimitive.content) }, enabled = state.connected && !state.loading) { Text("查看代理进展 ${thread.jsonPrimitive.content.takeLast(8)}") }
+                        }
+                    }
                 }
                 if (state.report.isNotBlank()) item { ExpandableCard("核心返回详情", state.report, Icons.Outlined.Info) }
             }
@@ -162,6 +183,7 @@ internal fun openOriginalLogin(context: android.content.Context, url: String) {
     val elicitation = request.method == "mcpServer/elicitation/request"
     val context = LocalContext.current
     val form = remember(request.id) { (params["requestedSchema"] as? JsonObject)?.let(::ElicitationForm) }
+    LaunchedEffect(request.id, form) { if (elicitation && form != null) answers = form.initialValues }
     var formError by remember(request.id) { mutableStateOf("") }
     val reviewedItem = items.firstOrNull { it.id == params.string("itemId") }
     val canReview = if (request.method.contains("fileChange")) reviewedItem?.type == "fileChange" && (reviewedItem.data["changes"] as? JsonArray)?.isNotEmpty() == true && reviewedItem.text.length <= 100_000 else params.string("command").isNotBlank() || reviewedItem?.type == "commandExecution"
@@ -185,17 +207,18 @@ internal fun openOriginalLogin(context: android.content.Context, url: String) {
                     OutlinedButton(onClick = { openOriginalLogin(context, params.string("url")) }) { Text("打开授权页面") }
                     Text("完成服务页面的授权后，再确认返回工具。", style = MaterialTheme.typography.bodySmall)
                 } else if (form?.supported == true) {
-                    form.fields.forEach { field ->
+                    if (form.rawInput) OutlinedTextField(answers["__form_json"].orEmpty(), { answers = answers + ("__form_json" to it) }, label = { Text("表单内容（JSON）") }, modifier = Modifier.fillMaxWidth())
+                    else form.fields.forEach { field ->
                         Text(field.title + if (field.required) " *" else "")
                         if (field.description.isNotBlank()) Text(field.description, style = MaterialTheme.typography.bodySmall)
-                        if (field.options != null) field.options!!.forEach { option ->
+                        if (field.options != null) field.options!!.forEachIndexed { index, option ->
                             val value = option.jsonPrimitive.content
-                            FilterChip(answers[field.name] == value, { answers = answers + (field.name to value) }, label = { Text(value) })
+                            FilterChip(answers[field.name] == value, { answers = answers + (field.name to value) }, label = { Text(field.label(index)) })
                         } else if (field.type == "boolean") Row {
                             listOf("true" to "是", "false" to "否").forEach { (value, label) -> FilterChip(answers[field.name] == value, { answers = answers + (field.name to value) }, label = { Text(label) }) }
-                        } else OutlinedTextField(answers[field.name].orEmpty(), { answers = answers + (field.name to it) }, label = { Text(field.title) }, modifier = Modifier.fillMaxWidth())
+                        } else OutlinedTextField(answers[field.name].orEmpty(), { answers = answers + (field.name to it) }, label = { Text(if (field.type in setOf("json", "object", "array")) "${field.title}（JSON）" else field.title) }, modifier = Modifier.fillMaxWidth())
                     }
-                } else Text("此表单包含尚未支持的嵌套字段，可拒绝后继续其他任务。", style = MaterialTheme.typography.bodySmall)
+                } else Text("此表单包含无法离线解析的引用或验证规则，可拒绝后继续其他任务。", style = MaterialTheme.typography.bodySmall)
                 if (formError.isNotBlank()) Text(formError, color = MaterialTheme.colorScheme.error)
             } else {
                 val item = items.firstOrNull { it.id == params.string("itemId") }

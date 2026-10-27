@@ -26,8 +26,6 @@ for kind, file in [("客户端请求", "ClientRequest.ts"), ("服务端请求", 
             elif method in facade:
                 entry = client_path
                 status = "调用及界面代码已接入，未运行验证"
-                if method == "thread/read":
-                    status = "仅客户端封装，界面待接入"
                 if method.startswith("plugin/") or method in {"hooks/list", "config/read", "config/batchWrite"}:
                     entry += ";" + extension_path
                 if method in {"mcpServerStatus/list", "config/mcpServer/reload", "config/read", "config/batchWrite"}:
