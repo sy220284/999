@@ -1,0 +1,294 @@
+{
+  "upstream_commit": "970111f6cb62cc02fe36a82ea7d71b37a2889c97",
+  "evidence": "静态源码审阅，无构建或运行结果",
+  "entries": [
+    {
+      "name": "app-server",
+      "package": "codex-app-server",
+      "binary": "codex-app-server",
+      "requiredBy": [
+        "中文原版入口",
+        "原版会话与工具"
+      ],
+      "androidInstall": "nativeLibraryDir/libcodex_engine.so",
+      "args": [
+        "--listen",
+        "stdio://"
+      ],
+      "ipc": "逐行双向 JSON-RPC/stdin/stdout；stderr 排空不落日志",
+      "stop": "turn/interrupt 后等待同回合完成；超时回收进程树",
+      "status": "源码接入，未构建/运行",
+      "refs": [
+        {
+          "path": "codex-rs/app-server/Cargo.toml",
+          "sha256": "c7db28ab330cb0257e3255c727f73f5ae888f080a856a72c80eff4feeda2bd47"
+        },
+        {
+          "path": "codex-rs/app-server/src/main.rs",
+          "sha256": "e0fb50054d6adabe7af2cdc10232d2cffb19b0cc96a59880d3f03d0988643a9e"
+        }
+      ],
+      "abi": [
+        "arm64-v8a",
+        "x86_64"
+      ],
+      "environment": "CODEX_HOME/HOME/TMPDIR/Android CA；账号与MCP走Keystore桥；不得记录凭证"
+    },
+    {
+      "name": "exec-helper",
+      "package": "codex-exec-server（链接到 app-server）",
+      "binary": "复用 libcodex_engine.so",
+      "requiredBy": [
+        "原版受控命令辅助"
+      ],
+      "androidInstall": "同 app-server",
+      "args": [
+        "--codex-run-as-arg0-exec-helper",
+        "ARG0",
+        "PROGRAM",
+        "ARGS..."
+      ],
+      "ipc": "辅助程序用指定 arg0 调用 exec 替换自身，沿用调用者设置的标准流/工作目录/环境",
+      "stop": "由原版工具控制；宿主强退时按进程树回收",
+      "status": "unix 自分发路径已确认，Android 运行待验证",
+      "refs": [
+        {
+          "path": "codex-rs/arg0/src/lib.rs",
+          "sha256": "c2e09deecca9af9307029e8ff62b384e314ee07f70080df249fa38e435c610ee"
+        },
+        {
+          "path": "codex-rs/exec-server/src/arg0_exec_helper.rs",
+          "sha256": "0af4e94c8a109d7847079ca8ebc67f0599a2fbdb2ca313718e0b1ae540cea9e2"
+        },
+        {
+          "path": "codex-rs/exec-server/src/process_sandbox.rs",
+          "sha256": "e66a8116655beeef5ccb9070f43b9945f9688adf8277ed6a7a91b0a04969aebe"
+        }
+      ],
+      "abi": [
+        "arm64-v8a",
+        "x86_64"
+      ],
+      "environment": "CODEX_HOME/HOME/TMPDIR/Android CA；账号与MCP走Keystore桥；不得记录凭证"
+    },
+    {
+      "name": "fs-helper",
+      "package": "codex-exec-server（链接到 app-server）",
+      "binary": "复用 libcodex_engine.so",
+      "requiredBy": [
+        "原版文件辅助"
+      ],
+      "androidInstall": "同 app-server",
+      "args": [
+        "--codex-run-as-fs-helper"
+      ],
+      "ipc": "由原版 fs_sandbox 构造辅助参数与通道",
+      "stop": "原版持有辅助任务；宿主退出时回收子树",
+      "status": "自分发路径已确认；项目权限模型仍需适配",
+      "refs": [
+        {
+          "path": "codex-rs/arg0/src/lib.rs",
+          "sha256": "c2e09deecca9af9307029e8ff62b384e314ee07f70080df249fa38e435c610ee"
+        },
+        {
+          "path": "codex-rs/exec-server/src/fs_helper.rs",
+          "sha256": "80804a6be4677d99d95697fa70f61b028f1c3e7f5f2d16d09960789369d9d454"
+        },
+        {
+          "path": "codex-rs/exec-server/src/fs_sandbox.rs",
+          "sha256": "29d0decd8ba36a25b2c3617051ec201be577d84989fb6396d550b52ccd4f5275"
+        }
+      ],
+      "abi": [
+        "arm64-v8a",
+        "x86_64"
+      ],
+      "environment": "CODEX_HOME/HOME/TMPDIR/Android CA；账号与MCP走Keystore桥；不得记录凭证",
+      "androidGap": "强制沙箱请求若 select_sandbox 返回 None，原版会拒绝执行；自分发存在不等于文件沙箱已适配。"
+    },
+    {
+      "name": "apply-patch",
+      "package": "codex-apply-patch（链接到 app-server）",
+      "binary": "原版创建 apply_patch/applypatch 别名指向当前程序，或使用隐藏参数",
+      "requiredBy": [
+        "原版补丁工具"
+      ],
+      "androidInstall": "别名位于原版 CODEX_HOME 管理的临时 PATH 目录，目标为安装目录原生程序",
+      "args": [
+        "--codex-run-as-apply-patch",
+        "PATCH"
+      ],
+      "ipc": "补丁参数、stdout/stderr/退出码",
+      "stop": "原版工具取消与宿主子树清理",
+      "status": "分发已确认；Android symlink/exec 策略和补丁行为待设备验证",
+      "refs": [
+        {
+          "path": "codex-rs/arg0/src/lib.rs",
+          "sha256": "c2e09deecca9af9307029e8ff62b384e314ee07f70080df249fa38e435c610ee"
+        },
+        {
+          "path": "codex-rs/apply-patch/src/lib.rs",
+          "sha256": "81eeac02181ffb6b1c8e1bdb18457372f11ef800f18675f77f0e10f3ee5dd9f2"
+        }
+      ],
+      "abi": [
+        "arm64-v8a",
+        "x86_64"
+      ],
+      "environment": "CODEX_HOME/HOME/TMPDIR/Android CA；账号与MCP走Keystore桥；不得记录凭证"
+    },
+    {
+      "name": "code-mode-host",
+      "package": "codex-code-mode-host",
+      "binary": "codex-code-mode-host",
+      "requiredBy": [
+        "原版代码模式 JS/V8 执行"
+      ],
+      "androidInstall": "nativeLibraryDir/libcodex_code_mode_host.so",
+      "args": [],
+      "ipc": "stdin/stdout 的 FramedReader/FramedWriter 分帧协议及 ClientHello 握手；不是 app-server 的逐行 JSON-RPC",
+      "stop": "上游 kill_on_drop 与独立进程组；应用最终子树回收",
+      "status": "Android 名称解析及构建入口已补；V8 交叉构建/链接/运行均待验证",
+      "refs": [
+        {
+          "path": "codex-rs/install-context/src/lib.rs",
+          "sha256": "d6e5b59ea003a8f035cde7b8092f17033290963f5e13d94fa6b449483581b3a5"
+        },
+        {
+          "path": "codex-rs/code-mode/src/remote_session.rs",
+          "sha256": "0ced42a3d006cff5ac352d18f91677367c324997dc6e76c5680bf5125be04472"
+        },
+        {
+          "path": "codex-rs/code-mode/src/remote_session/connection.rs",
+          "sha256": "dba3a7ceb5eea0aedfcf83641b0c1148923025525df6d78b78728b9813225496"
+        },
+        {
+          "path": "codex-rs/code-mode-host/src/main.rs",
+          "sha256": "7cb4c1fbe7505228f3432452f00a77ebeb6a08380f3f272cc972faa426c140af"
+        },
+        {
+          "path": "codex-rs/code-mode-runtime/Cargo.toml",
+          "sha256": "593ded78596279c8e6ce85f2d9708d549c44b3fe693cbbab9341aeb57e3ea923"
+        },
+        {
+          "path": "codex-rs/code-mode-protocol/src/host/codec.rs",
+          "sha256": "76b37ff1d32c3214b3457235cf87670015024173383713ebb255439d2d444d3c"
+        }
+      ],
+      "abi": [
+        "arm64-v8a",
+        "x86_64"
+      ],
+      "environment": "CODEX_HOME/HOME/TMPDIR/Android CA；账号与MCP走Keystore桥；不得记录凭证"
+    },
+    {
+      "name": "system-shell",
+      "package": "Android 系统 mksh/sh",
+      "binary": "/system/bin/sh",
+      "requiredBy": [
+        "shell 命令",
+        "PTY",
+        "命令 Hooks"
+      ],
+      "androidInstall": "系统提供，不打包桌面 /bin/sh",
+      "args": [
+        "由原版命令构造器生成"
+      ],
+      "ipc": "原版 pipe/PTY；应用终端 JNI PTY 单独存在",
+      "stop": "原版进程/PTY 取消和应用子树回收",
+      "status": "Android 兜底路径补丁已补；真实权限、终端和脚本行为待验证",
+      "refs": [
+        {
+          "path": "codex-rs/shell-command/src/shell_detect.rs",
+          "sha256": "89339079be8a9dbc66287a3555b9ce9470cb878547aa859978fe477d5e9fa5d9"
+        },
+        {
+          "path": "codex-rs/utils/pty/src/pty.rs",
+          "sha256": "840f07e5875466ae2da0182c36f7041cebd6f11ce7b73e265b48d738c6ebac80"
+        },
+        {
+          "path": "codex-rs/utils/pty/src/pipe.rs",
+          "sha256": "c147cbbf3c9bde1f15c83ded3c4641a6b5ca290f3639256b2cf5b4f7efe5d820"
+        }
+      ],
+      "abi": [
+        "arm64-v8a",
+        "x86_64"
+      ],
+      "environment": "CODEX_HOME/HOME/TMPDIR/Android CA；账号与MCP走Keystore桥；不得记录凭证"
+    },
+    {
+      "name": "ripgrep",
+      "package": "外部工具，未作为本脚本 Cargo workspace bin 构建",
+      "binary": "rg",
+      "requiredBy": [
+        "原版 thread-store 本机会话检索路径"
+      ],
+      "androidInstall": null,
+      "args": [
+        "由原版检索器构造"
+      ],
+      "ipc": "子进程输出与退出码",
+      "stop": "原版检索取消和应用子树回收",
+      "status": "缺口：待固定外部源码版本、Android 构建和查找路径；不能声称全工具运行环境已齐备",
+      "refs": [
+        {
+          "path": "codex-rs/install-context/src/lib.rs",
+          "sha256": "d6e5b59ea003a8f035cde7b8092f17033290963f5e13d94fa6b449483581b3a5"
+        },
+        {
+          "path": "codex-rs/thread-store/src/local/search_threads.rs",
+          "sha256": "d09554c4837d84bb402778badf286c9fc11978db38ac67ebda37753082dde945"
+        }
+      ],
+      "abi": [],
+      "environment": "CODEX_HOME/HOME/TMPDIR/Android CA；账号与MCP走Keystore桥；不得记录凭证"
+    },
+    {
+      "name": "desktop-sandboxes",
+      "package": "codex-linux-sandbox / Windows/macOS 平台代码",
+      "binary": "桌面平台专用",
+      "requiredBy": [
+        "桌面项目沙箱保证"
+      ],
+      "androidInstall": null,
+      "args": [],
+      "ipc": "不冒用桌面安全语义",
+      "stop": "不作为 Android 已支持能力",
+      "status": "平台差异：Android UID 不等于项目目录沙箱",
+      "refs": [
+        {
+          "path": "codex-rs/arg0/src/lib.rs",
+          "sha256": "c2e09deecca9af9307029e8ff62b384e314ee07f70080df249fa38e435c610ee"
+        }
+      ],
+      "abi": [],
+      "environment": "CODEX_HOME/HOME/TMPDIR/Android CA；账号与MCP走Keystore桥；不得记录凭证"
+    },
+    {
+      "name": "exec-server-fixture",
+      "package": "codex-app-server",
+      "binary": "exec-server",
+      "requiredBy": [
+        "上游集成测试夹具"
+      ],
+      "androidInstall": null,
+      "args": [],
+      "ipc": "测试用 WS 服务",
+      "stop": "测试框架负责",
+      "status": "明确排除生产必需清单：Cargo 源码注释标为 integration-test fixture",
+      "refs": [
+        {
+          "path": "codex-rs/app-server/Cargo.toml",
+          "sha256": "c7db28ab330cb0257e3255c727f73f5ae888f080a856a72c80eff4feeda2bd47"
+        },
+        {
+          "path": "codex-rs/app-server/src/bin/exec_server.rs",
+          "sha256": "93aa80b002c5b1958db8c89ae1ac9f869b1b775deb0a3ddcb6efb33bebba56c3"
+        }
+      ],
+      "abi": [],
+      "environment": "CODEX_HOME/HOME/TMPDIR/Android CA；账号与MCP走Keystore桥；不得记录凭证"
+    }
+  ]
+}

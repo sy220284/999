@@ -96,3 +96,42 @@ diff --git a/codex-rs/Cargo.lock b/codex-rs/Cargo.lock
   "pretty_assertions",
   "secret-service",
   "security-framework 3.5.1",
+diff --git a/codex-rs/install-context/src/lib.rs b/codex-rs/install-context/src/lib.rs
+--- a/codex-rs/install-context/src/lib.rs
++++ b/codex-rs/install-context/src/lib.rs
+@@ -8,7 +8,9 @@
+ use serde::Deserialize;
+
+ const BIN_DIRNAME: &str = "bin";
+-const CODE_MODE_HOST_EXECUTABLE_NAME: &str = if cfg!(windows) {
++const CODE_MODE_HOST_EXECUTABLE_NAME: &str = if cfg!(target_os = "android") {
++    "libcodex_code_mode_host.so"
++} else if cfg!(windows) {
+     "codex-code-mode-host.exe"
+ } else {
+     "codex-code-mode-host"
+diff --git a/codex-rs/shell-command/src/shell_detect.rs b/codex-rs/shell-command/src/shell_detect.rs
+--- a/codex-rs/shell-command/src/shell_detect.rs
++++ b/codex-rs/shell-command/src/shell_detect.rs
+@@ -250,7 +250,11 @@
+     })
+ }
+
+-const SH_FALLBACK_PATHS: &[&str] = &["/bin/sh"];
++const SH_FALLBACK_PATHS: &[&str] = if cfg!(target_os = "android") {
++    &["/system/bin/sh"]
++} else {
++    &["/bin/sh"]
++};
+
+ fn get_sh_shell() -> Option<DetectedShell> {
+     let shell_path = get_shell_path(ShellType::Sh, "sh", SH_FALLBACK_PATHS);
+@@ -334,7 +338,7 @@
+     } else {
+         DetectedShell {
+             shell_type: ShellType::Sh,
+-            shell_path: PathBuf::from("/bin/sh"),
++            shell_path: PathBuf::from(if cfg!(target_os = "android") { "/system/bin/sh" } else { "/bin/sh" }),
+         }
+     }
+ }

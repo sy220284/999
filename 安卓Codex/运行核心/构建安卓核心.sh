@@ -8,6 +8,12 @@ work_root="${CODEX_ANDROID_BUILD_DIR:-$app_root/build/original-engine}"
 source_root="$work_root/source"
 : "${ANDROID_NDK_ROOT:?请设置 ANDROID_NDK_ROOT，使用 NDK 28.2.13676358}"
 abi="${1:-arm64-v8a}"
+component="${2:-engine}"
+case "$component" in
+  engine) package=codex-app-server; program=codex-app-server; library=libcodex_engine.so ;;
+  code-mode) package=codex-code-mode-host; program=codex-code-mode-host; library=libcodex_code_mode_host.so ;;
+  *) echo '第二参数支持 engine 或 code-mode；code-mode 需要真实 Android V8 工具链，不能用空库替代。' >&2; exit 2 ;;
+esac
 case "$abi" in
   arm64-v8a) target=aarch64-linux-android; cc=aarch64-linux-android35-clang ;;
   x86_64) target=x86_64-linux-android; cc=x86_64-linux-android35-clang ;;
@@ -46,14 +52,14 @@ export "CARGO_TARGET_${cargo_target}_RUSTFLAGS=-C link-arg=-Wl,-z,max-page-size=
 export "CC_${target//-/_}=$ndk_bin/$cc"
 export "AR_${target//-/_}=$ndk_bin/llvm-ar"
 export PATH="$ndk_bin:$PATH"
-cargo build --manifest-path "$source_root/codex-rs/Cargo.toml" -p codex-app-server \
-  --bin codex-app-server --target "$target" --profile dev-small --locked
-binary="$CARGO_TARGET_DIR/$target/dev-small/codex-app-server"
+cargo build --manifest-path "$source_root/codex-rs/Cargo.toml" -p "$package" \
+  --bin "$program" --target "$target" --profile dev-small --locked
+binary="$CARGO_TARGET_DIR/$target/dev-small/$program"
 "$ndk_bin/llvm-readelf" -l "$binary"
 "$ndk_bin/llvm-readelf" -d "$binary"
 output="$app_root/app/src/main/jniLibs/$abi"
 mkdir -p "$output"
 # Android 只允许从安装时提取的 nativeLibraryDir 执行随包原生程序。
-install -m 755 "$binary" "$output/libcodex_engine.so"
-sha256sum "$output/libcodex_engine.so"
+install -m 755 "$binary" "$output/$library"
+sha256sum "$output/$library"
 echo '仅完成构建；仍须在对应 ABI 的 Android 17 设备上验证启动、协议、工具与取消。'
