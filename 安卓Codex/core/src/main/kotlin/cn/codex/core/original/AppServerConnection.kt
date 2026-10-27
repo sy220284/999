@@ -3,6 +3,7 @@ package cn.codex.core.original
 import kotlinx.coroutines.*
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.receiveAsFlow
+import kotlinx.coroutines.flow.map
 import kotlinx.serialization.json.*
 import java.io.*
 import java.util.concurrent.ConcurrentHashMap
@@ -23,9 +24,15 @@ class AppServerConnection(
     private val ids = AtomicLong()
     private val closed = AtomicBoolean()
     private val writeLock = Any()
-    private val incoming = Channel<ServerMessage>(64)
-    // 单一消费者按顺序处理事件；审批 UI 必须把请求加入队列后立即返回，不能阻塞此流。
-    val messages = incoming.receiveAsFlow()
+    private data class BufferedMessage(val value: ServerMessage, val size: Int)
+    private val bufferedBytes = AtomicLong()
+    private val maxBufferedBytes = 32L * 1024 * 1024
+    private val incoming = Channel<BufferedMessage>(64)
+    // 有界帧数 + 有界字节数：解码后立即释放队列预算，杜绝通知洪泛拖垮手机内存。
+    val messages = incoming.receiveAsFlow().map { item ->
+        bufferedBytes.addAndGet(-item.size.toLong())
+        item.value
+    }
     private val reader = scope.launch {
         try {
             val buffered = BufferedInputStream(input)
@@ -42,7 +49,12 @@ class AppServerConnection(
                     // 保留有界队列；处理速度不足时明确断开并清理 pending，绝不无限积压。
                     val event = if (id != null && id != JsonNull) ServerMessage.Request(id, method, params)
                         else ServerMessage.Notification(method, params)
-                    if (!incoming.trySend(event).isSuccess) throw IOException("原版通知队列已满，已断开连接以避免协议死锁")
+                    val size = line.toByteArray(Charsets.UTF_8).size
+                    val total = bufferedBytes.addAndGet(size.toLong())
+                    if (total > maxBufferedBytes || !incoming.trySend(BufferedMessage(event, size)).isSuccess) {
+                        bufferedBytes.addAndGet(-size.toLong())
+                        throw IOException("原版通知队列超过数量或字节预算，已断开连接以避免协议死锁")
+                    }
                 } else if (id != null && id != JsonNull) {
                     val waiter = pending.remove(id.toString()) ?: continue
                     val error = message["error"] as? JsonObject
