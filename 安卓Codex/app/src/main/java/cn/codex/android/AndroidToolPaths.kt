@@ -6,7 +6,7 @@ import java.io.File
 
 /** 别名只链接安装目录中的真实程序，不在可写目录生成可执行脚本或复制 ELF。 */
 object AndroidToolPaths {
-    val programs = linkedMapOf("rg" to "libcodex_rg.so", "git" to "libcodex_git.so",
+    val programs: Map<String, String> = linkedMapOf("rg" to "libcodex_rg.so", "git" to "libcodex_git.so",
         "git-upload-pack" to "libcodex_git.so", "git-receive-pack" to "libcodex_git.so", "git-upload-archive" to "libcodex_git.so")
     fun directory(context: Context) = File(context.filesDir, "原版工具/bin")
     fun environment(context: Context): Map<String, String> = mapOf(

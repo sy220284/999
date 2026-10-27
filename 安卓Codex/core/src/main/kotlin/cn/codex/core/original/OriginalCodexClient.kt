@@ -104,6 +104,15 @@ class OriginalCodexClient(val connection: AppServerConnection) {
     suspend fun experimentalFeatures(threadId: String? = null, cursor: String? = null) = call("experimentalFeature/list", buildJsonObject { put("limit", 30); threadId?.let { put("threadId", it) }; cursor?.let { put("cursor", it) } })
     suspend fun permissionProfiles(cwd: String, cursor: String? = null) = call("permissionProfile/list", buildJsonObject { put("cwd", cwd); put("limit", 30); cursor?.let { put("cursor", it) } })
     suspend fun setExperimentalFeature(name: String, enabled: Boolean) = call("experimentalFeature/enablement/set", buildJsonObject { put("enablement", buildJsonObject { put(name, enabled) }) })
+    suspend fun readFile(path: String) = call("fs/readFile", buildJsonObject { put("path", path) })
+    suspend fun writeFile(path: String, dataBase64: String) = call("fs/writeFile", buildJsonObject { put("path", path); put("dataBase64", dataBase64) })
+    suspend fun createDirectory(path: String, recursive: Boolean) = call("fs/createDirectory", buildJsonObject { put("path", path); put("recursive", recursive) })
+    suspend fun fileMetadata(path: String) = call("fs/getMetadata", buildJsonObject { put("path", path) })
+    suspend fun readDirectory(path: String) = call("fs/readDirectory", buildJsonObject { put("path", path) })
+    suspend fun removeFile(path: String, recursive: Boolean) = call("fs/remove", buildJsonObject { put("path", path); put("recursive", recursive); put("force", false) })
+    suspend fun copyFile(source: String, destination: String, recursive: Boolean) = call("fs/copy", buildJsonObject { put("sourcePath", source); put("destinationPath", destination); put("recursive", recursive) })
+    suspend fun watchFiles(watchId: String, path: String) = call("fs/watch", buildJsonObject { put("watchId", watchId); put("path", path) })
+    suspend fun unwatchFiles(watchId: String) = call("fs/unwatch", buildJsonObject { put("watchId", watchId) })
     private fun id(threadId: String) = buildJsonObject { put("threadId", threadId) }
     companion object {
         fun textInput(text: String) = buildJsonArray { add(buildJsonObject { put("type", "text"); put("text", text); put("text_elements", buildJsonArray {}) }) }

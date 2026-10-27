@@ -9,6 +9,7 @@ ROOT = Path(__file__).resolve().parents[1]
 client_path = "core/src/main/kotlin/cn/codex/core/original/OriginalCodexClient.kt"
 host_path = "app/src/main/java/cn/codex/android/OriginalCoreHost.kt"
 extension_path = "core/src/main/kotlin/cn/codex/core/original/OriginalExtensionsController.kt"
+files_path = "core/src/main/kotlin/cn/codex/core/original/OriginalFilesController.kt"
 settings_path = "core/src/main/kotlin/cn/codex/core/original/OriginalSettingsController.kt"
 mcp_path = "core/src/main/kotlin/cn/codex/core/original/OriginalMcpController.kt"
 client = (ROOT / client_path).read_text()
@@ -34,6 +35,8 @@ for kind, file in [("客户端请求", "ClientRequest.ts"), ("服务端请求", 
                     entry += ";" + mcp_path
                 if method in {"account/usage/read", "account/workspaceMessages/read", "modelProvider/capabilities/read", "configRequirements/read", "permissionProfile/list", "experimentalFeature/list", "experimentalFeature/enablement/set"}:
                     entry += ";" + settings_path
+                if method.startswith("fs/"):
+                    entry += ";" + files_path
                 phase = "待运行验证/继续语义审阅"
             elif method.startswith(("plugin/", "skills/", "mcpServer/", "config/mcpServer")):
                 phase = "P2"

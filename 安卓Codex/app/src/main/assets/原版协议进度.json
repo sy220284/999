@@ -410,73 +410,73 @@
   {
     "kind": "客户端请求",
     "method": "fs/readFile",
-    "status": "待接入",
-    "entry": "",
-    "phase": "P4",
+    "status": "调用及界面代码已接入，未运行验证",
+    "entry": "core/src/main/kotlin/cn/codex/core/original/OriginalCodexClient.kt;core/src/main/kotlin/cn/codex/core/original/OriginalFilesController.kt",
+    "phase": "待运行验证/继续语义审阅",
     "validation": "未运行验证"
   },
   {
     "kind": "客户端请求",
     "method": "fs/writeFile",
-    "status": "待接入",
-    "entry": "",
-    "phase": "P4",
+    "status": "调用及界面代码已接入，未运行验证",
+    "entry": "core/src/main/kotlin/cn/codex/core/original/OriginalCodexClient.kt;core/src/main/kotlin/cn/codex/core/original/OriginalFilesController.kt",
+    "phase": "待运行验证/继续语义审阅",
     "validation": "未运行验证"
   },
   {
     "kind": "客户端请求",
     "method": "fs/createDirectory",
-    "status": "待接入",
-    "entry": "",
-    "phase": "P4",
+    "status": "调用及界面代码已接入，未运行验证",
+    "entry": "core/src/main/kotlin/cn/codex/core/original/OriginalCodexClient.kt;core/src/main/kotlin/cn/codex/core/original/OriginalFilesController.kt",
+    "phase": "待运行验证/继续语义审阅",
     "validation": "未运行验证"
   },
   {
     "kind": "客户端请求",
     "method": "fs/getMetadata",
-    "status": "待接入",
-    "entry": "",
-    "phase": "P4",
+    "status": "调用及界面代码已接入，未运行验证",
+    "entry": "core/src/main/kotlin/cn/codex/core/original/OriginalCodexClient.kt;core/src/main/kotlin/cn/codex/core/original/OriginalFilesController.kt",
+    "phase": "待运行验证/继续语义审阅",
     "validation": "未运行验证"
   },
   {
     "kind": "客户端请求",
     "method": "fs/readDirectory",
-    "status": "待接入",
-    "entry": "",
-    "phase": "P4",
+    "status": "调用及界面代码已接入，未运行验证",
+    "entry": "core/src/main/kotlin/cn/codex/core/original/OriginalCodexClient.kt;core/src/main/kotlin/cn/codex/core/original/OriginalFilesController.kt",
+    "phase": "待运行验证/继续语义审阅",
     "validation": "未运行验证"
   },
   {
     "kind": "客户端请求",
     "method": "fs/remove",
-    "status": "待接入",
-    "entry": "",
-    "phase": "P4",
+    "status": "调用及界面代码已接入，未运行验证",
+    "entry": "core/src/main/kotlin/cn/codex/core/original/OriginalCodexClient.kt;core/src/main/kotlin/cn/codex/core/original/OriginalFilesController.kt",
+    "phase": "待运行验证/继续语义审阅",
     "validation": "未运行验证"
   },
   {
     "kind": "客户端请求",
     "method": "fs/copy",
-    "status": "待接入",
-    "entry": "",
-    "phase": "P4",
+    "status": "调用及界面代码已接入，未运行验证",
+    "entry": "core/src/main/kotlin/cn/codex/core/original/OriginalCodexClient.kt;core/src/main/kotlin/cn/codex/core/original/OriginalFilesController.kt",
+    "phase": "待运行验证/继续语义审阅",
     "validation": "未运行验证"
   },
   {
     "kind": "客户端请求",
     "method": "fs/watch",
-    "status": "待接入",
-    "entry": "",
-    "phase": "P4",
+    "status": "调用及界面代码已接入，未运行验证",
+    "entry": "core/src/main/kotlin/cn/codex/core/original/OriginalCodexClient.kt;core/src/main/kotlin/cn/codex/core/original/OriginalFilesController.kt",
+    "phase": "待运行验证/继续语义审阅",
     "validation": "未运行验证"
   },
   {
     "kind": "客户端请求",
     "method": "fs/unwatch",
-    "status": "待接入",
-    "entry": "",
-    "phase": "P4",
+    "status": "调用及界面代码已接入，未运行验证",
+    "entry": "core/src/main/kotlin/cn/codex/core/original/OriginalCodexClient.kt;core/src/main/kotlin/cn/codex/core/original/OriginalFilesController.kt",
+    "phase": "待运行验证/继续语义审阅",
     "validation": "未运行验证"
   },
   {
@@ -1402,9 +1402,9 @@
   {
     "kind": "服务端通知",
     "method": "fs/changed",
-    "status": "待接入",
-    "entry": "",
-    "phase": "P4",
+    "status": "通知分支已接入，未运行验证",
+    "entry": "app/src/main/java/cn/codex/android/OriginalCoreHost.kt",
+    "phase": "待验证/继续语义审阅",
     "validation": "未运行验证"
   },
   {

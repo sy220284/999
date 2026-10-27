@@ -57,18 +57,21 @@ class OriginalCoreHost(
     private val workspace = File(context.filesDir, "工作区/原版项目").apply { mkdirs() }
     private val engineHome = File(context.filesDir, "原版核心数据").apply { mkdirs() }
     val configurationJournal get() = (context.applicationContext as CodexApplication).configurationJournal
-    val extensions: OriginalExtensionsController = OriginalExtensionsController(scope, workspace.absolutePath, configurationJournal.lifecycle("插件与自动规则")) { state.value.working || state.value.turnId != null || state.value.loading || otherTaskRunning() || mcp.state.value.mutating || settings.state.value.mutating || commands.state.value.running || (context.applicationContext as CodexApplication).fullTerminal.state.value.running }
+    val extensions: OriginalExtensionsController = OriginalExtensionsController(scope, workspace.absolutePath, configurationJournal.lifecycle("插件与自动规则")) { state.value.working || state.value.turnId != null || state.value.loading || otherTaskRunning() || mcp.state.value.mutating || settings.state.value.mutating || files.state.value.mutating || commands.state.value.running || (context.applicationContext as CodexApplication).fullTerminal.state.value.running }
     val mcp: OriginalMcpController = OriginalMcpController(scope, workspace.absolutePath,
-        activeTask = { state.value.working || state.value.turnId != null || state.value.loading || state.value.closing || otherTaskRunning() || extensions.state.value.mutating || settings.state.value.mutating || commands.state.value.running || (context.applicationContext as CodexApplication).fullTerminal.state.value.running },
+        activeTask = { state.value.working || state.value.turnId != null || state.value.loading || state.value.closing || otherTaskRunning() || extensions.state.value.mutating || settings.state.value.mutating || files.state.value.mutating || commands.state.value.running || (context.applicationContext as CodexApplication).fullTerminal.state.value.running },
         threadId = { state.value.threadId }, mutationLifecycle = configurationJournal.lifecycle("MCP 服务操作"))
     val commands: OriginalCommandController = OriginalCommandController(scope,
-        busyElsewhere = { state.value.working || state.value.turnId != null || state.value.loading || state.value.closing || otherTaskRunning() || extensions.state.value.mutating || mcp.state.value.mutating || settings.state.value.mutating || (context.applicationContext as CodexApplication).fullTerminal.state.value.running },
+        busyElsewhere = { state.value.working || state.value.turnId != null || state.value.loading || state.value.closing || otherTaskRunning() || extensions.state.value.mutating || mcp.state.value.mutating || settings.state.value.mutating || files.state.value.mutating || (context.applicationContext as CodexApplication).fullTerminal.state.value.running },
         lifecycle = configurationJournal.lifecycle("原版独立命令"))
     val settings: OriginalSettingsController = OriginalSettingsController(scope, workspace.absolutePath,
         activeTask = { state.value.working || state.value.turnId != null || state.value.loading || state.value.closing || otherTaskRunning() || configurationChanging },
         threadId = { state.value.threadId }, lifecycle = configurationJournal.lifecycle("原版实验设置"))
+    val files: OriginalFilesController = OriginalFilesController(scope, workspace,
+        activeTask = { state.value.working || state.value.turnId != null || state.value.loading || state.value.closing || otherTaskRunning() || configurationChanging },
+        lifecycle = configurationJournal.lifecycle("原版项目文件"))
     fun commandWorkspace() = workspace.absolutePath
-    val configurationChanging get() = (context.applicationContext as CodexApplication).gitOperations.state.value.running || (context.applicationContext as CodexApplication).fullTerminal.state.value.running || commands.state.value.running || extensions.state.value.mutating || mcp.state.value.mutating || settings.state.value.mutating
+    val configurationChanging get() = (context.applicationContext as CodexApplication).gitOperations.state.value.running || (context.applicationContext as CodexApplication).fullTerminal.state.value.running || commands.state.value.running || extensions.state.value.mutating || mcp.state.value.mutating || settings.state.value.mutating || files.state.value.mutating
     fun mcpImports() = McpTools(context).connections().map { it.name to it.url }
     private fun error(error: Throwable) { mutable.update { it.copy(error = error.message ?: "原版核心操作失败") } }
     fun dismissError() { mutable.update { it.copy(error = null) } }
@@ -125,7 +128,7 @@ class OriginalCoreHost(
         ensureCurrent(epoch, rpc)
         if (config.apiKey.isNotBlank() && config.endpoint.trimEnd('/') == "https://api.openai.com/v1" && api.account().jsonObject["account"] == JsonNull) api.loginApiKey(config.apiKey)
         ensureCurrent(epoch, rpc)
-        client = api; extensions.bind(api); mcp.bind(api); commands.bind(api); settings.bind(api)
+        client = api; extensions.bind(api); mcp.bind(api); commands.bind(api); settings.bind(api); files.bind(api)
         mutable.update { it.copy(connected = true, status = "原版核心已连接 · 凭证由手机 Keystore 加密保存", model = config.model) }
         refreshThreads(api, false); readAccount(api, epoch)
     }
@@ -136,7 +139,7 @@ class OriginalCoreHost(
         if (cancelStartup) startupJob?.cancel()
         operationJob?.cancel(); operationJob = null
         stopping?.cancel(); stopping = null
-        extensions.bind(null); mcp.bind(null); commands.bind(null); settings.bind(null)
+        extensions.bind(null); mcp.bind(null); commands.bind(null); settings.bind(null); files.bind(null)
         turnWaiter?.finished?.completeExceptionally(IllegalStateException("原版核心已停止")); turnWaiter = null
         listener?.cancel(); listener = null
         val session = engine
@@ -413,6 +416,7 @@ class OriginalCoreHost(
             if (params.string("threadId") == state.value.threadId) mutable.update { it.copy(goal = null) }
             return
         }
+        if (method == "fs/changed") { files.changed(params); return }
         if (method == "mcpServer/startupStatus/updated") {
             mcp.runtimeChanged(params.string("threadId").ifBlank { null }, params.string("name"), params.string("status"), params.string("error").ifBlank { null })
             return
