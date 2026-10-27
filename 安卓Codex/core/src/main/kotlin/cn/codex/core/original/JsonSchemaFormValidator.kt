@@ -29,7 +29,35 @@ class JsonSchemaFormValidator(private val root: JsonObject) {
         }
         for (key in listOf("oneOf", "anyOf", "allOf", "prefixItems")) if ((obj[key] as? JsonArray)?.any { !supported(it, refs) } == true) return false
         for (key in listOf("items", "contains", "not", "if", "then", "else", "additionalProperties")) if (obj[key]?.let { !supported(it, refs) } == true) return false
-        return obj.string("pattern").let { it.isBlank() || runCatching { Regex(it) }.isSuccess }
+        // 仅接受本校验器确实实现的格式；不把未识别的 format 当作已检查。
+        obj["format"]?.let {
+            val format = it as? JsonPrimitive
+            if (format == null || !format.isString ||
+                format.content !in setOf("email", "uri", "date", "date-time", "uuid")) return false
+        }
+        obj["pattern"]?.let {
+            val value = it as? JsonPrimitive ?: return false
+            if (!value.isString || runCatching { Regex(value.content) }.isFailure) return false
+        }
+        (obj["patternProperties"] as? JsonObject)?.keys?.forEach {
+            if (runCatching { Regex(it) }.isFailure) return false
+        }
+        obj["type"]?.let {
+            val valid = setOf("null", "boolean", "object", "array", "number", "integer", "string")
+            val types = when (it) {
+                is JsonPrimitive -> if (it.isString) listOf(it.content) else return false
+                is JsonArray -> if (it.all { t -> t is JsonPrimitive && t.isString }) it.map { t -> t.jsonPrimitive.content } else return false
+                else -> return false
+            }
+            if (types.isEmpty() || types.distinct().size != types.size || types.any { type -> type !in valid }) return false
+        }
+        for (field in listOf("required", "dependentRequired")) {
+            val raw = obj[field] ?: continue
+            val valid = if (field == "required") raw is JsonArray && raw.all { it is JsonPrimitive && it.isString }
+                else raw is JsonObject && raw.values.all { it is JsonArray && it.all { part -> part is JsonPrimitive && part.isString } }
+            if (!valid) return false
+        }
+        return true
     }
     private fun equal(a: JsonElement, b: JsonElement): Boolean {
         if (a is JsonPrimitive && b is JsonPrimitive && !a.isString && !b.isString) {
