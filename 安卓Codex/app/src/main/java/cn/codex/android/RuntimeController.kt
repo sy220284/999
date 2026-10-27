@@ -212,7 +212,8 @@ class RuntimeController(private val context: Context) {
         }
     }
     fun reserveTask(): Boolean {
-        if (state.value.busy) return false
+        val native = (context.applicationContext as CodexApplication).originalCore.state.value
+        if (state.value.busy || native.working || native.closing || native.turnId != null) return false
         mutable.update { it.copy(busy = true) }
         return true
     }

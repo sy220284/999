@@ -124,3 +124,141 @@ JNIEXPORT void JNICALL Java_cn_codex_android_NativePty_terminateGroup(JNIEnv *en
     int status;
     while (waitpid(pid, &status, 0) < 0 && errno == EINTR) {}
 }
+
+// 原版核心需要互相独立的 stdin/stdout/stderr。fork 后只做系统调用和 execve。
+#include <stdlib.h>
+#include <string.h>
+#include <stdio.h>
+#include <dirent.h>
+#include <sys/prctl.h>
+static char *core_bytes(JNIEnv *env, jbyteArray value) {
+    jsize count = (*env)->GetArrayLength(env, value);
+    char *result = malloc((size_t)count + 1);
+    if (!result) return NULL;
+    (*env)->GetByteArrayRegion(env, value, 0, count, (jbyte *)result);
+    result[count] = 0;
+    return result;
+}
+static char **core_strings(JNIEnv *env, jobjectArray values) {
+    jsize count = (*env)->GetArrayLength(env, values);
+    char **result = calloc((size_t)count + 1, sizeof(char *));
+    if (!result) return NULL;
+    for (jsize i = 0; i < count; i++) {
+        jbyteArray value = (*env)->GetObjectArrayElement(env, values, i);
+        result[i] = core_bytes(env, value);
+        (*env)->DeleteLocalRef(env, value);
+        if (!result[i] || (*env)->ExceptionCheck(env)) { for (jsize j = 0; j <= i; j++) free(result[j]); free(result); return NULL; }
+    }
+    return result;
+}
+static void core_free(char **values) { if (values) { for (int i = 0; values[i]; i++) free(values[i]); free(values); } }
+JNIEXPORT jintArray JNICALL Java_cn_codex_android_NativeCoreBridge_spawn(JNIEnv *env, jclass cls, jobjectArray arguments, jobjectArray environment, jbyteArray directory) {
+    (void)cls;
+    char **argv = core_strings(env, arguments), **envp = core_strings(env, environment);
+    char *cwd = core_bytes(env, directory);
+    int pipes[4][2] = {{-1,-1},{-1,-1},{-1,-1},{-1,-1}};
+    pid_t pid = -1;
+    int failure = ENOMEM;
+    if (argv && argv[0] && envp && cwd) {
+        int count = 0;
+        for (; count < 4; count++) if (pipe2(pipes[count], O_CLOEXEC) < 0) break;
+        if (count == 4) {
+            pid = fork();
+            if (pid == 0) {
+                close(pipes[0][1]); close(pipes[1][0]); close(pipes[2][0]); close(pipes[3][0]);
+                // 仅影响核心进程：收留脱离中间父进程的工具，退出时可按进程树清理。
+                (void)prctl(PR_SET_CHILD_SUBREAPER, 1, 0, 0, 0);
+                if (setsid() >= 0 && chdir(cwd) == 0 && dup2(pipes[0][0], STDIN_FILENO) >= 0 && dup2(pipes[1][1], STDOUT_FILENO) >= 0 && dup2(pipes[2][1], STDERR_FILENO) >= 0) {
+                    close(pipes[0][0]); close(pipes[1][1]); close(pipes[2][1]);
+                    execve(argv[0], argv, envp);
+                }
+                int code = errno;
+                (void)write(pipes[3][1], &code, sizeof(code));
+                _exit(127);
+            }
+            if (pid < 0) failure = errno;
+        } else failure = errno;
+    }
+    core_free(argv); core_free(envp);
+    free(cwd);
+    if (pid > 0) {
+        close(pipes[0][0]); pipes[0][0] = -1;
+        close(pipes[1][1]); pipes[1][1] = -1;
+        close(pipes[2][1]); pipes[2][1] = -1;
+        close(pipes[3][1]); pipes[3][1] = -1;
+        int child_error = 0;
+        ssize_t got;
+        do { got = read(pipes[3][0], &child_error, sizeof(child_error)); } while (got < 0 && errno == EINTR);
+        close(pipes[3][0]); pipes[3][0] = -1;
+        if (got == 0) {
+            jint data[4] = {pid, pipes[0][1], pipes[1][0], pipes[2][0]};
+            jintArray result = (*env)->NewIntArray(env, 4);
+            if (result) { (*env)->SetIntArrayRegion(env, result, 0, 4, data); return result; }
+        }
+        failure = child_error ? child_error : EIO;
+        kill(-pid, SIGKILL); kill(pid, SIGKILL);
+        while (waitpid(pid, NULL, 0) < 0 && errno == EINTR) {}
+    }
+    for (int i = 0; i < 4; i++) for (int j = 0; j < 2; j++) if (pipes[i][j] >= 0) close(pipes[i][j]);
+    if (!(*env)->ExceptionCheck(env)) (*env)->ThrowNew(env, (*env)->FindClass(env, "java/io/IOException"), strerror(failure));
+    return NULL;
+}
+typedef struct { pid_t pid; unsigned long long started; } CoreProcessIdentity;
+static int core_identity(pid_t pid, pid_t *parent, unsigned long long *started) {
+    char path[64], buffer[4096];
+    snprintf(path, sizeof(path), "/proc/%d/stat", pid);
+    FILE *file = fopen(path, "r");
+    if (!file) return 0;
+    char *line = fgets(buffer, sizeof(buffer), file);
+    fclose(file);
+    if (!line) return 0;
+    // comm 允许空格/括号，从最后一个右括号后解析第 3..22 字段。
+    char *tail = strrchr(buffer, ')');
+    if (!tail) return 0;
+    char *save = NULL, *token = strtok_r(tail + 1, " ", &save);
+    for (int field = 3; token; field++, token = strtok_r(NULL, " ", &save)) {
+        if (field == 4) *parent = (pid_t)strtol(token, NULL, 10);
+        if (field == 22) { *started = strtoull(token, NULL, 10); return 1; }
+    }
+    return 0;
+}
+static int core_same(CoreProcessIdentity identity) {
+    pid_t parent = 0; unsigned long long started = 0;
+    return core_identity(identity.pid, &parent, &started) && started == identity.started;
+}
+static void core_kill_tree(pid_t pid) {
+    CoreProcessIdentity *nodes = calloc(4096, sizeof(CoreProcessIdentity));
+    pid_t parent = 0; unsigned long long started = 0;
+    if (nodes && core_identity(pid, &parent, &started)) {
+        nodes[0] = (CoreProcessIdentity){pid, started};
+        size_t count = 1;
+        kill(pid, SIGSTOP);
+        for (int pass = 0; pass < 32 && count < 4096; pass++) {
+            size_t before = count;
+            DIR *directory = opendir("/proc");
+            if (!directory) break;
+            struct dirent *entry;
+            while ((entry = readdir(directory)) && count < 4096) {
+                pid_t child = (pid_t)strtol(entry->d_name, NULL, 10);
+                if (child <= 0 || !core_identity(child, &parent, &started)) continue;
+                int known = 0, descendant = 0;
+                for (size_t i = 0; i < count; i++) { if (nodes[i].pid == child) known = 1; if (nodes[i].pid == parent) descendant = 1; }
+                if (!known && descendant) {
+                    CoreProcessIdentity identity = {child, started};
+                    if (core_same(identity)) { kill(child, SIGSTOP); nodes[count++] = identity; }
+                }
+            }
+            closedir(directory);
+            if (count == before) break;
+        }
+        // 子工具可能自行创建独立进程组，不能仅凭 kill(-enginePid) 清理。
+        for (size_t i = count; i > 1; i--) if (core_same(nodes[i-1])) kill(nodes[i-1].pid, SIGKILL);
+        if (core_same(nodes[0])) { kill(-pid, SIGKILL); kill(pid, SIGKILL); }
+    } else { kill(-pid, SIGKILL); kill(pid, SIGKILL); }
+    free(nodes);
+}
+JNIEXPORT void JNICALL Java_cn_codex_android_NativeCoreBridge_terminate(JNIEnv *env, jclass cls, jint pid) {
+    (void)env; (void)cls;
+    core_kill_tree(pid);
+    while (waitpid(pid, NULL, 0) < 0 && errno == EINTR) {}
+}

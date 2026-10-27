@@ -1,0 +1,61 @@
+package cn.codex.core.original
+
+import kotlinx.serialization.json.*
+
+/** 字段名对应上传版本 app-server-protocol/schema/typescript；不将 Kotlin 会话协议冒充原版 RPC。 */
+class OriginalCodexClient(val connection: AppServerConnection) {
+    suspend fun initialize(): JsonElement {
+        val result = call("initialize", buildJsonObject {
+            put("clientInfo", buildJsonObject { put("name", "codex_android"); put("title", "Codex · 随行"); put("version", "0.1.0") })
+            put("capabilities", buildJsonObject { put("experimentalApi", true) })
+        })
+        connection.notify("initialized")
+        return result
+    }
+    suspend fun call(method: String, params: JsonObject? = null, timeoutMs: Long = 60_000): JsonElement =
+        connection.request(method, params, timeoutMs)
+    suspend fun threads(cursor: String? = null, archived: Boolean = false) = call("thread/list", buildJsonObject {
+        put("limit", 30); put("archived", archived); cursor?.let { put("cursor", it) }
+    })
+    suspend fun start(cwd: String, model: String?) = call("thread/start", buildJsonObject {
+        put("cwd", cwd); model?.takeIf { it.isNotBlank() }?.let { put("model", it) }
+        // Android UID 仅隔离其他应用，不能宣称桌面项目沙箱；UI 必须先披露并取得本次同意。
+        put("sandbox", "danger-full-access"); put("approvalPolicy", "untrusted")
+    })
+    suspend fun resume(threadId: String) = call("thread/resume", buildJsonObject { put("threadId", threadId) })
+    suspend fun history(threadId: String, cursor: String? = null) = call("thread/items/list", buildJsonObject {
+        put("threadId", threadId); put("limit", 100); put("sortDirection", "desc"); cursor?.let { put("cursor", it) }
+    })
+    suspend fun read(threadId: String) = call("thread/read", buildJsonObject { put("threadId", threadId); put("includeTurns", true) })
+    suspend fun fork(threadId: String) = call("thread/fork", buildJsonObject { put("threadId", threadId) })
+    suspend fun archive(threadId: String, archived: Boolean) = call(if (archived) "thread/archive" else "thread/unarchive", id(threadId))
+    suspend fun rename(threadId: String, title: String) = call("thread/name/set", buildJsonObject { put("threadId", threadId); put("name", title) })
+    suspend fun compact(threadId: String) = call("thread/compact/start", id(threadId))
+    suspend fun turn(threadId: String, text: String, effort: String?) = call("turn/start", buildJsonObject {
+        put("threadId", threadId); put("input", textInput(text))
+        effort?.takeIf { it.isNotBlank() }?.let { put("effort", it) }
+    })
+    suspend fun steer(threadId: String, turnId: String, text: String) = call("turn/steer", buildJsonObject {
+        put("threadId", threadId); put("expectedTurnId", turnId); put("input", textInput(text))
+    })
+    suspend fun interrupt(threadId: String, turnId: String) = call("turn/interrupt", buildJsonObject { put("threadId", threadId); put("turnId", turnId) })
+    suspend fun account() = call("account/read", buildJsonObject { put("refreshToken", false) })
+    suspend fun loginApiKey(key: String) = call("account/login/start", buildJsonObject { put("type", "apiKey"); put("apiKey", key) })
+    suspend fun loginDeviceCode() = call("account/login/start", buildJsonObject { put("type", "chatgptDeviceCode") }, 180_000)
+    suspend fun loginBrowser() = call("account/login/start", buildJsonObject { put("type", "chatgpt") })
+    suspend fun cancelLogin(loginId: String) = call("account/login/cancel", buildJsonObject { put("loginId", loginId) })
+    suspend fun logout() = call("account/logout")
+    suspend fun models(cursor: String? = null) = call("model/list", buildJsonObject { cursor?.let { put("cursor", it) }; put("limit", 100) })
+    suspend fun rateLimits() = call("account/rateLimits/read")
+    suspend fun skills(cwd: String) = call("skills/list", buildJsonObject { put("cwds", buildJsonArray { add(cwd) }) })
+    suspend fun mcp(cursor: String? = null) = call("mcpServerStatus/list", buildJsonObject { cursor?.let { put("cursor", it) } })
+    suspend fun hooks(cwd: String, threadId: String?) = call("hooks/list", buildJsonObject {
+        if (threadId == null) put("cwds", buildJsonArray { add(cwd) }) else put("threadId", threadId)
+    })
+    suspend fun installedPlugins(cwd: String) = call("plugin/installed", buildJsonObject { put("cwds", buildJsonArray { add(cwd) }) })
+    suspend fun config() = call("config/read", buildJsonObject { put("includeLayers", true) })
+    private fun id(threadId: String) = buildJsonObject { put("threadId", threadId) }
+    companion object {
+        fun textInput(text: String) = buildJsonArray { add(buildJsonObject { put("type", "text"); put("text", text); put("text_elements", buildJsonArray {}) }) }
+    }
+}

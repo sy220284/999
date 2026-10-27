@@ -1,0 +1,49 @@
+diff --git a/codex-rs/http-client/Cargo.toml b/codex-rs/http-client/Cargo.toml
+--- a/codex-rs/http-client/Cargo.toml
++++ b/codex-rs/http-client/Cargo.toml
+@@ -11,7 +11,7 @@
+ http = { workspace = true }
+ http-body = "1.0.1"
+ httpdate = { workspace = true }
+-native-tls = "0.2"
++native-tls = { version = "0.2", features = ["vendored"] }
+ opentelemetry = { workspace = true }
+ reqwest = { workspace = true, features = ["json", "rustls-tls", "rustls-tls-native-roots", "stream"] }
+ rustls = { workspace = true }
+diff --git a/codex-rs/mxc-sandbox/Cargo.toml b/codex-rs/mxc-sandbox/Cargo.toml
+--- a/codex-rs/mxc-sandbox/Cargo.toml
++++ b/codex-rs/mxc-sandbox/Cargo.toml
+@@ -21,10 +21,12 @@
+ codex-utils-absolute-path = { workspace = true }
+ codex-utils-path-uri = { workspace = true }
+ codex-windows-sandbox = { workspace = true }
+-mxc-sdk = { workspace = true }
+ serde = { workspace = true, features = ["derive"] }
+ serde_json = { workspace = true }
+ thiserror = { workspace = true }
++
++[target.'cfg(not(target_os = "android"))'.dependencies]
++mxc-sdk = { workspace = true }
+
+ [target.'cfg(windows)'.dependencies]
+ flatbuffers = { workspace = true }
+diff --git a/codex-rs/mxc-sandbox/src/lib.rs b/codex-rs/mxc-sandbox/src/lib.rs
+--- a/codex-rs/mxc-sandbox/src/lib.rs
++++ b/codex-rs/mxc-sandbox/src/lib.rs
+@@ -5,7 +5,7 @@
+ mod availability;
+ #[cfg(windows)]
+ mod native;
+-#[cfg(any(windows, test))]
++#[cfg(any(windows, all(test, not(target_os = "android"))))]
+ mod policy;
+ mod transport;
+ #[cfg(windows)]
+@@ -169,6 +169,6 @@
+     }
+ }
+
+-#[cfg(test)]
++#[cfg(all(test, not(target_os = "android")))]
+ #[path = "policy_tests.rs"]
+ mod tests;

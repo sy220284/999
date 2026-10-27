@@ -34,6 +34,7 @@ private val destinations = listOf(
     Destination("files", "项目文件", Icons.Outlined.FolderOpen), Destination("changes", "查看修改", Icons.Outlined.Difference),
     Destination("terminal", "本机终端", Icons.Outlined.Terminal), Destination("skills", "项目技能", Icons.Outlined.AutoAwesome),
     Destination("mcp", "工具连接", Icons.Outlined.Extension), Destination("settings", "连接与偏好", Icons.Outlined.Tune),
+    Destination("original", "原版核心", Icons.Outlined.Memory),
     Destination("capabilities", "功能与限制", Icons.Outlined.Info)
 )
 
@@ -164,6 +165,7 @@ private object NoMotion: MotionDurationScale { override val scaleFactor = 0f }
                             "changes" -> ChangesScreen(controller, state)
                             "terminal" -> TerminalScreen(state, controller) { send(it, true) }
                             "settings" -> SettingsScreen(controller, state)
+                            "original" -> OriginalCoreScreen((LocalContext.current.applicationContext as CodexApplication).originalCore)
                             "skills" -> SkillsScreen(controller, state)
                             "mcp" -> McpScreen(controller)
                             else -> CapabilitiesScreen()

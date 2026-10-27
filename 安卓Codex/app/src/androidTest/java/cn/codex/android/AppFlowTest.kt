@@ -77,4 +77,14 @@ class AppFlowTest {
             assertEquals("CODEX_PTY_OK", resultFile.readText().trim())
         } finally { terminal.close() }
     }
+    @Test fun originalCoreBridgeKeepsThreePipesAndUnicodeArgumentsSeparate() = runBlocking {
+        val context = InstrumentationRegistry.getInstrumentation().targetContext
+        val directory = File(context.cacheDir, "原版管道验证").apply { mkdirs() }
+        val process = NativeCoreProcess(File("/system/bin/sh"), listOf("-c", "read value; printf '%s' \"${'$'}value\"; printf '独立错误流' >&2"), mapOf("PATH" to "/system/bin", "HOME" to directory.absolutePath), directory)
+        process.use {
+            it.output.write("补充字符😀\n".toByteArray()); it.output.flush(); it.output.close()
+            assertEquals("补充字符😀", it.input.bufferedReader().readText())
+            assertEquals("独立错误流", it.errors.bufferedReader().readText())
+        }
+    }
 }
