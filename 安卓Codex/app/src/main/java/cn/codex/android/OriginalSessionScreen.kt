@@ -19,6 +19,7 @@ import kotlinx.serialization.json.*
     val state by host.state.collectAsState()
     val extensions by host.extensions.state.collectAsState()
     val mcp by host.mcp.state.collectAsState()
+    val settings by host.settings.state.collectAsState()
     val networkGit by (androidx.compose.ui.platform.LocalContext.current.applicationContext as CodexApplication).gitOperations.state.collectAsState()
     val fullTerminal by (androidx.compose.ui.platform.LocalContext.current.applicationContext as CodexApplication).fullTerminal.state.collectAsState()
     val commands by host.commands.state.collectAsState()
@@ -28,7 +29,7 @@ import kotlinx.serialization.json.*
     var attachmentEdit by remember { mutableStateOf(false) }
     var confirm by remember { mutableStateOf<Pair<String, JsonObject>?>(null) }
     var before by remember(state.threadId) { mutableStateOf("") }
-    val editable = state.connected && !state.loading && !state.working && state.turnId == null && !extensions.mutating && !mcp.mutating && !commands.running && !fullTerminal.running && !networkGit.running
+    val editable = state.connected && !state.loading && !state.working && state.turnId == null && !extensions.mutating && !mcp.mutating && !settings.mutating && !commands.running && !fullTerminal.running && !networkGit.running
     BackHandler(onBack = onBack)
     LaunchedEffect(state.connectionEpoch, state.threadId) { confirm = null; goalEdit = false; sectionEdit = null; attachmentEdit = false }
     LaunchedEffect(tab, state.threadId) {

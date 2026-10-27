@@ -24,6 +24,7 @@ import kotlinx.serialization.json.*
     val state by host.state.collectAsState()
     val extensionState by host.extensions.state.collectAsState()
     val mcpState by host.mcp.state.collectAsState()
+    val settingsState by host.settings.state.collectAsState()
     val configurationRecords by host.configurationJournal.records.collectAsState()
     val configurationReadError by host.configurationJournal.readError.collectAsState()
     val activeConfiguration by host.configurationJournal.active.collectAsState()
@@ -33,6 +34,7 @@ import kotlinx.serialization.json.*
     val fullTerminalState by (LocalContext.current.applicationContext as CodexApplication).fullTerminal.state.collectAsState()
     val commandState by host.commands.state.collectAsState()
     var commandManager by remember { mutableStateOf(false) }
+    var settingsManager by remember { mutableStateOf(false) }
     var sessionManager by remember { mutableStateOf(false) }
     var extensions by remember { mutableStateOf(false) }
     var consent by remember { mutableStateOf(false) }
@@ -53,18 +55,19 @@ import kotlinx.serialization.json.*
             }
         }, confirmButton = { TextButton(onClick = { host.closeAgent(); host.openThread(agent.string("id")) }, enabled = !state.working && state.turnId == null && !state.loading) { Text("切换到此会话") } }, dismissButton = { TextButton(onClick = host::closeAgent) { Text("关闭查看") } })
     }
+    if (settingsManager) { OriginalSettingsScreen(host.settings, allowChanges = !state.working && state.turnId == null && !state.loading && !extensionState.mutating && !mcpState.mutating && !settingsState.mutating && !fullTerminalState.running && !networkGit.running && !commandState.running) { settingsManager = false }; return }
     if (commandManager) { OriginalCommandScreen(host.commands, host.commandWorkspace()) { commandManager = false }; return }
     if (sessionManager) { OriginalSessionScreen(host) { sessionManager = false }; return }
     if (mcpManager) {
-        OriginalMcpScreen(host.mcp, allowChanges = !state.working && state.turnId == null && !state.loading && !extensionState.mutating && !fullTerminalState.running && !networkGit.running,
+        OriginalMcpScreen(host.mcp, allowChanges = !state.working && state.turnId == null && !state.loading && !extensionState.mutating && !settingsState.mutating && !fullTerminalState.running && !networkGit.running,
             imports = imports, authorizationUrl = state.mcpAuthorizationUrl, authorizationName = state.mcpAuthorizationName,
             hostError = state.error, onDismissHostError = host::dismissError, onLogin = { host.startMcpLogin(it) },
             onDismissAuthorization = host::dismissMcpLogin, onBack = { mcpManager = false })
         return
     }
-    if (extensions) { OriginalExtensionsScreen(host.extensions, allowChanges = !state.working && state.turnId == null && !state.loading && !mcpState.mutating && !fullTerminalState.running && !networkGit.running, onBack = { extensions = false }); return }
+    if (extensions) { OriginalExtensionsScreen(host.extensions, allowChanges = !state.working && state.turnId == null && !state.loading && !mcpState.mutating && !settingsState.mutating && !fullTerminalState.running && !networkGit.running, onBack = { extensions = false }); return }
     val active = state.working || state.turnId != null
-    val editable = state.connected && !state.loading && !extensionState.mutating && !mcpState.mutating && !commandState.running && !fullTerminalState.running && !networkGit.running && !active
+    val editable = state.connected && !state.loading && !extensionState.mutating && !mcpState.mutating && !settingsState.mutating && !commandState.running && !fullTerminalState.running && !networkGit.running && !active
     Column(Modifier.fillMaxSize().imePadding()) {
         LazyColumn(Modifier.weight(1f).fillMaxWidth(), contentPadding = PaddingValues(20.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
             item {
@@ -101,6 +104,7 @@ import kotlinx.serialization.json.*
                     OutlinedButton(onClick = { extensions = true; host.extensions.refresh() }, enabled = !state.loading) { Icon(Icons.Outlined.Extension, null); Spacer(Modifier.width(8.dp)); Text("插件与自动规则") }
                     OutlinedButton(onClick = { mcpManager = true; host.mcp.refresh() }, enabled = !state.loading) { Icon(Icons.Outlined.Hub, null); Spacer(Modifier.width(8.dp)); Text("MCP 服务管理") }
                     OutlinedButton(onClick = { commandManager = true }, enabled = state.connected && !state.loading) { Text("独立命令与交互输入") }
+                    OutlinedButton(onClick = { settingsManager = true; host.settings.refresh() }, enabled = !state.loading) { Text("账号用量、策略与实验功能") }
                     Text(state.account, style = MaterialTheme.typography.titleSmall)
                     Text("账号与 MCP 凭证由 Android Keystore 加密保存在手机，退出核心后仍可恢复。", style = MaterialTheme.typography.bodySmall)
                     Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -108,7 +112,7 @@ import kotlinx.serialization.json.*
                         OutlinedButton(onClick = { host.login(false) }, enabled = !state.loading && !active) { Text("浏览器登录") }
                         TextButton(onClick = { host.loginSavedApiKey() }, enabled = editable) { Text("使用设置中的密钥") }
                         TextButton(onClick = { host.logout() }, enabled = editable) { Text("退出账号") }
-                        TextButton(onClick = host::close, enabled = !state.loading && !extensionState.mutating && !mcpState.mutating && !commandState.running && !fullTerminalState.running && !networkGit.running && !active) { Text("关闭核心") }
+                        TextButton(onClick = host::close, enabled = !state.loading && !extensionState.mutating && !mcpState.mutating && !settingsState.mutating && !commandState.running && !fullTerminalState.running && !networkGit.running && !active) { Text("关闭核心") }
                     }
                 }
                 state.mcpAuthorizationUrl?.let { url -> item {
@@ -182,7 +186,7 @@ import kotlinx.serialization.json.*
                 OutlinedTextField(draft, { draft = it }, label = { Text(if (active) "追加本次任务的指令" else "交给 Codex 的任务") }, modifier = Modifier.fillMaxWidth(), maxLines = 6, shape = RoundedCornerShape(18.dp))
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
                     if (active) TextButton(onClick = { host.stop() }) { Text("停止任务") }
-                    Button(onClick = { if (active) host.steer(draft) else host.send(draft); draft = "" }, enabled = draft.isNotBlank() && !state.loading && !extensionState.mutating && !mcpState.mutating && !commandState.running && !fullTerminalState.running && !networkGit.running && (!active || state.turnId != null)) { Text(if (active) "追加指令" else "发送") }
+                    Button(onClick = { if (active) host.steer(draft) else host.send(draft); draft = "" }, enabled = draft.isNotBlank() && !state.loading && !extensionState.mutating && !mcpState.mutating && !settingsState.mutating && !commandState.running && !fullTerminalState.running && !networkGit.running && (!active || state.turnId != null)) { Text(if (active) "追加指令" else "发送") }
                 }
             }
         }

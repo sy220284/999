@@ -6,18 +6,26 @@ import java.io.File
 
 /** 别名只链接安装目录中的真实程序，不在可写目录生成可执行脚本或复制 ELF。 */
 object AndroidToolPaths {
+    val programs = linkedMapOf("rg" to "libcodex_rg.so", "git" to "libcodex_git.so",
+        "git-upload-pack" to "libcodex_git.so", "git-receive-pack" to "libcodex_git.so", "git-upload-archive" to "libcodex_git.so")
+    fun directory(context: Context) = File(context.filesDir, "原版工具/bin")
+    fun environment(context: Context): Map<String, String> = mapOf(
+        "GIT_EXEC_PATH" to directory(context).absolutePath,
+        "GIT_TEMPLATE_DIR" to File(context.filesDir, "原版工具/git-templates").apply { mkdirs() }.absolutePath,
+        "GIT_PAGER" to "cat")
     fun install(context: Context): String {
-        val bin = File(context.filesDir, "原版工具/bin").apply { mkdirs() }
-        val target = File(context.applicationInfo.nativeLibraryDir, "libcodex_rg.so")
-        val alias = File(bin, "rg")
-        if (target.isFile) {
-            val temporary = File.createTempFile("rg-", ".link", bin)
-            temporary.delete()
-            try {
-                Os.symlink(target.absolutePath, temporary.absolutePath)
-                Os.rename(temporary.absolutePath, alias.absolutePath)
-            } finally { temporary.delete() }
-        } else alias.delete()
+        val bin = directory(context).apply { mkdirs() }
+        for ((name, library) in programs) {
+            val target = File(context.applicationInfo.nativeLibraryDir, library)
+            val alias = File(bin, name)
+            if (target.isFile && target.canExecute()) {
+                val temporary = File.createTempFile("tool-", ".link", bin)
+                temporary.delete()
+                try { Os.symlink(target.absolutePath, temporary.absolutePath); Os.rename(temporary.absolutePath, alias.absolutePath) }
+                finally { temporary.delete() }
+            } else alias.delete()
+        }
         return bin.absolutePath + ":" + System.getenv("PATH").orEmpty()
     }
+    fun installed(context: Context, library: String): Boolean = File(context.applicationInfo.nativeLibraryDir, library).let { it.isFile && it.canExecute() }
 }

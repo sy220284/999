@@ -97,6 +97,13 @@ class OriginalCodexClient(val connection: AppServerConnection) {
     suspend fun writeCommand(processId: String, bytes: ByteArray, closeStdin: Boolean) = call("command/exec/write", buildJsonObject { put("processId", processId); put("deltaBase64", java.util.Base64.getEncoder().encodeToString(bytes)); put("closeStdin", closeStdin) })
     suspend fun terminateCommand(processId: String) = call("command/exec/terminate", buildJsonObject { put("processId", processId) })
     suspend fun resizeCommand(processId: String, rows: Int, cols: Int) = call("command/exec/resize", buildJsonObject { put("processId", processId); put("size", buildJsonObject { put("rows", rows); put("cols", cols) }) })
+    suspend fun accountUsage(threadId: String? = null) = call("account/usage/read", buildJsonObject { threadId?.let { put("threadId", it) } })
+    suspend fun workspaceMessages() = call("account/workspaceMessages/read")
+    suspend fun providerCapabilities() = call("modelProvider/capabilities/read", buildJsonObject {})
+    suspend fun configRequirements() = call("configRequirements/read")
+    suspend fun experimentalFeatures(threadId: String? = null, cursor: String? = null) = call("experimentalFeature/list", buildJsonObject { put("limit", 30); threadId?.let { put("threadId", it) }; cursor?.let { put("cursor", it) } })
+    suspend fun permissionProfiles(cwd: String, cursor: String? = null) = call("permissionProfile/list", buildJsonObject { put("cwd", cwd); put("limit", 30); cursor?.let { put("cursor", it) } })
+    suspend fun setExperimentalFeature(name: String, enabled: Boolean) = call("experimentalFeature/enablement/set", buildJsonObject { put("enablement", buildJsonObject { put(name, enabled) }) })
     private fun id(threadId: String) = buildJsonObject { put("threadId", threadId) }
     companion object {
         fun textInput(text: String) = buildJsonArray { add(buildJsonObject { put("type", "text"); put("text", text); put("text_elements", buildJsonArray {}) }) }

@@ -34,6 +34,8 @@ object NativeOriginalEngineFactory : OriginalEngineFactory {
         require(endpoint.scheme == "https" || config.allowLoopbackHttp && endpoint.scheme == "http" && endpoint.host in setOf("localhost", "127.0.0.1", "[::1]", "::1")) { "原版核心仅接受 HTTPS 或已允许的本机 HTTP 地址" }
         require(!endpoint.host.isNullOrBlank() && endpoint.rawUserInfo == null && endpoint.rawQuery == null && endpoint.rawFragment == null) { "模型地址需要有效主机名，且不可包含凭证、查询或片段" }
         val args = mutableListOf("--listen", "stdio://", "-c", "cli_auth_credentials_store=\"keyring\"", "-c", "mcp_oauth_credentials_store=\"keyring\"", "-c", "shell_environment_policy.inherit=\"core\"")
+        // core 继承策略不含 GIT_*；仅显式传入工具位置，不扩大秘密环境继承范围。
+        AndroidToolPaths.environment(context).forEach { (key, value) -> args += listOf("-c", "shell_environment_policy.set.$key=${JsonPrimitive(value)}") }
         // 原版 MCP 配置由管理页版本化保存，不再用每次启动的 CLI override 覆盖用户编辑。
         // 空文件仅首次创建；createNewFile 原子地保留已经存在的配置。
         File(home, "config.toml").createNewFile()
@@ -44,6 +46,7 @@ object NativeOriginalEngineFactory : OriginalEngineFactory {
         return try {
             val env = System.getenv().toMutableMap().apply {
                 put("PATH", (context.applicationContext as CodexApplication).toolPath)
+                putAll(AndroidToolPaths.environment(context))
                 put("CODEX_HOME", home.absolutePath); put("HOME", home.absolutePath)
                 put("CODEX_ANDROID_VAULT_SOCKET", vault.path); put("CODEX_ANDROID_VAULT_HOST_PID", android.os.Process.myPid().toString())
                 put("TMPDIR", context.cacheDir.absolutePath); put("SHELL", "/system/bin/sh")

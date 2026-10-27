@@ -8,6 +8,7 @@ class CodexApplication: Application() {
         super.onCreate()
         toolPath = AndroidToolPaths.install(this)
         android.system.Os.setenv("PATH", toolPath, true)
+        AndroidToolPaths.environment(this).forEach { (key, value) -> android.system.Os.setenv(key, value, true) }
     }
     val configurationJournal by lazy { ConfigurationJournal(this) }
     val gitOperations by lazy { GitNetworkController(this) }

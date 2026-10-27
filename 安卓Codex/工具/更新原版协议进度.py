@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """静态生成调用入口清单；不将方法存在性视为语义完成或测试通过。"""
 import csv
+import json
 import re
 from pathlib import Path
 
@@ -8,6 +9,7 @@ ROOT = Path(__file__).resolve().parents[1]
 client_path = "core/src/main/kotlin/cn/codex/core/original/OriginalCodexClient.kt"
 host_path = "app/src/main/java/cn/codex/android/OriginalCoreHost.kt"
 extension_path = "core/src/main/kotlin/cn/codex/core/original/OriginalExtensionsController.kt"
+settings_path = "core/src/main/kotlin/cn/codex/core/original/OriginalSettingsController.kt"
 mcp_path = "core/src/main/kotlin/cn/codex/core/original/OriginalMcpController.kt"
 client = (ROOT / client_path).read_text()
 host = (ROOT / host_path).read_text()
@@ -30,6 +32,8 @@ for kind, file in [("客户端请求", "ClientRequest.ts"), ("服务端请求", 
                     entry += ";" + extension_path
                 if method in {"mcpServerStatus/list", "config/mcpServer/reload", "config/read", "config/batchWrite"}:
                     entry += ";" + mcp_path
+                if method in {"account/usage/read", "account/workspaceMessages/read", "modelProvider/capabilities/read", "configRequirements/read", "permissionProfile/list", "experimentalFeature/list", "experimentalFeature/enablement/set"}:
+                    entry += ";" + settings_path
                 phase = "待运行验证/继续语义审阅"
             elif method.startswith(("plugin/", "skills/", "mcpServer/", "config/mcpServer")):
                 phase = "P2"
@@ -39,7 +43,7 @@ for kind, file in [("客户端请求", "ClientRequest.ts"), ("服务端请求", 
             if method in queued:
                 status, entry, phase = "中文交互已接入，未运行验证", host_path, "待验证"
                 if method == "mcpServer/elicitation/request":
-                    status, phase = "平面表单/URL 已接入，复杂 schema 待补", "P2"
+                    status, phase = "表单/URL 已接入；有限复杂 schema，未运行验证", "P2/待验证"
             else:
                 status, entry = "未接入，明确返回协议错误", host_path
         elif method.startswith("windows"):
@@ -57,3 +61,7 @@ with path.open("w", newline="", encoding="utf-8") as stream:
     writer.writerow(["类型", "方法", "代码状态", "代码入口", "后续单元", "验证状态"])
     writer.writerows(rows)
 print("写入", len(rows), "条协议项；此清单不代表完整功能完成率。")
+
+# 应用展示与仓库台账使用同一源，保留请求/通知种类，避免旧版功能页继续误报。
+asset = ROOT / "app/src/main/assets/原版协议进度.json"
+asset.write_text(json.dumps([dict(zip(["kind", "method", "status", "entry", "phase", "validation"], row)) for row in rows], ensure_ascii=False, indent=2) + "\n")

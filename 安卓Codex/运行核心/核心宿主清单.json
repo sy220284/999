@@ -310,6 +310,36 @@
       ],
       "abi": [],
       "environment": "CODEX_HOME/HOME/TMPDIR/Android CA；账号与MCP走Keystore桥；不得记录凭证"
+    },
+    {
+      "name": "git-local-cli",
+      "package": "external-git",
+      "binary": "git",
+      "requiredBy": [
+        "原版 worktree/git-utils 的外部 git 调用"
+      ],
+      "androidInstall": "nativeLibraryDir/libcodex_git.so；filesDir/原版工具/bin/git 及 upload/receive 别名",
+      "args": [
+        "原版原样传递的 Git 子命令"
+      ],
+      "ipc": "退出码/stdout/stderr；非 JGit RPC",
+      "stop": "原版进程树取消；宿主不可重放有副作用命令",
+      "status": "固定 Git v2.56.0 源码构建/命名/环境入口已写入；未构建、未运行；CLI 网络/外部脚本扩展尚缺",
+      "refs": [
+        {
+          "path": "codex-rs/worktree/src/git.rs",
+          "sha256": "631acdbf12cb9b2dc36829308f28f82bd9eabea84430582fa6b7245e186398d6"
+        },
+        {
+          "path": "codex-rs/git-utils/src/info.rs",
+          "sha256": "8621dba47a5f6c3949105b3d8e4badc4da5190acbad0fdfaacabd0b5fb18b454"
+        }
+      ],
+      "abi": [
+        "arm64-v8a",
+        "x86_64"
+      ],
+      "environment": "PATH/GIT_EXEC_PATH/GIT_TEMPLATE_DIR/GIT_PAGER；不注入网络凭证；core 继承策略使用显式无敏感位置字段"
     }
   ]
 }
