@@ -22,13 +22,16 @@ import kotlinx.serialization.json.*
 
 @Composable fun OriginalCoreScreen(host: OriginalCoreHost) {
     val state by host.state.collectAsState()
+    val extensionState by host.extensions.state.collectAsState()
+    var extensions by remember { mutableStateOf(false) }
     var consent by remember { mutableStateOf(false) }
     var draft by remember { mutableStateOf("") }
     var mcpName by remember { mutableStateOf("") }
     var renamed by remember { mutableStateOf<String?>(null) }
     val context = LocalContext.current
+    if (extensions) { OriginalExtensionsScreen(host.extensions, allowChanges = !state.working && state.turnId == null && !state.loading, onBack = { extensions = false }); return }
     val active = state.working || state.turnId != null
-    val editable = state.connected && !state.loading && !active
+    val editable = state.connected && !state.loading && !extensionState.mutating && !active
     Column(Modifier.fillMaxSize().imePadding()) {
         LazyColumn(Modifier.weight(1f).fillMaxWidth(), contentPadding = PaddingValues(20.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
             item {
@@ -48,6 +51,7 @@ import kotlinx.serialization.json.*
             }
             if (state.connected) {
                 item {
+                    OutlinedButton(onClick = { extensions = true; host.extensions.refresh() }, enabled = !state.loading) { Icon(Icons.Outlined.Extension, null); Spacer(Modifier.width(8.dp)); Text("插件与自动规则") }
                     Text(state.account, style = MaterialTheme.typography.titleSmall)
                     Text("账号与 MCP 凭证由 Android Keystore 加密保存在手机，退出核心后仍可恢复。", style = MaterialTheme.typography.bodySmall)
                     Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -55,7 +59,7 @@ import kotlinx.serialization.json.*
                         OutlinedButton(onClick = { host.login(false) }, enabled = !state.loading && !active) { Text("浏览器登录") }
                         TextButton(onClick = { host.loginSavedApiKey() }, enabled = editable) { Text("使用设置中的密钥") }
                         TextButton(onClick = { host.logout() }, enabled = editable) { Text("退出账号") }
-                        TextButton(onClick = host::close, enabled = !state.loading && !active) { Text("关闭核心") }
+                        TextButton(onClick = host::close, enabled = !state.loading && !extensionState.mutating && !active) { Text("关闭核心") }
                     }
                 }
                 item {
@@ -127,7 +131,7 @@ import kotlinx.serialization.json.*
                 OutlinedTextField(draft, { draft = it }, label = { Text(if (active) "追加本次任务的指令" else "交给 Codex 的任务") }, modifier = Modifier.fillMaxWidth(), maxLines = 6, shape = RoundedCornerShape(18.dp))
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
                     if (active) TextButton(onClick = { host.stop() }) { Text("停止任务") }
-                    Button(onClick = { if (active) host.steer(draft) else host.send(draft); draft = "" }, enabled = draft.isNotBlank() && !state.loading && (!active || state.turnId != null)) { Text(if (active) "追加指令" else "发送") }
+                    Button(onClick = { if (active) host.steer(draft) else host.send(draft); draft = "" }, enabled = draft.isNotBlank() && !state.loading && !extensionState.mutating && (!active || state.turnId != null)) { Text(if (active) "追加指令" else "发送") }
                 }
             }
         }
@@ -137,7 +141,7 @@ import kotlinx.serialization.json.*
     state.requests.firstOrNull()?.let { request -> OriginalRequestDialog(request, state.items, { host.answer(request, it) }) }
 }
 private fun originalItemTitle(type: String) = when (type) { "reasoning" -> "思考过程"; "plan" -> "工作计划"; "commandExecution" -> "命令执行"; "fileChange" -> "文件修改"; "mcpToolCall" -> "MCP 工具"; "collabAgentToolCall" -> "代理协作"; "contextCompaction" -> "上下文压缩"; else -> "工具记录 · $type" }
-private fun openOriginalLogin(context: android.content.Context, url: String) {
+internal fun openOriginalLogin(context: android.content.Context, url: String) {
     val uri = Uri.parse(url)
     if (uri.scheme != "https" && !(uri.scheme == "http" && uri.host in setOf("localhost", "127.0.0.1", "::1"))) {
         android.widget.Toast.makeText(context, "仅支持 HTTPS 或本机授权页面", android.widget.Toast.LENGTH_LONG).show(); return

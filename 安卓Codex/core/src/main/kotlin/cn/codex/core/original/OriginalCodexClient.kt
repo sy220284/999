@@ -53,6 +53,14 @@ class OriginalCodexClient(val connection: AppServerConnection) {
         if (threadId == null) put("cwds", buildJsonArray { add(cwd) }) else put("threadId", threadId)
     })
     suspend fun installedPlugins(cwd: String) = call("plugin/installed", buildJsonObject { put("cwds", buildJsonArray { add(cwd) }) })
+    suspend fun pluginCatalog(cwd: String, fresh: Boolean = false) = call("plugin/list", buildJsonObject {
+        put("cwds", buildJsonArray { add(cwd) }); put("forceRefetch", fresh)
+    })
+    suspend fun pluginDetail(plugin: OriginalPlugin) = call("plugin/read", plugin.locator())
+    suspend fun installPlugin(plugin: OriginalPlugin, attemptId: String) = call("plugin/install", buildJsonObject {
+        plugin.locator().forEach { (key, value) -> put(key, value) }; put("installAttemptId", attemptId)
+    }, 180_000)
+    suspend fun uninstallPlugin(pluginId: String) = call("plugin/uninstall", buildJsonObject { put("pluginId", pluginId) }, 180_000)
     suspend fun mcpLogin(name: String, threadId: String?) = call("mcpServer/oauth/login", buildJsonObject {
         put("name", name); threadId?.let { put("threadId", it) }; put("timeoutSecs", 180)
     })

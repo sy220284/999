@@ -35,25 +35,37 @@ class OriginalCoreHost(private val context: Context) {
     private var client: OriginalCodexClient? = null
     private var listener: Job? = null
     private var closingJob: Job? = null
+    private var operationJob: Job? = null
     private var completion: CompletableDeferred<Unit>? = null
     private var stopping: Job? = null
     private val workspace = File(context.filesDir, "工作区/原版项目").apply { mkdirs() }
     private val engineHome = File(context.filesDir, "原版核心数据").apply { mkdirs() }
+    val extensions = OriginalExtensionsController(scope, workspace.absolutePath) { state.value.working || state.value.turnId != null || state.value.loading || (context.applicationContext as CodexApplication).controller.state.value.busy }
     private fun error(error: Throwable) { mutable.update { it.copy(error = error.message ?: "原版核心操作失败") } }
     fun dismissError() { mutable.update { it.copy(error = null) } }
-    private fun operation(block: suspend (OriginalCodexClient) -> Unit) = scope.launch {
-        if (state.value.loading) return@launch
+    private fun operation(block: suspend (OriginalCodexClient) -> Unit): Job? {
+        if (state.value.loading || state.value.closing || extensions.state.value.mutating) return null
+        val api = client ?: run { error(IllegalStateException("请先启动原版核心")); return null }
         mutable.update { it.copy(loading = true, error = null) }
-        try { block(checkNotNull(client) { "请先启动原版核心" }) }
-        catch (cancelled: CancellationException) { throw cancelled }
-        catch (failure: Exception) { error(failure) }
-        finally { mutable.update { it.copy(loading = false) } }
+        return scope.launch {
+            try { block(api) }
+            catch (cancelled: CancellationException) {
+                if (cancelled is TimeoutCancellationException) { if (client === api) error(IllegalStateException("原版请求超时，请刷新实际状态；不会自动重放操作")) }
+                else throw cancelled
+            }
+            catch (failure: Exception) { if (client === api) error(failure) }
+            finally { if (client === api) mutable.update { it.copy(loading = false) } }
+        }.also { operationJob = it }
     }
     fun connect() = scope.launch {
         if (state.value.loading || state.value.connected || state.value.closing) return@launch
         mutable.update { it.copy(loading = true, error = null) }
         try { startup.withLock { closingJob?.join(); startProcess() } }
-        catch (cancelled: CancellationException) { throw cancelled }
+        catch (cancelled: CancellationException) {
+            close()
+            if (cancelled is TimeoutCancellationException) error(IllegalStateException("原版核心启动超时，已关闭启动中的进程，请核查后重试"))
+            else throw cancelled
+        }
         catch (failure: Exception) { close(); error(failure) }
         finally { mutable.update { it.copy(loading = false) } }
     }
@@ -111,6 +123,7 @@ class OriginalCoreHost(private val context: Context) {
         withContext(Dispatchers.Main.immediate) {
             check(connection === rpc && !state.value.closing) { "原版核心在初始化期间退出" }
             client = api
+            extensions.bind(api)
             mutable.update { it.copy(connected = true, status = "原版核心已连接 · 凭证由手机 Keystore 加密保存", model = config.model) }
         }
         refreshThreads(api, false)
@@ -118,6 +131,8 @@ class OriginalCoreHost(private val context: Context) {
     }
     fun close() {
         if (state.value.closing) return
+        operationJob?.cancel(); operationJob = null
+        extensions.bind(null)
         completion?.completeExceptionally(IllegalStateException("原版核心已停止")); completion = null
         listener?.cancel(); listener = null
         val rpc = connection; val child = process; val vault = vaultServer
@@ -202,7 +217,7 @@ class OriginalCoreHost(private val context: Context) {
         mutable.update { it.copy(account = label) }
     }
     fun send(text: String) {
-        if (text.isBlank() || state.value.loading || state.value.working || !state.value.connected) return
+        if (text.isBlank() || state.value.loading || state.value.working || extensions.state.value.mutating || !state.value.connected) return
         if (state.value.turnId != null) { error(IllegalStateException("已恢复的回合仍在运行，请先停止或追加指令")); return }
         if ((context.applicationContext as CodexApplication).controller.state.value.busy) { error(IllegalStateException("另一个任务正在运行")); return }
         mutable.update { it.copy(working = true, error = null) }
@@ -223,7 +238,10 @@ class OriginalCoreHost(private val context: Context) {
             if (!finished.isCompleted) mutable.update { it.copy(turnId = turn?.string("id") ?: it.turnId, status = "正在处理") }
             finished.await(); turnFinished = true
             refreshThreads(api, false)
-        } catch (cancelled: CancellationException) { stop(); throw cancelled }
+        } catch (cancelled: CancellationException) {
+            if (cancelled is TimeoutCancellationException) { close(); error(IllegalStateException("任务请求超时，已关闭核心。请恢复会话检查已产生的修改，不会自动重发任务。")) }
+            else { stop(); throw cancelled }
+        }
         catch (failure: Exception) {
             // 请求超时可能已有副作用；不自动再发 turn/start，关闭后让用户恢复检查。
             if (turnFinished) error(IllegalStateException("任务已结束，但刷新会话失败：${failure.message.orEmpty()}"))
@@ -276,6 +294,10 @@ class OriginalCoreHost(private val context: Context) {
         }
     }
     private suspend fun notification(method: String, params: JsonObject) {
+        if (method == "hook/started" || method == "hook/completed") {
+            (params["run"] as? JsonObject)?.let { run -> extensions.recordHook(JsonObject(run + mapOf("threadId" to (params["threadId"] ?: JsonNull)))) }
+            return
+        }
         if (method == "account/login/completed") {
             if (state.value.loginId != null && params.string("loginId") != state.value.loginId) return
             val success = params["success"]?.jsonPrimitive?.booleanOrNull == true
