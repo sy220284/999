@@ -118,12 +118,14 @@ class OriginalMcpController(private val scope: CoroutineScope, private val cwd: 
         require(editor.generation == stamp && editor == state.value.editor && editor.snapshot == state.value.snapshot) { "配置或连接已变化，请重新打开编辑" }
         if (editor.name == null) require(state.value.entries.none { it.name == name }) { "这个标识已存在，请选择其他名称" }
         else require(editor.name == name) { "编辑时不能改变服务标识" }
-        persist(api, stamp, editor.snapshot, OriginalMcpConfig.edit(name, config))
+        // 所有调用者统一经过原版字段契约，不能仅依赖 Compose 表单验证。
+        val validated = OriginalMcpAdvanced.validate(config)
+        persist(api, stamp, editor.snapshot, OriginalMcpConfig.edit(name, validated))
     }
     fun toggle(approved: OriginalMcpEntry, snapshot: OriginalConfigSnapshot) = operation(mutating = true) { api, stamp ->
         val current = current(approved, snapshot)
         val fields = JsonObject(current.userConfig!! + ("enabled" to JsonPrimitive(!approved.enabled)))
-        persist(api, stamp, snapshot, OriginalMcpConfig.edit(current.name, fields))
+        persist(api, stamp, snapshot, OriginalMcpConfig.edit(current.name, OriginalMcpAdvanced.validate(fields)))
     }
     fun delete(approved: OriginalMcpEntry, snapshot: OriginalConfigSnapshot) = operation(mutating = true) { api, stamp ->
         current(approved, snapshot)
