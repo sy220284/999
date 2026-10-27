@@ -138,7 +138,7 @@ import kotlinx.serialization.json.*
     }
     if (consent) AlertDialog(onDismissRequest = { consent = false }, title = { Text("手机执行权限") }, text = { Text("原版核心将以本应用身份运行命令。Android 应用隔离无法把命令限制在单个项目目录内，命令也可能访问本应用的其他数据。该模式保留原版审批机制；请逐条检查命令和文件修改。是否在本次启动中继续？") }, confirmButton = { TextButton(onClick = { consent = false; host.connect() }) { Text("同意并启动") } }, dismissButton = { TextButton(onClick = { consent = false }) { Text("取消") } })
     renamed?.let { title -> AlertDialog(onDismissRequest = { renamed = null }, title = { Text("重命名原版会话") }, text = { OutlinedTextField(title, { renamed = it }, label = { Text("会话名称") }) }, confirmButton = { TextButton(onClick = { host.rename(title); renamed = null }, enabled = title.isNotBlank()) { Text("保存") } }, dismissButton = { TextButton(onClick = { renamed = null }) { Text("取消") } }) }
-    state.requests.firstOrNull()?.let { request -> OriginalRequestDialog(request, state.items, { host.answer(request, it) }) }
+    state.requests.firstOrNull()?.let { request -> key(state.connectionEpoch, request.id) { OriginalRequestDialog(request, state.items, { host.answer(request, it) }) } }
 }
 private fun originalItemTitle(type: String) = when (type) { "reasoning" -> "思考过程"; "plan" -> "工作计划"; "commandExecution" -> "命令执行"; "fileChange" -> "文件修改"; "mcpToolCall" -> "MCP 工具"; "collabAgentToolCall" -> "代理协作"; "contextCompaction" -> "上下文压缩"; else -> "工具记录 · $type" }
 internal fun openOriginalLogin(context: android.content.Context, url: String) {

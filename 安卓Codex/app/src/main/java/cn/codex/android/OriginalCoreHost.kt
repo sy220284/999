@@ -10,11 +10,11 @@ import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.serialization.json.*
 import java.io.File
-import java.net.URI
+import java.util.UUID
 
 /** Application 持有连接；Compose 只订阅状态。原版任务由独立前台服务等待完成。 */
 data class OriginalState(
-    val connected: Boolean = false, val closing: Boolean = false, val loading: Boolean = false, val working: Boolean = false,
+    val connectionEpoch: Long = 0, val connected: Boolean = false, val closing: Boolean = false, val loading: Boolean = false, val working: Boolean = false,
     val threadId: String? = null, val turnId: String? = null,
     val threads: List<JsonObject> = emptyList(), val nextCursor: String? = null, val archived: Boolean = false,
     val items: List<OriginalItem> = emptyList(), val requests: List<ServerMessage.Request> = emptyList(),
@@ -24,23 +24,35 @@ data class OriginalState(
     val mcpAuthorizationUrl: String? = null, val mcpAuthorizationName: String? = null, val mcpLoginId: String? = null,
     val models: List<String> = emptyList(), val model: String = "", val report: String = ""
 )
-class OriginalCoreHost(private val context: Context) {
-    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
+class OriginalCoreHost(
+    private val context: Context,
+    private val engineFactory: OriginalEngineFactory = NativeOriginalEngineFactory,
+    private val configLoader: suspend () -> ApiConfig = { withContext(Dispatchers.IO) { SecureSettings(context).load() } },
+    private val startupTimeoutMs: Long = 60_000,
+    private val scope: CoroutineScope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate),
+    private val startTask: (String) -> Unit = { prompt -> context.startForegroundService(Intent(context, OriginalExecutionService::class.java).putExtra("prompt", prompt)); Unit },
+    private val otherTaskRunning: () -> Boolean = { (context.applicationContext as CodexApplication).controller.state.value.busy }
+) {
     private val mutable = MutableStateFlow(OriginalState())
     val state = mutable.asStateFlow()
     private val startup = Mutex()
-    private var process: NativeCoreProcess? = null
-    private var vaultServer: OriginalVaultServer? = null
-    private var connection: AppServerConnection? = null
+    private val lifecycle = OriginalRuntimeLifecycle()
+    private var engine: OriginalEngineSession? = null
+    private val connection get() = engine?.connection
+    private var startupJob: Job? = null
     private var client: OriginalCodexClient? = null
     private var listener: Job? = null
     private var closingJob: Job? = null
     private var operationJob: Job? = null
-    private var completion: CompletableDeferred<Unit>? = null
+    private data class Outcome(val status: String, val error: String?)
+    private data class TurnWaiter(val epoch: Long, val threadId: String, val requestId: String,
+        val finished: CompletableDeferred<Unit> = CompletableDeferred(), var turnId: String? = null,
+        val outcomes: LinkedHashMap<String, Outcome> = linkedMapOf())
+    private var turnWaiter: TurnWaiter? = null
     private var stopping: Job? = null
     private val workspace = File(context.filesDir, "工作区/原版项目").apply { mkdirs() }
     private val engineHome = File(context.filesDir, "原版核心数据").apply { mkdirs() }
-    val extensions = OriginalExtensionsController(scope, workspace.absolutePath) { state.value.working || state.value.turnId != null || state.value.loading || (context.applicationContext as CodexApplication).controller.state.value.busy }
+    val extensions = OriginalExtensionsController(scope, workspace.absolutePath) { state.value.working || state.value.turnId != null || state.value.loading || otherTaskRunning() }
     private fun error(error: Throwable) { mutable.update { it.copy(error = error.message ?: "原版核心操作失败") } }
     fun dismissError() { mutable.update { it.copy(error = null) } }
     private fun operation(block: suspend (OriginalCodexClient) -> Unit): Job? {
@@ -57,90 +69,66 @@ class OriginalCoreHost(private val context: Context) {
             finally { if (client === api) mutable.update { it.copy(loading = false) } }
         }.also { operationJob = it }
     }
-    fun connect() = scope.launch {
-        if (state.value.loading || state.value.connected || state.value.closing) return@launch
-        mutable.update { it.copy(loading = true, error = null) }
-        try { startup.withLock { closingJob?.join(); startProcess() } }
-        catch (cancelled: CancellationException) {
-            close()
-            if (cancelled is TimeoutCancellationException) error(IllegalStateException("原版核心启动超时，已关闭启动中的进程，请核查后重试"))
-            else throw cancelled
-        }
-        catch (failure: Exception) { close(); error(failure) }
-        finally { mutable.update { it.copy(loading = false) } }
-    }
-    private suspend fun startProcess() = withContext(Dispatchers.IO) {
-        val binary = File(context.applicationInfo.nativeLibraryDir, "libcodex_engine.so")
-        check(binary.isFile && binary.canExecute()) { "当前包未包含可执行的原版核心。请按“运行核心/构建安卓核心.sh”生成对应 ABI 产物；此入口不会改用 Kotlin 内核。" }
-        val config = SecureSettings(context).load()
-        val endpoint = URI(config.endpoint)
-        require(endpoint.scheme == "https" || config.allowLoopbackHttp && endpoint.scheme == "http" && endpoint.host in setOf("localhost", "127.0.0.1", "[::1]", "::1")) { "原版核心仅接受 HTTPS 或已允许的本机 HTTP 模型地址" }
-        require(!endpoint.host.isNullOrBlank()) { "模型地址需要有效主机名" }
-        require(endpoint.rawUserInfo == null && endpoint.rawQuery == null && endpoint.rawFragment == null) { "模型地址不可包含凭证、查询或片段" }
-        val args = mutableListOf("--listen", "stdio://", "-c", "cli_auth_credentials_store=\"keyring\"", "-c", "mcp_oauth_credentials_store=\"keyring\"", "-c", "shell_environment_policy.inherit=\"core\"")
-        for (server in McpTools(context).connections()) {
-            val mcpUrl = URI(server.url)
-            require(mcpUrl.scheme == "https" && !mcpUrl.host.isNullOrBlank() && mcpUrl.rawUserInfo == null) { "MCP 连接需要不含凭证的 HTTPS 地址" }
-            require(server.name.matches(Regex("[A-Za-z0-9_-]{1,32}"))) { "MCP 连接标识不适用于原版配置" }
-            args += listOf("-c", "mcp_servers.${server.name}.url=${JsonPrimitive(server.url)}")
-        }
-        val trust = AndroidTrustBundle.write(engineHome)
-        val vault = OriginalVaultServer(context, scope).also { vaultServer = it }
-        val env = System.getenv().toMutableMap().apply {
-            put("CODEX_HOME", engineHome.absolutePath); put("HOME", engineHome.absolutePath)
-            put("CODEX_ANDROID_VAULT_SOCKET", vault.path); put("CODEX_ANDROID_VAULT_HOST_PID", android.os.Process.myPid().toString())
-            put("TMPDIR", context.cacheDir.absolutePath); put("SHELL", "/system/bin/sh")
-            put("CODEX_CA_CERTIFICATE", trust.absolutePath); put("SSL_CERT_FILE", trust.absolutePath)
-            remove("SSL_CERT_DIR")
-            remove("OPENAI_API_KEY"); remove("CODEX_API_KEY"); remove("CODEX_ANDROID_API_KEY")
-        }
-        if (config.endpoint.trimEnd('/') != "https://api.openai.com/v1") {
-            val base = JsonPrimitive(config.endpoint.trimEnd('/')).toString()
-            args += listOf("-c", "model_provider=\"android_service\"", "-c", "model_providers.android_service={name=\"手机模型服务\",base_url=$base,wire_api=\"responses\",env_key=\"CODEX_ANDROID_API_KEY\"}")
-            if (config.apiKey.isNotBlank()) env["CODEX_ANDROID_API_KEY"] = config.apiKey
-        }
-        val child = NativeCoreProcess(binary, args, env, workspace)
-        process = child
-        vault.authorize(child.pid)
-        // 丢弃 stderr，避免上游错误带入令牌；绝不把协议/环境/API key 原样写日志。
-        scope.launch(Dispatchers.IO) { runCatching { child.errors.use { stream -> val buffer = ByteArray(4096); while (stream.read(buffer) >= 0) { /* drain */ } } } }
-        val rpc = AppServerConnection(child.input, child.output, scope, child::close)
-        connection = rpc
-        listener = scope.launch {
-            try { rpc.messages.collect { message -> onMessage(rpc, message) } }
-            catch (cancelled: CancellationException) { throw cancelled }
-            catch (failure: Exception) {
-                if (connection === rpc) {
-                    completion?.completeExceptionally(failure)
-                    close()
-                    mutable.update { it.copy(error = "原版核心连接已中断，请重新启动后恢复会话") }
+    private fun current(epoch: Long, rpc: AppServerConnection? = connection) = lifecycle.isCurrent(epoch) && connection === rpc
+    private fun ensureCurrent(epoch: Long, rpc: AppServerConnection) { check(current(epoch, rpc)) { "原版连接已变更，已丢弃旧操作结果" } }
+    private fun syncLifecycle() { val value = lifecycle.state; mutable.update { it.copy(threadId = value.threadId, turnId = value.turnId) } }
+    fun connect(): Job? {
+        if (state.value.loading || state.value.connected || state.value.closing) return null
+        val epoch = lifecycle.beginConnection()
+        mutable.update { it.copy(connectionEpoch = epoch, loading = true, error = null) }
+        return scope.launch {
+            try { withTimeout(startupTimeoutMs) { startup.withLock { closingJob?.join(); startProcess(epoch) } } }
+            catch (cancelled: CancellationException) {
+                if (lifecycle.isCurrent(epoch)) {
+                    closeSession(cancelStartup = false)
+                    if (cancelled is TimeoutCancellationException) error(IllegalStateException("原版核心启动超时，已关闭启动中的进程，请核查后重试"))
                 }
+                if (cancelled !is TimeoutCancellationException) throw cancelled
             }
+            catch (failure: Exception) { if (lifecycle.isCurrent(epoch)) { closeSession(cancelStartup = false); error(failure) } }
+            finally { if (lifecycle.isCurrent(epoch)) mutable.update { it.copy(loading = false) } }
+        }.also { startupJob = it }
+    }
+    private suspend fun startProcess(epoch: Long) {
+        val config = configLoader()
+        val session = engineFactory.open(OriginalEngineLaunch(context, config, workspace, engineHome, scope))
+        if (!lifecycle.isCurrent(epoch)) {
+            withContext(NonCancellable + Dispatchers.IO) { session.close() }
+            throw CancellationException("启动期间连接已关闭")
+        }
+        engine = session
+        val rpc = session.connection
+        listener = scope.launch {
+            try { rpc.messages.collect { message -> if (current(epoch, rpc)) onMessage(epoch, rpc, message) } }
+            catch (cancelled: CancellationException) { throw cancelled }
+            catch (failure: Exception) { if (current(epoch, rpc)) { close(); error(IllegalStateException("原版核心连接已中断，请重新启动后恢复会话")) } }
         }
         val api = OriginalCodexClient(rpc)
         api.initialize()
+        ensureCurrent(epoch, rpc)
         if (config.apiKey.isNotBlank() && config.endpoint.trimEnd('/') == "https://api.openai.com/v1" && api.account().jsonObject["account"] == JsonNull) api.loginApiKey(config.apiKey)
-        withContext(Dispatchers.Main.immediate) {
-            check(connection === rpc && !state.value.closing) { "原版核心在初始化期间退出" }
-            client = api
-            extensions.bind(api)
-            mutable.update { it.copy(connected = true, status = "原版核心已连接 · 凭证由手机 Keystore 加密保存", model = config.model) }
-        }
-        refreshThreads(api, false)
-        readAccount(api)
+        ensureCurrent(epoch, rpc)
+        client = api; extensions.bind(api)
+        mutable.update { it.copy(connected = true, status = "原版核心已连接 · 凭证由手机 Keystore 加密保存", model = config.model) }
+        refreshThreads(api, false); readAccount(api, epoch)
     }
-    fun close() {
+    fun close() { closeSession(cancelStartup = true) }
+    private fun closeSession(cancelStartup: Boolean) {
         if (state.value.closing) return
+        lifecycle.disconnect(lifecycle.state.connectionEpoch)
+        if (cancelStartup) startupJob?.cancel()
         operationJob?.cancel(); operationJob = null
+        stopping?.cancel(); stopping = null
         extensions.bind(null)
-        completion?.completeExceptionally(IllegalStateException("原版核心已停止")); completion = null
+        turnWaiter?.finished?.completeExceptionally(IllegalStateException("原版核心已停止")); turnWaiter = null
         listener?.cancel(); listener = null
-        val rpc = connection; val child = process; val vault = vaultServer
-        connection = null; client = null; process = null; vaultServer = null
-        mutable.update { OriginalState(model = it.model, closing = true, status = "正在关闭核心") }
+        val session = engine
+        engine = null; client = null
+        mutable.update { OriginalState(connectionEpoch = lifecycle.state.connectionEpoch, model = it.model, closing = true, status = "正在关闭核心") }
         closingJob = scope.launch(Dispatchers.IO) {
-            try { rpc?.close(); child?.close() }
-            finally { runCatching { vault?.close() }; mutable.update { it.copy(closing = false, status = "原版核心已关闭") } }
+            try { session?.close() }
+            catch (_: Exception) { mutable.update { it.copy(error = "核心资源回收未能确认，请检查进程状态后再启动") } }
+            finally { mutable.update { it.copy(closing = false, status = "原版核心已关闭") } }
         }
     }
     fun refresh(archived: Boolean = state.value.archived, more: Boolean = false) = operation { api -> refreshThreads(api, archived, more) }
@@ -176,7 +164,9 @@ class OriginalCoreHost(private val context: Context) {
         val turns = (thread["turns"] as? JsonArray).orEmpty().mapNotNull { it as? JsonObject }
         val active = turns.lastOrNull { it.string("status") == "inProgress" }?.string("id")
         val items = OriginalThreadView.history(thread)
-        mutable.update { it.copy(threadId = thread.string("id"), turnId = active, items = items, historyCursor = null, model = thread.string("model", it.model), status = if (active == null) "会话已恢复" else "已恢复正在运行的回合") }
+        lifecycle.accept(lifecycle.state.connectionEpoch, OriginalLifecycleEvent.ThreadSelected(thread.string("id"), active))
+        syncLifecycle()
+        mutable.update { it.copy(items = items, historyCursor = null, model = thread.string("model", it.model), status = if (lifecycle.state.turnId == null) "会话已恢复" else "已恢复正在运行的回合") }
     }
     fun loadHistory() = operation { api ->
         val snapshot = state.value
@@ -200,7 +190,7 @@ class OriginalCoreHost(private val context: Context) {
     fun cancelLogin() = operation { api -> state.value.loginId?.let { api.cancelLogin(it) }; mutable.update { it.copy(loginId = null, loginUrl = null, loginCode = null) } }
     fun loginSavedApiKey() = operation { api ->
         check(!state.value.working && state.value.turnId == null)
-        val key = withContext(Dispatchers.IO) { SecureSettings(context).load().apiKey }
+        val key = configLoader().apiKey
         require(key.isNotBlank()) { "请先在连接设置中保存 API 密钥" }
         api.loginApiKey(key); readAccount(api)
     }
@@ -211,74 +201,102 @@ class OriginalCoreHost(private val context: Context) {
     }
     fun dismissMcpLogin() { mutable.update { it.copy(mcpAuthorizationUrl = null) } }
     fun logout() = operation { api -> check(!state.value.working && state.value.turnId == null); api.logout(); readAccount(api) }
-    private suspend fun readAccount(api: OriginalCodexClient) {
+    private suspend fun readAccount(api: OriginalCodexClient, epoch: Long = lifecycle.state.connectionEpoch) {
         val account = api.account().jsonObject["account"] as? JsonObject
         val label = when (account?.string("type")) { "chatgpt" -> "ChatGPT · ${account.string("email")} · ${account.string("planType")}"; "apiKey" -> "API 密钥"; else -> "尚未登录" }
-        mutable.update { it.copy(account = label) }
+        if (current(epoch, api.connection) && client === api) mutable.update { it.copy(account = label) }
     }
     fun send(text: String) {
         if (text.isBlank() || state.value.loading || state.value.working || extensions.state.value.mutating || !state.value.connected) return
         if (state.value.turnId != null) { error(IllegalStateException("已恢复的回合仍在运行，请先停止或追加指令")); return }
-        if ((context.applicationContext as CodexApplication).controller.state.value.busy) { error(IllegalStateException("另一个任务正在运行")); return }
+        if (otherTaskRunning()) { error(IllegalStateException("另一个任务正在运行")); return }
         mutable.update { it.copy(working = true, error = null) }
-        try { context.startForegroundService(Intent(context, OriginalExecutionService::class.java).putExtra("prompt", text)) }
+        try { startTask(text) }
         catch (failure: Exception) { mutable.update { it.copy(working = false) }; error(failure) }
     }
     suspend fun runReserved(text: String) {
         if (!state.value.working) return
-        val finished = CompletableDeferred<Unit>(); completion = finished
+        val epoch = lifecycle.state.connectionEpoch
+        val api = client ?: run { mutable.update { it.copy(working = false) }; return }
+        var waiter: TurnWaiter? = null
         var turnFinished = false
         try {
-            val api = checkNotNull(client)
-            if (state.value.threadId == null) selectThread(api.start(workspace.absolutePath, state.value.model).jsonObject.getValue("thread").jsonObject)
-            val thread = requireNotNull(state.value.threadId)
-            val response = api.turn(thread, text, SecureSettings(context).load().reasoning).jsonObject
-            val turn = response["turn"] as? JsonObject
-            // 可能在响应之前已收到 turn/completed，不能把已完成回合重新标为活动。
-            if (!finished.isCompleted) mutable.update { it.copy(turnId = turn?.string("id") ?: it.turnId, status = "正在处理") }
-            finished.await(); turnFinished = true
-            refreshThreads(api, false)
+            if (state.value.threadId == null) {
+                val thread = api.start(workspace.absolutePath, state.value.model).jsonObject.getValue("thread").jsonObject
+                ensureCurrent(epoch, api.connection); selectThread(thread)
+            }
+            val thread = requireNotNull(lifecycle.state.threadId)
+            val request = UUID.randomUUID().toString()
+            lifecycle.accept(epoch, OriginalLifecycleEvent.StartRequested(request))
+            val waiting = TurnWaiter(epoch, thread, request).also { waiter = it; turnWaiter = it }
+            val response = api.turn(thread, text, configLoader().reasoning).jsonObject
+            ensureCurrent(epoch, api.connection)
+            val turnId = (response["turn"] as? JsonObject)?.string("id").orEmpty()
+            require(turnId.isNotBlank()) { "原版任务启动响应缺少回合标识，不能确认任务状态" }
+            waiting.turnId = turnId
+            lifecycle.accept(epoch, OriginalLifecycleEvent.StartResponded(request, thread, turnId)); syncLifecycle()
+            waiting.outcomes[turnId]?.let { outcome -> applyOutcome(outcome); waiting.finished.complete(Unit) }
+            if (!waiting.finished.isCompleted) mutable.update { it.copy(status = "正在处理") }
+            waiting.finished.await(); turnFinished = true
+            if (current(epoch, api.connection)) refreshThreads(api, false)
         } catch (cancelled: CancellationException) {
-            if (cancelled is TimeoutCancellationException) { close(); error(IllegalStateException("任务请求超时，已关闭核心。请恢复会话检查已产生的修改，不会自动重发任务。")) }
-            else { stop(); throw cancelled }
+            if (current(epoch, api.connection)) {
+                if (cancelled is TimeoutCancellationException) { close(); error(IllegalStateException("任务请求超时，已关闭核心。请恢复会话检查修改；不会自动重发任务。")) }
+                else stop()
+            }
+            if (cancelled !is TimeoutCancellationException) throw cancelled
+        } catch (failure: Exception) {
+            if (current(epoch, api.connection)) {
+                if (turnFinished) error(IllegalStateException("任务已结束，但刷新会话失败：${failure.message.orEmpty()}"))
+                else { close(); error(IllegalStateException("任务状态无法确认，核心已关闭。请恢复会话检查修改。${failure.message.orEmpty()}")) }
+            }
+        } finally {
+            if (turnWaiter === waiter) turnWaiter = null
+            if (current(epoch, api.connection)) mutable.update { it.copy(working = false) }
         }
-        catch (failure: Exception) {
-            // 请求超时可能已有副作用；不自动再发 turn/start，关闭后让用户恢复检查。
-            if (turnFinished) error(IllegalStateException("任务已结束，但刷新会话失败：${failure.message.orEmpty()}"))
-            else { close(); error(IllegalStateException("任务状态无法确认，核心已关闭。请恢复会话检查已产生的修改。${failure.message.orEmpty()}")) }
-        }
-        finally { if (completion === finished) completion = null; mutable.update { it.copy(working = false) } }
+    }
+    private fun applyOutcome(outcome: Outcome) {
+        mutable.update { it.copy(status = when (outcome.status) { "failed" -> "任务失败"; "interrupted" -> "任务已停止"; else -> "任务完成" }, error = outcome.error) }
     }
     fun steer(text: String) = operation { api -> api.steer(requireNotNull(state.value.threadId), requireNotNull(state.value.turnId), text) }
     fun stop() {
         if (stopping?.isActive == true) return
+        val epoch = lifecycle.state.connectionEpoch
+        val api = client ?: return
         stopping = scope.launch {
             val snapshot = state.value
-            val rpc = connection
+            val rpc = api.connection
             try {
                 if (snapshot.threadId != null && snapshot.turnId != null) {
+                    lifecycle.accept(epoch, OriginalLifecycleEvent.StopRequested(snapshot.threadId, snapshot.turnId)); syncLifecycle()
                     mutable.update { it.copy(status = "正在停止任务") }
                     withTimeout(10_000) {
-                        client?.interrupt(snapshot.threadId, snapshot.turnId)
+                        api.interrupt(snapshot.threadId, snapshot.turnId)
+                        ensureCurrent(epoch, rpc)
+                        lifecycle.accept(epoch, OriginalLifecycleEvent.InterruptAccepted(snapshot.threadId, snapshot.turnId)); syncLifecycle()
                         state.first { it.turnId != snapshot.turnId || !it.connected }
                     }
-                } else if (snapshot.working) { close(); return@launch }
+                } else if (snapshot.working && current(epoch, rpc)) { close(); return@launch }
             } catch (cancelled: CancellationException) {
                 if (cancelled !is TimeoutCancellationException) throw cancelled
-                if (connection === rpc && state.value.turnId == snapshot.turnId) { close(); error(IllegalStateException("核心未及时响应停止，已结束本机核心进程；已完成的修改仍保留")) }
+                if (current(epoch, rpc) && state.value.turnId == snapshot.turnId) { close(); error(IllegalStateException("核心未及时响应停止，已结束本机核心进程；已完成的修改仍保留")) }
             } catch (failure: Exception) {
-                if (connection === rpc && state.value.turnId == snapshot.turnId) close()
-                error(failure)
+                if (current(epoch, rpc)) { if (state.value.turnId == snapshot.turnId) close(); error(failure) }
             }
         }
     }
     fun answer(request: ServerMessage.Request, result: JsonElement) = scope.launch {
-        // resolved 通知已移除的请求不可再次回传；ID 类型（数字/字符串）原样保留。
-        if (state.value.requests.none { it.id == request.id }) return@launch
-        try { connection?.respond(request.id, result); mutable.update { it.copy(requests = it.requests.filterNot { pending -> pending.id == request.id }) } }
-        catch (failure: Exception) { error(failure) }
+        val epoch = lifecycle.state.connectionEpoch
+        val rpc = connection ?: return@launch
+        // 请求 ID 可在重连后复用，必须核对当前队列中的同一个请求实例。
+        if (state.value.requests.none { it === request }) return@launch
+        try {
+            rpc.respond(request.id, result)
+            if (current(epoch, rpc)) mutable.update { it.copy(requests = it.requests.filterNot { pending -> pending === request }) }
+        } catch (failure: Exception) { if (current(epoch, rpc)) error(failure) }
     }
-    private suspend fun onMessage(rpc: AppServerConnection, message: ServerMessage) {
+    private suspend fun onMessage(epoch: Long, rpc: AppServerConnection, message: ServerMessage) {
+        if (!current(epoch, rpc)) return
         when (message) {
             is ServerMessage.Request -> {
                 if (message.method in setOf("item/commandExecution/requestApproval", "item/fileChange/requestApproval", "item/tool/requestUserInput", "mcpServer/elicitation/request")) {
@@ -290,10 +308,11 @@ class OriginalCoreHost(private val context: Context) {
                     rpc.respond(message.id, buildJsonObject { put("permissions", buildJsonObject {}); put("scope", "turn") })
                 } else rpc.reject(message.id)
             }
-            is ServerMessage.Notification -> notification(message.method, message.params as? JsonObject ?: return)
+            is ServerMessage.Notification -> notification(epoch, rpc, message.method, message.params as? JsonObject ?: return)
         }
     }
-    private suspend fun notification(method: String, params: JsonObject) {
+    private suspend fun notification(epoch: Long, rpc: AppServerConnection, method: String, params: JsonObject) {
+        if (!current(epoch, rpc)) return
         if (method == "hook/started" || method == "hook/completed") {
             (params["run"] as? JsonObject)?.let { run -> extensions.recordHook(JsonObject(run + mapOf("threadId" to (params["threadId"] ?: JsonNull)))) }
             return
@@ -303,7 +322,7 @@ class OriginalCoreHost(private val context: Context) {
             val success = params["success"]?.jsonPrimitive?.booleanOrNull == true
             mutable.update { it.copy(loginId = null, loginUrl = null, loginCode = null, error = if (success) null else params.string("error", "登录未完成")) }
             // 不在读取循环里等待另一条 RPC，否则响应无人读取而死锁。
-            if (success) scope.launch { runSuspendCatching { client?.let { readAccount(it) } }.onFailure(::error) }
+            if (success) scope.launch { runSuspendCatching { client?.let { readAccount(it) } }.onFailure { if (current(epoch, rpc)) error(it) } }
             return
         }
         if (method == "mcpServer/oauthLogin/completed") {
@@ -314,20 +333,33 @@ class OriginalCoreHost(private val context: Context) {
             return
         }
         if (method == "account/updated") {
-            scope.launch { runSuspendCatching { client?.let { readAccount(it) } }.onFailure(::error) }; return
+            scope.launch { runSuspendCatching { client?.let { readAccount(it) } }.onFailure { if (current(epoch, rpc)) error(it) } }; return
         }
         if (method == "serverRequest/resolved") { mutable.update { it.copy(requests = it.requests.filterNot { r -> r.id == params["requestId"] }) }; return }
         if (params.string("threadId").isNotBlank() && params.string("threadId") != state.value.threadId) return
         when (method) {
-            "turn/started" -> mutable.update { it.copy(turnId = (params["turn"] as? JsonObject)?.string("id"), status = "正在处理") }
+            "turn/started" -> {
+                val id = (params["turn"] as? JsonObject)?.string("id").orEmpty()
+                lifecycle.accept(epoch, OriginalLifecycleEvent.TurnStarted(params.string("threadId"), id)); syncLifecycle()
+                if (lifecycle.state.turnId == id && id.isNotBlank()) mutable.update { it.copy(status = "正在处理") }
+            }
             "turn/completed" -> {
-                val turn = params["turn"] as? JsonObject
-                val failure = (turn?.get("error") as? JsonObject)?.string("message")
-                mutable.update { it.copy(turnId = null, requests = it.requests.filterNot { r -> (r.params as? JsonObject)?.string("turnId") == turn?.string("id") }, status = when (turn?.string("status")) { "failed" -> "任务失败"; "interrupted" -> "任务已停止"; else -> "任务完成" }, error = failure?.takeIf(String::isNotBlank)) }
-                completion?.complete(Unit)
+                val turn = params["turn"] as? JsonObject ?: return
+                val id = turn.string("id"); if (id.isBlank()) return
+                val wasActive = lifecycle.state.turnId == id
+                lifecycle.accept(epoch, OriginalLifecycleEvent.TurnCompleted(params.string("threadId"), id)); syncLifecycle()
+                val outcome = Outcome(turn.string("status"), (turn["error"] as? JsonObject)?.string("message")?.takeIf { it.isNotBlank() }?.takeLast(4096))
+                val waiting = turnWaiter?.takeIf { it.epoch == epoch && it.threadId == params.string("threadId") }
+                if (waiting != null) {
+                    waiting.outcomes[id] = outcome
+                    while (waiting.outcomes.size > 128) waiting.outcomes.remove(waiting.outcomes.keys.first())
+                }
+                if (wasActive || waiting?.turnId == id) applyOutcome(outcome)
+                mutable.update { it.copy(requests = it.requests.filterNot { r -> (r.params as? JsonObject)?.string("turnId") == id }) }
+                if (waiting?.turnId == id) waiting.finished.complete(Unit)
             }
             "item/fileChange/patchUpdated" -> mutable.update { it.copy(items = OriginalThreadView.patch(it.items, params.string("itemId"), params["changes"] as? JsonArray ?: buildJsonArray {})) }
-            "turn/diff/updated" -> mutable.update { it.copy(report = params.string("diff")) }
+            "turn/diff/updated" -> if (params.string("turnId") == lifecycle.state.turnId) mutable.update { it.copy(report = params.string("diff")) }
             "thread/compacted" -> mutable.update { it.copy(status = "上下文已压缩") }
             "item/started", "item/completed" -> (params["item"] as? JsonObject)?.let { raw ->
                 val item = OriginalThreadView.item(raw)

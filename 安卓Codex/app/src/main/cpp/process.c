@@ -131,6 +131,8 @@ JNIEXPORT void JNICALL Java_cn_codex_android_NativePty_terminateGroup(JNIEnv *en
 #include <stdio.h>
 #include <dirent.h>
 #include <sys/prctl.h>
+#include <poll.h>
+#include <time.h>
 static char *core_bytes(JNIEnv *env, jbyteArray value) {
     jsize count = (*env)->GetArrayLength(env, value);
     char *result = malloc((size_t)count + 1);
@@ -152,6 +154,22 @@ static char **core_strings(JNIEnv *env, jobjectArray values) {
     return result;
 }
 static void core_free(char **values) { if (values) { for (int i = 0; values[i]; i++) free(values[i]); free(values); } }
+// exec 确认有单调时钟期限，避免 JNI 阻塞让协程启动超时无法收尾。
+static int core_wait_exec(int fd, int timeout_ms) {
+    struct timespec stamp;
+    if (clock_gettime(CLOCK_MONOTONIC, &stamp) != 0) return -1;
+    long long deadline = (long long)stamp.tv_sec * 1000 + stamp.tv_nsec / 1000000 + timeout_ms;
+    for (;;) {
+        if (clock_gettime(CLOCK_MONOTONIC, &stamp) != 0) return -1;
+        long long remaining = deadline - ((long long)stamp.tv_sec * 1000 + stamp.tv_nsec / 1000000);
+        if (remaining <= 0) { errno = ETIMEDOUT; return 0; }
+        struct pollfd watched = {.fd = fd, .events = POLLIN | POLLHUP};
+        int ready = poll(&watched, 1, (int)remaining);
+        if (ready > 0) return ready;
+        if (ready == 0) { errno = ETIMEDOUT; return 0; }
+        if (errno != EINTR) return -1;
+    }
+}
 JNIEXPORT jintArray JNICALL Java_cn_codex_android_NativeCoreBridge_spawn(JNIEnv *env, jclass cls, jobjectArray arguments, jobjectArray environment, jbyteArray directory) {
     (void)cls;
     char **argv = core_strings(env, arguments), **envp = core_strings(env, environment);
@@ -187,8 +205,10 @@ JNIEXPORT jintArray JNICALL Java_cn_codex_android_NativeCoreBridge_spawn(JNIEnv 
         close(pipes[2][1]); pipes[2][1] = -1;
         close(pipes[3][1]); pipes[3][1] = -1;
         int child_error = 0;
-        ssize_t got;
-        do { got = read(pipes[3][0], &child_error, sizeof(child_error)); } while (got < 0 && errno == EINTR);
+        ssize_t got = -1;
+        if (core_wait_exec(pipes[3][0], 10000) > 0) {
+            do { got = read(pipes[3][0], &child_error, sizeof(child_error)); } while (got < 0 && errno == EINTR);
+        } else child_error = errno;
         close(pipes[3][0]); pipes[3][0] = -1;
         if (got == 0) {
             jint data[4] = {pid, pipes[0][1], pipes[1][0], pipes[2][0]};
