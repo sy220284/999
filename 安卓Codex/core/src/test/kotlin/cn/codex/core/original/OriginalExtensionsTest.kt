@@ -130,6 +130,30 @@ class OriginalExtensionsTest {
             wire.reply(r.getValue("id"), buildJsonObject { put("itemsBackwardsCursor", "anchor") }); assertEquals("anchor", revert.await().jsonObject.getValue("itemsBackwardsCursor").jsonPrimitive.content)
         } } finally { scope.cancel() }
     }
+    @Test fun standaloneCommandStopAcknowledgementWaitsForFinalResponseAndPreservesSplitUtf8() = runBlocking {
+        val dispatcher = Executors.newSingleThreadExecutor().asCoroutineDispatcher()
+        val scope = CoroutineScope(SupervisorJob() + dispatcher)
+        val finished = mutableListOf<Boolean>()
+        val lifecycle = object : OriginalMutationLifecycle { override fun begin() = "ticket"; override fun finish(ticket: String, confirmed: Boolean) { finished += confirmed } }
+        try { Wire(scope).use { wire ->
+            val controller = OriginalCommandController(scope, { false }, lifecycle)
+            withContext(dispatcher) { controller.bind(OriginalCodexClient(wire.rpc)); controller.run("echo 中文", "/project", false, 5000) }
+            val start = wire.read(); assertEquals("command/exec", start.getValue("method").jsonPrimitive.content)
+            val id = start.getValue("params").jsonObject.getValue("processId").jsonPrimitive.content
+            val bytes = "中文".toByteArray(Charsets.UTF_8)
+            withContext(dispatcher) {
+                for (part in listOf(bytes.copyOfRange(0, 2), bytes.copyOfRange(2, bytes.size))) controller.output(buildJsonObject { put("processId", id); put("stream", "stdout"); put("deltaBase64", java.util.Base64.getEncoder().encodeToString(part)) })
+                controller.stop()
+            }
+            val stop = wire.read(); assertEquals("command/exec/terminate", stop.getValue("method").jsonPrimitive.content)
+            wire.reply(stop.getValue("id"), buildJsonObject {})
+            val waiting = withTimeout(3000) { controller.state.first { !it.controlBusy && it.status.contains("等待命令结束") } }
+            assertTrue(waiting.running)
+            wire.reply(start.getValue("id"), buildJsonObject { put("exitCode", 0); put("stdout", ""); put("stderr", "") })
+            val complete = withTimeout(3000) { controller.state.first { !it.running } }
+            assertEquals("中文", complete.output); assertEquals(listOf(true), finished)
+        } } finally { scope.cancel(); dispatcher.close() }
+    }
     @Test fun offlineCatalogStillLoadsInstalledHooksAndReconnectIgnoresOldResponse() = runBlocking {
         val dispatcher = Executors.newSingleThreadExecutor().asCoroutineDispatcher()
         val scope = CoroutineScope(SupervisorJob() + dispatcher)

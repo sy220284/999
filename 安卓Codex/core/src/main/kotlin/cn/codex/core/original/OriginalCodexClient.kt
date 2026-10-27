@@ -87,6 +87,16 @@ class OriginalCodexClient(val connection: AppServerConnection) {
     suspend fun revert(threadId: String, beforeTurnId: String) = call("thread/revert", buildJsonObject { put("threadId", threadId); put("beforeTurnId", beforeTurnId) })
     suspend fun deleteThread(threadId: String) = call("thread/delete", id(threadId))
     suspend fun unsubscribe(threadId: String) = call("thread/unsubscribe", id(threadId))
+    suspend fun mcpResource(server: String, uri: String, threadId: String?) = call("mcpServer/resource/read", buildJsonObject { put("server", server); put("uri", uri); threadId?.let { put("threadId", it) } })
+    suspend fun mcpTool(threadId: String, server: String, tool: String, arguments: JsonElement) = call("mcpServer/tool/call", buildJsonObject { put("threadId", threadId); put("server", server); put("tool", tool); put("arguments", arguments) }, 180_000)
+    suspend fun exec(processId: String, command: List<String>, cwd: String, tty: Boolean, timeoutMs: Long, rows: Int, cols: Int) = call("command/exec", buildJsonObject {
+        put("processId", processId); put("command", JsonArray(command.map(::JsonPrimitive))); put("cwd", cwd); put("tty", tty); put("streamStdin", true); put("streamStdoutStderr", true); put("timeoutMs", timeoutMs); put("outputBytesCap", 1_048_576)
+        if (tty) put("size", buildJsonObject { put("rows", rows); put("cols", cols) })
+        put("sandboxPolicy", buildJsonObject { put("type", "dangerFullAccess") })
+    }, timeoutMs + 10_000)
+    suspend fun writeCommand(processId: String, bytes: ByteArray, closeStdin: Boolean) = call("command/exec/write", buildJsonObject { put("processId", processId); put("deltaBase64", java.util.Base64.getEncoder().encodeToString(bytes)); put("closeStdin", closeStdin) })
+    suspend fun terminateCommand(processId: String) = call("command/exec/terminate", buildJsonObject { put("processId", processId) })
+    suspend fun resizeCommand(processId: String, rows: Int, cols: Int) = call("command/exec/resize", buildJsonObject { put("processId", processId); put("size", buildJsonObject { put("rows", rows); put("cols", cols) }) })
     private fun id(threadId: String) = buildJsonObject { put("threadId", threadId) }
     companion object {
         fun textInput(text: String) = buildJsonArray { add(buildJsonObject { put("type", "text"); put("text", text); put("text_elements", buildJsonArray {}) }) }

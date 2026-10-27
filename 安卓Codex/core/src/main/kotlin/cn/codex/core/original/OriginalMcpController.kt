@@ -11,6 +11,7 @@ data class OriginalMcpState(
     val config: JsonObject? = null, val snapshot: OriginalConfigSnapshot? = null,
     val inventory: List<JsonObject> = emptyList(), val nextCursor: String? = null,
     val inventoryThread: String? = null, val inventoryError: String? = null,
+    val result: JsonObject? = null, val resultServer: String = "", val resultTitle: String = "",
     val editor: OriginalMcpEditor? = null, val error: String? = null, val notice: String = "尚未读取服务"
 ) {
     val entries get() = OriginalMcpConfig.entries(config, inventory)
@@ -18,7 +19,7 @@ data class OriginalMcpState(
 
 /** 页面只管理原版配置；保存和重连分别报告结果，不把保存成功当作连接成功。 */
 class OriginalMcpController(private val scope: CoroutineScope, private val cwd: String,
-    private val activeTask: () -> Boolean, private val threadId: () -> String?) {
+    private val activeTask: () -> Boolean, private val threadId: () -> String?, private val mutationLifecycle: OriginalMutationLifecycle = OriginalMutationLifecycle.None) {
     private val mutable = MutableStateFlow(OriginalMcpState())
     val state = mutable.asStateFlow()
     private var client: OriginalCodexClient? = null
@@ -49,15 +50,21 @@ class OriginalMcpController(private val scope: CoroutineScope, private val cwd: 
         val api = client ?: return
         if (mutating && activeTask()) { mutable.update { it.copy(error = "请先停止任务后修改或重新连接服务") }; return }
         val stamp = generation
+        val ticket = if (mutating) try { mutationLifecycle.begin() } catch (failure: Exception) { mutable.update { it.copy(error = "无法托管服务配置操作：${failure.message.orEmpty()}") }; return } else null
         mutable.update { it.copy(busy = true, mutating = mutating, error = null) }
         job = scope.launch {
-            try { action(api, stamp) }
+            var confirmed = false
+            try { action(api, stamp); confirmed = stamp == generation && state.value.error == null }
             catch (cancelled: CancellationException) {
                 if (cancelled !is TimeoutCancellationException) throw cancelled
                 if (stamp == generation) mutable.update { it.copy(error = "服务请求超时，请刷新核查实际状态；不会自动重复提交") }
             }
             catch (failure: Exception) { if (stamp == generation) mutable.update { it.copy(error = failure.message ?: "服务操作失败，请刷新核查") } }
-            finally { if (stamp == generation) mutable.update { it.copy(busy = false, mutating = false) } }
+            finally {
+                try { if (ticket != null) mutationLifecycle.finish(ticket, confirmed && stamp == generation) }
+                catch (failure: Exception) { if (stamp == generation) mutable.update { it.copy(error = "操作记录保存失败，请核查实际配置：${failure.message.orEmpty()}") } }
+                finally { if (stamp == generation) mutable.update { it.copy(busy = false, mutating = false) } }
+            }
         }
     }
     private suspend fun load(api: OriginalCodexClient, stamp: Long) {
@@ -127,6 +134,17 @@ class OriginalMcpController(private val scope: CoroutineScope, private val cwd: 
         val current = state.value.entries.singleOrNull { it.name == approved.name }
         require(current != null && current.editable && current.userConfig == approved.userConfig && current.effectiveConfig == approved.effectiveConfig) { "服务配置已变化，请重新确认" }
         return current
+    }
+    fun closeResult() { mutable.update { it.copy(result = null) } }
+    fun readResource(server: String, uri: String) = operation { api, stamp ->
+        require(uri.isNotBlank()) { "请填写资料地址" }
+        val result = api.mcpResource(server, uri, threadId()).jsonObject
+        if (stamp == generation) mutable.update { it.copy(result = result, resultServer = server, resultTitle = "资料内容") }
+    }
+    fun callTool(server: String, tool: String, arguments: JsonElement) = operation(mutating = true) { api, stamp ->
+        val thread = threadId() ?: error("请先返回选择会话")
+        val result = api.mcpTool(thread, server, tool, arguments).jsonObject
+        if (stamp == generation) mutable.update { it.copy(result = result, resultServer = server, resultTitle = "$tool · 调用结果") }
     }
     fun reconnect() = operation(mutating = true) { api, stamp ->
         api.reloadMcp(); load(api, stamp)

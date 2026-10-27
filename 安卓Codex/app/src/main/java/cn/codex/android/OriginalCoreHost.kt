@@ -56,11 +56,16 @@ class OriginalCoreHost(
     private var stopping: Job? = null
     private val workspace = File(context.filesDir, "工作区/原版项目").apply { mkdirs() }
     private val engineHome = File(context.filesDir, "原版核心数据").apply { mkdirs() }
-    val extensions: OriginalExtensionsController = OriginalExtensionsController(scope, workspace.absolutePath) { state.value.working || state.value.turnId != null || state.value.loading || otherTaskRunning() || mcp.state.value.mutating }
+    val configurationJournal get() = (context.applicationContext as CodexApplication).configurationJournal
+    val extensions: OriginalExtensionsController = OriginalExtensionsController(scope, workspace.absolutePath, configurationJournal.lifecycle("插件与自动规则")) { state.value.working || state.value.turnId != null || state.value.loading || otherTaskRunning() || mcp.state.value.mutating || commands.state.value.running }
     val mcp: OriginalMcpController = OriginalMcpController(scope, workspace.absolutePath,
-        activeTask = { state.value.working || state.value.turnId != null || state.value.loading || state.value.closing || otherTaskRunning() || extensions.state.value.mutating },
-        threadId = { state.value.threadId })
-    val configurationChanging get() = extensions.state.value.mutating || mcp.state.value.mutating
+        activeTask = { state.value.working || state.value.turnId != null || state.value.loading || state.value.closing || otherTaskRunning() || extensions.state.value.mutating || commands.state.value.running },
+        threadId = { state.value.threadId }, mutationLifecycle = configurationJournal.lifecycle("MCP 服务操作"))
+    val commands: OriginalCommandController = OriginalCommandController(scope,
+        busyElsewhere = { state.value.working || state.value.turnId != null || state.value.loading || state.value.closing || otherTaskRunning() || extensions.state.value.mutating || mcp.state.value.mutating },
+        lifecycle = configurationJournal.lifecycle("原版独立命令"))
+    fun commandWorkspace() = workspace.absolutePath
+    val configurationChanging get() = commands.state.value.running || extensions.state.value.mutating || mcp.state.value.mutating
     fun mcpImports() = McpTools(context).connections().map { it.name to it.url }
     private fun error(error: Throwable) { mutable.update { it.copy(error = error.message ?: "原版核心操作失败") } }
     fun dismissError() { mutable.update { it.copy(error = null) } }
@@ -117,7 +122,7 @@ class OriginalCoreHost(
         ensureCurrent(epoch, rpc)
         if (config.apiKey.isNotBlank() && config.endpoint.trimEnd('/') == "https://api.openai.com/v1" && api.account().jsonObject["account"] == JsonNull) api.loginApiKey(config.apiKey)
         ensureCurrent(epoch, rpc)
-        client = api; extensions.bind(api); mcp.bind(api)
+        client = api; extensions.bind(api); mcp.bind(api); commands.bind(api)
         mutable.update { it.copy(connected = true, status = "原版核心已连接 · 凭证由手机 Keystore 加密保存", model = config.model) }
         refreshThreads(api, false); readAccount(api, epoch)
     }
@@ -128,7 +133,7 @@ class OriginalCoreHost(
         if (cancelStartup) startupJob?.cancel()
         operationJob?.cancel(); operationJob = null
         stopping?.cancel(); stopping = null
-        extensions.bind(null); mcp.bind(null)
+        extensions.bind(null); mcp.bind(null); commands.bind(null)
         turnWaiter?.finished?.completeExceptionally(IllegalStateException("原版核心已停止")); turnWaiter = null
         listener?.cancel(); listener = null
         val session = engine
@@ -386,13 +391,9 @@ class OriginalCoreHost(
         if (!current(epoch, rpc)) return
         when (message) {
             is ServerMessage.Request -> {
-                if (message.method in setOf("item/commandExecution/requestApproval", "item/fileChange/requestApproval", "item/tool/requestUserInput", "mcpServer/elicitation/request")) {
+                if (message.method in setOf("item/commandExecution/requestApproval", "item/fileChange/requestApproval", "item/tool/requestUserInput", "mcpServer/elicitation/request", "item/permissions/requestApproval")) {
                     if (state.value.requests.size >= 32) rpc.reject(message.id, -32000, "待处理交互数量达到上限")
                     else mutable.update { it.copy(requests = it.requests + message) }
-                } else if (message.method == "item/permissions/requestApproval") {
-                    // 该客户端尚未提供细粒度权限 UI，返回空授权；不可把 approve 普通按钮映射成全部权限。
-                    mutable.update { it.copy(status = "细粒度权限尚未接入，本次未授予额外权限") }
-                    rpc.respond(message.id, buildJsonObject { put("permissions", buildJsonObject {}); put("scope", "turn") })
                 } else rpc.reject(message.id)
             }
             is ServerMessage.Notification -> notification(epoch, rpc, message.method, message.params as? JsonObject ?: return)
@@ -400,6 +401,7 @@ class OriginalCoreHost(
     }
     private suspend fun notification(epoch: Long, rpc: AppServerConnection, method: String, params: JsonObject) {
         if (!current(epoch, rpc)) return
+        if (method == "command/exec/outputDelta") { commands.output(params); return }
         if (method == "thread/goal/updated") {
             if (params.string("threadId") == state.value.threadId) mutable.update { it.copy(goal = params["goal"] as? JsonObject) }
             return

@@ -14,7 +14,7 @@ host = (ROOT / host_path).read_text()
 facade = set(re.findall(r'call\("([^"]+)"', client)) | {"thread/archive", "thread/unarchive"}
 notifications = set(re.findall(r'"method": "([^"]+)"', (ROOT / "源码对照/ServerNotification.ts").read_text()))
 handled = {m for m in notifications if f'"{m}" ->' in host or f'method == "{m}"' in host}
-queued = {"item/commandExecution/requestApproval", "item/fileChange/requestApproval", "item/tool/requestUserInput", "mcpServer/elicitation/request"}
+queued = {"item/commandExecution/requestApproval", "item/fileChange/requestApproval", "item/tool/requestUserInput", "mcpServer/elicitation/request", "item/permissions/requestApproval"}
 rows = []
 for kind, file in [("客户端请求", "ClientRequest.ts"), ("服务端请求", "ServerRequest.ts"), ("服务端通知", "ServerNotification.ts")]:
     methods = list(dict.fromkeys(re.findall(r'"method": "([^"]+)"', (ROOT / "源码对照" / file).read_text())))
@@ -40,8 +40,6 @@ for kind, file in [("客户端请求", "ClientRequest.ts"), ("服务端请求", 
                 status, entry, phase = "中文交互已接入，未运行验证", host_path, "待验证"
                 if method == "mcpServer/elicitation/request":
                     status, phase = "平面表单/URL 已接入，复杂 schema 待补", "P2"
-            elif method == "item/permissions/requestApproval":
-                status, entry, phase = "返回空授权，细粒度界面待补", host_path, "P0/P4"
             else:
                 status, entry = "未接入，明确返回协议错误", host_path
         elif method.startswith("windows"):

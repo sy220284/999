@@ -24,14 +24,20 @@ import kotlinx.serialization.json.*
     val state by host.state.collectAsState()
     val extensionState by host.extensions.state.collectAsState()
     val mcpState by host.mcp.state.collectAsState()
+    val configurationRecords by host.configurationJournal.records.collectAsState()
+    val configurationReadError by host.configurationJournal.readError.collectAsState()
+    val activeConfiguration by host.configurationJournal.active.collectAsState()
     var mcpManager by remember { mutableStateOf(false) }
     val imports = remember(host) { host.mcpImports() }
+    val commandState by host.commands.state.collectAsState()
+    var commandManager by remember { mutableStateOf(false) }
     var sessionManager by remember { mutableStateOf(false) }
     var extensions by remember { mutableStateOf(false) }
     var consent by remember { mutableStateOf(false) }
     var draft by remember { mutableStateOf("") }
     var renamed by remember { mutableStateOf<String?>(null) }
     val context = LocalContext.current
+    state.requests.firstOrNull()?.let { request -> key(state.connectionEpoch, request.id) { OriginalRequestDialog(request, state.items, { host.answer(request, it) }) } }
     if (state.agent != null) {
         val agent = state.agent!!
         AlertDialog(onDismissRequest = host::closeAgent, title = { Text("代理会话 ${agent.string("id").takeLast(8)}") }, text = {
@@ -45,6 +51,7 @@ import kotlinx.serialization.json.*
             }
         }, confirmButton = { TextButton(onClick = { host.closeAgent(); host.openThread(agent.string("id")) }, enabled = !state.working && state.turnId == null && !state.loading) { Text("切换到此会话") } }, dismissButton = { TextButton(onClick = host::closeAgent) { Text("关闭查看") } })
     }
+    if (commandManager) { OriginalCommandScreen(host.commands, host.commandWorkspace()) { commandManager = false }; return }
     if (sessionManager) { OriginalSessionScreen(host) { sessionManager = false }; return }
     if (mcpManager) {
         OriginalMcpScreen(host.mcp, allowChanges = !state.working && state.turnId == null && !state.loading && !extensionState.mutating,
@@ -55,7 +62,7 @@ import kotlinx.serialization.json.*
     }
     if (extensions) { OriginalExtensionsScreen(host.extensions, allowChanges = !state.working && state.turnId == null && !state.loading && !mcpState.mutating, onBack = { extensions = false }); return }
     val active = state.working || state.turnId != null
-    val editable = state.connected && !state.loading && !extensionState.mutating && !mcpState.mutating && !active
+    val editable = state.connected && !state.loading && !extensionState.mutating && !mcpState.mutating && !commandState.running && !active
     Column(Modifier.fillMaxSize().imePadding()) {
         LazyColumn(Modifier.weight(1f).fillMaxWidth(), contentPadding = PaddingValues(20.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
             item {
@@ -63,6 +70,19 @@ import kotlinx.serialization.json.*
                 Spacer(Modifier.height(8.dp))
                 Text(state.status, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.primary)
                 Text("原版会话单独保存。文件页选择“原版项目”查看任务文件。", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+            if (configurationReadError != null || configurationRecords.any { it.id != activeConfiguration }) item {
+                Surface(shape = RoundedCornerShape(14.dp), color = MaterialTheme.colorScheme.tertiaryContainer) {
+                    Column(Modifier.fillMaxWidth().padding(14.dp)) {
+                        configurationReadError?.let { Text(it, color = MaterialTheme.colorScheme.error) }
+                        Text("上次原版操作的结果需要核查。请检查配置或命令产生的文件与外部变化；不会自动重复提交。")
+                        configurationRecords.filter { it.id != activeConfiguration }.forEach { Text(it.kind, style = MaterialTheme.typography.bodySmall) }
+                        Row {
+                            TextButton(onClick = { host.extensions.refresh(); host.mcp.refresh() }, enabled = state.connected && !state.loading && !extensionState.busy && !mcpState.busy) { Text("刷新核查") }
+                            TextButton(onClick = { host.configurationJournal.confirmReviewed() }, enabled = activeConfiguration == null) { Text("我已核查实际状态") }
+                        }
+                    }
+                }
             }
             if (!state.connected) item {
                 Text("此入口使用随应用安装的原版核心，连接原版会话与账号。缺少运行核心时会提示具体原因。", style = MaterialTheme.typography.bodyMedium)
@@ -77,6 +97,7 @@ import kotlinx.serialization.json.*
                 item {
                     OutlinedButton(onClick = { extensions = true; host.extensions.refresh() }, enabled = !state.loading) { Icon(Icons.Outlined.Extension, null); Spacer(Modifier.width(8.dp)); Text("插件与自动规则") }
                     OutlinedButton(onClick = { mcpManager = true; host.mcp.refresh() }, enabled = !state.loading) { Icon(Icons.Outlined.Hub, null); Spacer(Modifier.width(8.dp)); Text("MCP 服务管理") }
+                    OutlinedButton(onClick = { commandManager = true }, enabled = state.connected && !state.loading) { Text("独立命令与交互输入") }
                     Text(state.account, style = MaterialTheme.typography.titleSmall)
                     Text("账号与 MCP 凭证由 Android Keystore 加密保存在手机，退出核心后仍可恢复。", style = MaterialTheme.typography.bodySmall)
                     Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -84,7 +105,7 @@ import kotlinx.serialization.json.*
                         OutlinedButton(onClick = { host.login(false) }, enabled = !state.loading && !active) { Text("浏览器登录") }
                         TextButton(onClick = { host.loginSavedApiKey() }, enabled = editable) { Text("使用设置中的密钥") }
                         TextButton(onClick = { host.logout() }, enabled = editable) { Text("退出账号") }
-                        TextButton(onClick = host::close, enabled = !state.loading && !extensionState.mutating && !mcpState.mutating && !active) { Text("关闭核心") }
+                        TextButton(onClick = host::close, enabled = !state.loading && !extensionState.mutating && !mcpState.mutating && !commandState.running && !active) { Text("关闭核心") }
                     }
                 }
                 state.mcpAuthorizationUrl?.let { url -> item {
@@ -158,14 +179,13 @@ import kotlinx.serialization.json.*
                 OutlinedTextField(draft, { draft = it }, label = { Text(if (active) "追加本次任务的指令" else "交给 Codex 的任务") }, modifier = Modifier.fillMaxWidth(), maxLines = 6, shape = RoundedCornerShape(18.dp))
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
                     if (active) TextButton(onClick = { host.stop() }) { Text("停止任务") }
-                    Button(onClick = { if (active) host.steer(draft) else host.send(draft); draft = "" }, enabled = draft.isNotBlank() && !state.loading && !extensionState.mutating && (!active || state.turnId != null)) { Text(if (active) "追加指令" else "发送") }
+                    Button(onClick = { if (active) host.steer(draft) else host.send(draft); draft = "" }, enabled = draft.isNotBlank() && !state.loading && !extensionState.mutating && !mcpState.mutating && !commandState.running && (!active || state.turnId != null)) { Text(if (active) "追加指令" else "发送") }
                 }
             }
         }
     }
     if (consent) AlertDialog(onDismissRequest = { consent = false }, title = { Text("手机执行权限") }, text = { Text("原版核心将以本应用身份运行命令。Android 应用隔离无法把命令限制在单个项目目录内，命令也可能访问本应用的其他数据。该模式保留原版审批机制；请逐条检查命令和文件修改。是否在本次启动中继续？") }, confirmButton = { TextButton(onClick = { consent = false; host.connect() }) { Text("同意并启动") } }, dismissButton = { TextButton(onClick = { consent = false }) { Text("取消") } })
     renamed?.let { title -> AlertDialog(onDismissRequest = { renamed = null }, title = { Text("重命名原版会话") }, text = { OutlinedTextField(title, { renamed = it }, label = { Text("会话名称") }) }, confirmButton = { TextButton(onClick = { host.rename(title); renamed = null }, enabled = title.isNotBlank()) { Text("保存") } }, dismissButton = { TextButton(onClick = { renamed = null }) { Text("取消") } }) }
-    state.requests.firstOrNull()?.let { request -> key(state.connectionEpoch, request.id) { OriginalRequestDialog(request, state.items, { host.answer(request, it) }) } }
 }
 private fun originalItemTitle(type: String) = when (type) { "reasoning" -> "思考过程"; "plan" -> "工作计划"; "commandExecution" -> "命令执行"; "fileChange" -> "文件修改"; "mcpToolCall" -> "MCP 工具"; "collabAgentToolCall" -> "代理协作"; "contextCompaction" -> "上下文压缩"; else -> "工具记录 · $type" }
 internal fun openOriginalLogin(context: android.content.Context, url: String) {
@@ -178,6 +198,7 @@ internal fun openOriginalLogin(context: android.content.Context, url: String) {
 
 @Composable private fun OriginalRequestDialog(request: ServerMessage.Request, items: List<OriginalItem>, respond: (JsonElement) -> Unit) {
     val params = request.params as? JsonObject ?: buildJsonObject {}
+    if (request.method == "item/permissions/requestApproval") { OriginalPermissionDialog(params, respond); return }
     var answers by remember(request.id) { mutableStateOf(emptyMap<String, String>()) }
     val question = request.method == "item/tool/requestUserInput"
     val elicitation = request.method == "mcpServer/elicitation/request"

@@ -19,7 +19,7 @@ data class OriginalExtensionsState(
     val detail: JsonObject? = null, val detailKey: String? = null,
     val appsNeedingAuth: List<JsonObject> = emptyList(), val error: String? = null, val status: String = "尚未加载扩展"
 )
-class OriginalExtensionsController(private val scope: CoroutineScope, private val cwd: String, private val activeTask: () -> Boolean) {
+class OriginalExtensionsController(private val scope: CoroutineScope, private val cwd: String, private val mutationLifecycle: OriginalMutationLifecycle = OriginalMutationLifecycle.None, private val activeTask: () -> Boolean) {
     private val mutable = MutableStateFlow(OriginalExtensionsState())
     val state = mutable.asStateFlow()
     private var client: OriginalCodexClient? = null
@@ -37,16 +37,22 @@ class OriginalExtensionsController(private val scope: CoroutineScope, private va
         val api = client ?: return
         val stamp = generation
         if (mutating && activeTask()) { mutable.update { it.copy(error = "任务运行中，请先停止任务后修改扩展") }; return }
+        val ticket = if (mutating) try { mutationLifecycle.begin() } catch (failure: Exception) { mutable.update { it.copy(error = "无法托管配置操作：${failure.message.orEmpty()}") }; return } else null
         mutable.update { it.copy(busy = true, mutating = mutating, error = null) }
         job = scope.launch {
-            try { block(api, stamp) }
+            var confirmed = false
+            try { block(api, stamp); confirmed = stamp == generation && state.value.error == null }
             catch (cancelled: CancellationException) {
                 // withTimeout 的超时也属于 CancellationException，必须报告未知安装结果。
                 if (cancelled is TimeoutCancellationException && stamp == generation) mutable.update { it.copy(error = if (mutating) "扩展请求超时，结果需核查。请刷新实际配置与安装状态，勿直接重复提交。" else "扩展请求超时，请稍后刷新", status = "请求超时，请刷新核查") }
                 else throw cancelled
             }
             catch (failure: Exception) { if (stamp == generation) mutable.update { it.copy(error = if (mutating) "扩展操作未能确认结果，请刷新核查：${failure.message.orEmpty()}" else failure.message ?: "扩展操作失败", status = if (mutating) "操作未确认，请刷新核查" else it.status) } }
-            finally { if (stamp == generation) mutable.update { it.copy(busy = false, mutating = false) } }
+            finally {
+                try { if (ticket != null) mutationLifecycle.finish(ticket, confirmed && stamp == generation) }
+                catch (failure: Exception) { if (stamp == generation) mutable.update { it.copy(error = "操作记录保存失败，请核查实际配置：${failure.message.orEmpty()}") } }
+                finally { if (stamp == generation) mutable.update { it.copy(busy = false, mutating = false) } }
+            }
         }
     }
     private suspend fun load(api: OriginalCodexClient, stamp: Long, fresh: Boolean) {

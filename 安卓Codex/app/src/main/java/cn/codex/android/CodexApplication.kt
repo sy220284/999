@@ -9,6 +9,7 @@ class CodexApplication: Application() {
         toolPath = AndroidToolPaths.install(this)
         android.system.Os.setenv("PATH", toolPath, true)
     }
+    val configurationJournal by lazy { ConfigurationJournal(this) }
     val originalCore by lazy { OriginalCoreHost(this) }
     val controller by lazy { RuntimeController(this) }
 }

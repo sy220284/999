@@ -77,8 +77,8 @@
 客户端请求,mcpServer/oauth/login,调用及界面代码已接入，未运行验证,core/src/main/kotlin/cn/codex/core/original/OriginalCodexClient.kt,待运行验证/继续语义审阅,未运行验证
 客户端请求,config/mcpServer/reload,调用及界面代码已接入，未运行验证,core/src/main/kotlin/cn/codex/core/original/OriginalCodexClient.kt;core/src/main/kotlin/cn/codex/core/original/OriginalMcpController.kt,待运行验证/继续语义审阅,未运行验证
 客户端请求,mcpServerStatus/list,调用及界面代码已接入，未运行验证,core/src/main/kotlin/cn/codex/core/original/OriginalCodexClient.kt;core/src/main/kotlin/cn/codex/core/original/OriginalMcpController.kt,待运行验证/继续语义审阅,未运行验证
-客户端请求,mcpServer/resource/read,待接入,,P2,未运行验证
-客户端请求,mcpServer/tool/call,待接入,,P2,未运行验证
+客户端请求,mcpServer/resource/read,调用及界面代码已接入，未运行验证,core/src/main/kotlin/cn/codex/core/original/OriginalCodexClient.kt,待运行验证/继续语义审阅,未运行验证
+客户端请求,mcpServer/tool/call,调用及界面代码已接入，未运行验证,core/src/main/kotlin/cn/codex/core/original/OriginalCodexClient.kt,待运行验证/继续语义审阅,未运行验证
 客户端请求,windowsSandbox/setupStart,Windows 专用，Android 平台受限,,平台限制,未运行验证
 客户端请求,windowsSandbox/readiness,Windows 专用，Android 平台受限,,平台限制,未运行验证
 客户端请求,account/login/start,调用及界面代码已接入，未运行验证,core/src/main/kotlin/cn/codex/core/original/OriginalCodexClient.kt,待运行验证/继续语义审阅,未运行验证
@@ -91,10 +91,10 @@
 客户端请求,account/sendAddCreditsNudgeEmail,待接入,,P4,未运行验证
 客户端请求,feedback/upload,待接入,,P4,未运行验证
 客户端请求,feedback/save,待接入,,P4,未运行验证
-客户端请求,command/exec,待接入,,P4,未运行验证
-客户端请求,command/exec/write,待接入,,P4,未运行验证
-客户端请求,command/exec/terminate,待接入,,P4,未运行验证
-客户端请求,command/exec/resize,待接入,,P4,未运行验证
+客户端请求,command/exec,调用及界面代码已接入，未运行验证,core/src/main/kotlin/cn/codex/core/original/OriginalCodexClient.kt,待运行验证/继续语义审阅,未运行验证
+客户端请求,command/exec/write,调用及界面代码已接入，未运行验证,core/src/main/kotlin/cn/codex/core/original/OriginalCodexClient.kt,待运行验证/继续语义审阅,未运行验证
+客户端请求,command/exec/terminate,调用及界面代码已接入，未运行验证,core/src/main/kotlin/cn/codex/core/original/OriginalCodexClient.kt,待运行验证/继续语义审阅,未运行验证
+客户端请求,command/exec/resize,调用及界面代码已接入，未运行验证,core/src/main/kotlin/cn/codex/core/original/OriginalCodexClient.kt,待运行验证/继续语义审阅,未运行验证
 客户端请求,config/read,调用及界面代码已接入，未运行验证,core/src/main/kotlin/cn/codex/core/original/OriginalCodexClient.kt;core/src/main/kotlin/cn/codex/core/original/OriginalExtensionsController.kt;core/src/main/kotlin/cn/codex/core/original/OriginalMcpController.kt,待运行验证/继续语义审阅,未运行验证
 客户端请求,externalAgentConfig/detect,待接入,,P4,未运行验证
 客户端请求,externalAgentConfig/import,待接入,,P4,未运行验证
@@ -112,7 +112,7 @@
 服务端请求,item/fileChange/requestApproval,中文交互已接入，未运行验证,app/src/main/java/cn/codex/android/OriginalCoreHost.kt,待验证,未运行验证
 服务端请求,item/tool/requestUserInput,中文交互已接入，未运行验证,app/src/main/java/cn/codex/android/OriginalCoreHost.kt,待验证,未运行验证
 服务端请求,mcpServer/elicitation/request,平面表单/URL 已接入，复杂 schema 待补,app/src/main/java/cn/codex/android/OriginalCoreHost.kt,P2,未运行验证
-服务端请求,item/permissions/requestApproval,返回空授权，细粒度界面待补,app/src/main/java/cn/codex/android/OriginalCoreHost.kt,P0/P4,未运行验证
+服务端请求,item/permissions/requestApproval,中文交互已接入，未运行验证,app/src/main/java/cn/codex/android/OriginalCoreHost.kt,待验证,未运行验证
 服务端请求,item/tool/call,未接入，明确返回协议错误,app/src/main/java/cn/codex/android/OriginalCoreHost.kt,P4,未运行验证
 服务端请求,account/chatgptAuthTokens/refresh,未接入，明确返回协议错误,app/src/main/java/cn/codex/android/OriginalCoreHost.kt,P4,未运行验证
 服务端请求,attestation/generate,未接入，明确返回协议错误,app/src/main/java/cn/codex/android/OriginalCoreHost.kt,P4,未运行验证
@@ -155,7 +155,7 @@
 服务端通知,rawResponse/completed,待接入,,P4,未运行验证
 服务端通知,item/agentMessage/delta,通知分支已接入，未运行验证,app/src/main/java/cn/codex/android/OriginalCoreHost.kt,待验证/继续语义审阅,未运行验证
 服务端通知,item/plan/delta,通知分支已接入，未运行验证,app/src/main/java/cn/codex/android/OriginalCoreHost.kt,待验证/继续语义审阅,未运行验证
-服务端通知,command/exec/outputDelta,待接入,,P4,未运行验证
+服务端通知,command/exec/outputDelta,通知分支已接入，未运行验证,app/src/main/java/cn/codex/android/OriginalCoreHost.kt,待验证/继续语义审阅,未运行验证
 服务端通知,process/outputDelta,待接入,,P4,未运行验证
 服务端通知,process/exited,待接入,,P4,未运行验证
 服务端通知,item/commandExecution/outputDelta,通知分支已接入，未运行验证,app/src/main/java/cn/codex/android/OriginalCoreHost.kt,待验证/继续语义审阅,未运行验证

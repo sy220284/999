@@ -29,6 +29,9 @@ private data class McpConfirmation(val entry: OriginalMcpEntry, val snapshot: Or
     val motion = LocalMotionEnabled.current
     var search by remember { mutableStateOf("") }
     var confirmation by remember { mutableStateOf<McpConfirmation?>(null) }
+    var toolCall by remember { mutableStateOf<Triple<String, String, JsonObject>?>(null) }
+    var resourceServer by remember { mutableStateOf<String?>(null) }
+    var resourceUri by remember { mutableStateOf("") }
     var showImports by remember { mutableStateOf(false) }
     BackHandler(onBack = onBack)
     LaunchedEffect(state.connected) { if (!state.connected) { confirmation = null; showImports = false } }
@@ -91,6 +94,17 @@ private data class McpConfirmation(val entry: OriginalMcpEntry, val snapshot: Or
                                     resources.mapNotNull { it as? JsonObject }.map { it.string("name") + " · " + it.string("uri") } +
                                     templates.mapNotNull { it as? JsonObject }.map { it.string("name") + " · " + it.string("uriTemplate") }).joinToString("\n").ifBlank { "目录为空或尚未取得，请刷新后核查。" }, Icons.Outlined.Hub)
                         }
+                        if (runtime != null) {
+                            Row(Modifier.horizontalScroll(rememberScrollState())) {
+                                (runtime["tools"] as? JsonObject).orEmpty().forEach { (name, metadata) ->
+                                    TextButton(onClick = { toolCall = Triple(entry.name, name, metadata as? JsonObject ?: buildJsonObject {}) }, enabled = !state.busy && allowChanges) { Text("调用 $name") }
+                                }
+                                TextButton(onClick = { resourceServer = entry.name; resourceUri = "" }, enabled = !state.busy) { Text("读取资料地址") }
+                            }
+                            (runtime["resources"] as? JsonArray).orEmpty().mapNotNull { it as? JsonObject }.forEach { resource ->
+                                TextButton(onClick = { resourceServer = entry.name; resourceUri = resource.string("uri") }, enabled = !state.busy) { Text("读取 ${resource.string("name", resource.string("uri"))}") }
+                            }
+                        }
                         Row(Modifier.horizontalScroll(rememberScrollState())) {
                             val editable = state.snapshot != null && !state.busy && allowChanges && entry.editable
                             TextButton(onClick = { controller.edit(entry.name) }, enabled = editable) { Text("编辑") }
@@ -106,6 +120,34 @@ private data class McpConfirmation(val entry: OriginalMcpEntry, val snapshot: Or
             if (state.nextCursor != null) item { OutlinedButton(onClick = controller::more, enabled = !state.busy) { Text("加载更多服务") } }
         }
     }
+    toolCall?.let { (server, name, metadata) ->
+        var arguments by remember(server, name) { mutableStateOf("{}") }
+        var error by remember(server, name) { mutableStateOf<String?>(null) }
+        AlertDialog(onDismissRequest = { toolCall = null }, title = { Text("调用 $name") }, text = {
+            Column(Modifier.heightIn(max = 430.dp).verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                Text(metadata.string("description")); Text("这会立即调用 $server 的工具，可能修改服务中的数据。请核对参数后确认。", style = MaterialTheme.typography.bodySmall)
+                (metadata["inputSchema"] as? JsonObject)?.let { Text(Json { prettyPrint = true }.encodeToString(JsonObject.serializer(), it), style = MaterialTheme.typography.bodySmall) }
+                OutlinedTextField(arguments, { arguments = it }, label = { Text("工具参数（JSON）") }, modifier = Modifier.fillMaxWidth())
+                error?.let { Text(it, color = MaterialTheme.colorScheme.error) }
+            }
+        }, confirmButton = { TextButton(onClick = {
+            runCatching {
+                val args = Json.parseToJsonElement(arguments)
+                (metadata["inputSchema"] as? JsonObject)?.let { schema -> val validator = JsonSchemaFormValidator(schema); if (validator.supported()) validator.validate(args) }
+                args
+            }.onSuccess { toolCall = null; controller.callTool(server, name, it) }.onFailure { error = it.message ?: "参数格式不正确" }
+        }, enabled = state.connected && !state.busy && allowChanges) { Text("确认调用") } }, dismissButton = { TextButton(onClick = { toolCall = null }) { Text("取消") } })
+    }
+    resourceServer?.let { server -> AlertDialog(onDismissRequest = { resourceServer = null }, title = { Text("读取服务资料") }, text = {
+        OutlinedTextField(resourceUri, { resourceUri = it }, label = { Text("资料 URI") }, modifier = Modifier.fillMaxWidth())
+    }, confirmButton = { TextButton(onClick = { resourceServer = null; controller.readResource(server, resourceUri) }, enabled = !state.busy && resourceUri.isNotBlank()) { Text("读取") } }, dismissButton = { TextButton(onClick = { resourceServer = null }) { Text("取消") } }) }
+    state.result?.let { result -> AlertDialog(onDismissRequest = controller::closeResult, title = { Text(state.resultTitle) }, text = {
+        Column(Modifier.heightIn(max = 500.dp).verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            if (result["isError"]?.jsonPrimitive?.booleanOrNull == true) Text("服务报告此次工具执行失败", color = MaterialTheme.colorScheme.error)
+            ((result["content"] ?: result["contents"]) as? JsonArray).orEmpty().forEach { value -> McpContentView(value as? JsonObject ?: buildJsonObject { put("text", value.toString()) }) }
+            result["structuredContent"]?.let { Text(Json { prettyPrint = true }.encodeToString(JsonElement.serializer(), it)) }
+        }
+    }, confirmButton = { TextButton(onClick = controller::closeResult) { Text("关闭") } }) }
     confirmation?.let { request ->
         AlertDialog(onDismissRequest = { confirmation = null }, title = { Text(if (request.delete) "删除用户服务配置" else if (request.entry.enabled) "停用服务" else "启用服务") },
             text = { Text("${request.entry.name}\n\n" + if (request.delete) "删除此用户配置并重新连接。其他来源若有同名配置，删除后可能继续生效。已保存的账号授权不会随配置删除。" else "保存后会重新连接服务，并核查实际状态；项目或管理策略可能覆盖用户设置。") },

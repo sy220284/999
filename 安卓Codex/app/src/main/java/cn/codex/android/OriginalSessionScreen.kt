@@ -17,13 +17,16 @@ import kotlinx.serialization.json.*
 
 @Composable fun OriginalSessionScreen(host: OriginalCoreHost, onBack: () -> Unit) {
     val state by host.state.collectAsState()
+    val extensions by host.extensions.state.collectAsState()
+    val mcp by host.mcp.state.collectAsState()
+    val commands by host.commands.state.collectAsState()
     var tab by remember { mutableStateOf("目标") }
     var goalEdit by remember { mutableStateOf(false) }
     var sectionEdit by remember { mutableStateOf<Pair<String?, String>?>(null) }
     var attachmentEdit by remember { mutableStateOf(false) }
     var confirm by remember { mutableStateOf<Pair<String, JsonObject>?>(null) }
     var before by remember(state.threadId) { mutableStateOf("") }
-    val editable = state.connected && !state.loading && !state.working && state.turnId == null && !host.configurationChanging
+    val editable = state.connected && !state.loading && !state.working && state.turnId == null && !extensions.mutating && !mcp.mutating && !commands.running
     BackHandler(onBack = onBack)
     LaunchedEffect(state.connectionEpoch, state.threadId) { confirm = null; goalEdit = false; sectionEdit = null; attachmentEdit = false }
     LaunchedEffect(tab, state.threadId) {
