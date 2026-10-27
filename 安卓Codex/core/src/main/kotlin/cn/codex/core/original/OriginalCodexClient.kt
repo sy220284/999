@@ -65,6 +65,7 @@ class OriginalCodexClient(val connection: AppServerConnection) {
         put("name", name); threadId?.let { put("threadId", it) }; put("timeoutSecs", 180)
     })
     suspend fun config() = call("config/read", buildJsonObject { put("includeLayers", true) })
+    suspend fun writeConfig(snapshot: OriginalConfigSnapshot, edit: JsonObject) = call("config/batchWrite", OriginalConfigEdits.request(snapshot, edit))
     private fun id(threadId: String) = buildJsonObject { put("threadId", threadId) }
     companion object {
         fun textInput(text: String) = buildJsonArray { add(buildJsonObject { put("type", "text"); put("text", text); put("text_elements", buildJsonArray {}) }) }

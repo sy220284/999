@@ -26,11 +26,13 @@ import kotlinx.serialization.json.*
     var installedOnly by remember { mutableStateOf(false) }
     var search by remember { mutableStateOf("") }
     var confirm by remember { mutableStateOf<Pair<OriginalPlugin, Boolean>?>(null) }
+    var togglePlugin by remember { mutableStateOf<OriginalPlugin?>(null) }
+    var hookConfirm by remember { mutableStateOf<Pair<JsonObject, Boolean>?>(null) }
     val context = LocalContext.current
     val motion = LocalMotionEnabled.current
     BackHandler(onBack = onBack)
     // 连接代次变化或操作结束后，重新检查确认框中的插件，避免旧目录对象继续操作。
-    LaunchedEffect(state.connected) { if (!state.connected) confirm = null }
+    LaunchedEffect(state.connected) { if (!state.connected) { confirm = null; togglePlugin = null; hookConfirm = null } }
     Column(Modifier.fillMaxSize()) {
         Row(Modifier.fillMaxWidth().padding(horizontal = 8.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Outlined.ArrowBack, "返回原版会话") }
@@ -50,6 +52,7 @@ import kotlinx.serialization.json.*
                 }
             }
             if (state.error != null) item { Surface(shape = RoundedCornerShape(14.dp), color = MaterialTheme.colorScheme.errorContainer) { Column(Modifier.padding(14.dp)) { Text(state.error.orEmpty()); TextButton(onClick = controller::dismissError) { Text("知道了") } } } }
+            item { Text(state.configNotice, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant) }
             state.marketplaceErrors.forEachIndexed { index, error -> item(key = "market-error:$index") { Text(error, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall) } }
             if (tab == "插件") {
                 item {
@@ -68,6 +71,7 @@ import kotlinx.serialization.json.*
                             plugin.installBlock?.takeIf { !plugin.installed }?.let { Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant) }
                             Row {
                                 TextButton(onClick = { controller.detail(plugin) }, enabled = !state.busy && state.connected) { Text("详情与能力") }
+                                if (plugin.installed) TextButton(onClick = { togglePlugin = plugin }, enabled = !state.busy && state.connected && allowChanges && state.configSnapshot != null && plugin.summary.string("availability") == "AVAILABLE") { Text(if (plugin.enabled) "停用" else "启用") }
                                 if (plugin.installed) TextButton(onClick = { confirm = plugin to false }, enabled = !state.busy && state.connected && allowChanges) { Text("卸载") }
                                 else FilledTonalButton(onClick = { confirm = plugin to true; controller.detail(plugin) }, enabled = !state.busy && state.connected && allowChanges && plugin.installBlock == null) { Text("安装") }
                             }
@@ -75,7 +79,7 @@ import kotlinx.serialization.json.*
                     }
                 }
             } else {
-                if (state.hooks.isEmpty()) item { Text("当前没有已加载的 Hook 配置。项目配置与信任开关仍待接入，此页展示原版实际返回的状态。") }
+                if (state.hooks.isEmpty()) item { Text("当前没有已加载的 Hook 配置。此页展示原版核心实际加载的规则。") }
                 items(state.hooks, key = { "hooks:${it.string("cwd")}" }) { entry ->
                     Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                         Text(entry.string("cwd"), style = MaterialTheme.typography.labelMedium)
@@ -85,6 +89,14 @@ import kotlinx.serialization.json.*
                             val enabled = hook["enabled"]?.jsonPrimitive?.booleanOrNull == true
                             val trust = when (hook.string("trustStatus")) { "trusted" -> "已信任"; "untrusted" -> "未信任"; "modified" -> "内容已变化，需重新信任"; "managed" -> "由策略管理"; else -> "未知信任状态" }
                             ExpandableCard("${hookEventTitle(hook.string("eventName"))} · ${if (enabled) "启用" else "停用"} · $trust", listOf(hook.string("sourcePath"), "处理器：${when (hook.string("handlerType")) { "command" -> "本机命令"; "mcpTool" -> "MCP 工具"; "prompt" -> "提示词"; "agent" -> "代理任务"; else -> hook.string("handlerType") }}", hook.string("command"), "匹配：${hook.string("matcher", "全部")}", "超时：${hook["timeoutSec"]} 秒", hook.string("statusMessage")).filter { it.isNotBlank() }.joinToString("\n"), Icons.Outlined.Bolt)
+                            val managed = hook["isManaged"]?.jsonPrimitive?.booleanOrNull != false || hook.string("trustStatus") == "managed"
+                            Row(Modifier.horizontalScroll(rememberScrollState())) {
+                                val canEdit = !state.busy && state.connected && allowChanges && state.configSnapshot != null && !managed && hook.string("currentHash").isNotBlank() && hook.string("trustStatus") in setOf("trusted", "untrusted", "modified")
+                                TextButton(onClick = { hookConfirm = hook to false }, enabled = canEdit) { Text(if (enabled) "停用规则" else "启用规则") }
+                                if (hook.string("trustStatus") in setOf("untrusted", "modified")) TextButton(onClick = { hookConfirm = hook to true }, enabled = canEdit) { Text("查看并信任") }
+                            }
+                            if (managed) Text("由策略管理或状态未知，不能在此修改", style = MaterialTheme.typography.bodySmall)
+
                         }
                     }
                 }
@@ -96,6 +108,23 @@ import kotlinx.serialization.json.*
                 }
             }
         }
+    }
+    togglePlugin?.let { plugin ->
+        AlertDialog(onDismissRequest = { togglePlugin = null }, title = { Text(if (plugin.enabled) "停用插件" else "启用插件") }, text = {
+            Text("${plugin.displayName}\n市场：${plugin.marketplace}\n标识：${plugin.id}\n\n修改用户配置并重新读取有效状态。更高优先级策略可能覆盖此设置。")
+        }, confirmButton = { TextButton(onClick = { togglePlugin = null; controller.togglePlugin(plugin) }, enabled = state.connected && !state.busy && allowChanges && state.configSnapshot != null) { Text("确认修改") } }, dismissButton = { TextButton(onClick = { togglePlugin = null }) { Text("取消") } })
+    }
+    hookConfirm?.let { (hook, trust) ->
+        AlertDialog(onDismissRequest = { hookConfirm = null }, title = { Text(if (trust) "信任此版本的规则" else "修改规则启用状态") }, text = {
+            Column(Modifier.heightIn(max = 430.dp).verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                Text(hookEventTitle(hook.string("eventName")))
+                Text("来源：${hook.string("sourcePath")}\n标识：${hook.string("key")}\n处理器：${hook.string("handlerType")}")
+                Text(hook.string("command").ifBlank { "此处理器的完整内容需在来源文件中核查，请确认了解其行为后再信任。" })
+                if (trust) Text(Json { prettyPrint = true }.encodeToString(JsonObject.serializer(), hook), style = MaterialTheme.typography.bodySmall)
+                Text("内容哈希：${hook.string("currentHash")}", style = MaterialTheme.typography.bodySmall)
+                Text(if (trust) "信任后，这一版本的规则可参与自动执行，可能运行命令或调用服务。请核查来源与行为。此操作只记录信任，不自动启用规则；内容变化后需要再次确认。" else "修改启用状态不会授予信任。运行仍受原版信任检查与配置策略限制。")
+            }
+        }, confirmButton = { TextButton(onClick = { hookConfirm = null; controller.changeHook(hook, trust) }, enabled = state.connected && !state.busy && allowChanges && state.configSnapshot != null) { Text(if (trust) "信任此哈希" else "确认修改") } }, dismissButton = { TextButton(onClick = { hookConfirm = null }) { Text("取消") } })
     }
     confirm?.let { (plugin, install) ->
         val detail = state.detail?.takeIf { state.detailKey == plugin.key }

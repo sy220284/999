@@ -110,6 +110,19 @@ diff --git a/codex-rs/install-context/src/lib.rs b/codex-rs/install-context/src/
      "codex-code-mode-host.exe"
  } else {
      "codex-code-mode-host"
+@@ -149,6 +151,12 @@
+     }
+
+     pub fn rg_command(&self) -> PathBuf {
++        // Android executable must come from the installed native library directory.
++        if cfg!(target_os = "android") {
++            return std::env::current_exe().ok()
++                .and_then(|exe| exe.parent().map(|dir| dir.join("libcodex_rg.so")))
++                .unwrap_or_else(|| PathBuf::from("libcodex_rg.so"));
++        }
+         if let Some(package_layout) = &self.package_layout
+             && let Some(path_dir) = &package_layout.path_dir
+         {
 diff --git a/codex-rs/shell-command/src/shell_detect.rs b/codex-rs/shell-command/src/shell_detect.rs
 --- a/codex-rs/shell-command/src/shell_detect.rs
 +++ b/codex-rs/shell-command/src/shell_detect.rs

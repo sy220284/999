@@ -95,13 +95,13 @@
 客户端请求,command/exec/write,待接入,,P4,未运行验证
 客户端请求,command/exec/terminate,待接入,,P4,未运行验证
 客户端请求,command/exec/resize,待接入,,P4,未运行验证
-客户端请求,config/read,仅客户端封装，界面待接入,core/src/main/kotlin/cn/codex/core/original/OriginalCodexClient.kt,待运行验证/继续语义审阅,未运行验证
+客户端请求,config/read,调用及界面代码已接入，未运行验证,core/src/main/kotlin/cn/codex/core/original/OriginalCodexClient.kt;core/src/main/kotlin/cn/codex/core/original/OriginalExtensionsController.kt,待运行验证/继续语义审阅,未运行验证
 客户端请求,externalAgentConfig/detect,待接入,,P4,未运行验证
 客户端请求,externalAgentConfig/import,待接入,,P4,未运行验证
 客户端请求,externalAgentConfig/import/recordHistory,待接入,,P4,未运行验证
 客户端请求,externalAgentConfig/import/readHistories,待接入,,P4,未运行验证
 客户端请求,config/value/write,待接入,,P4,未运行验证
-客户端请求,config/batchWrite,待接入,,P4,未运行验证
+客户端请求,config/batchWrite,调用及界面代码已接入，未运行验证,core/src/main/kotlin/cn/codex/core/original/OriginalCodexClient.kt;core/src/main/kotlin/cn/codex/core/original/OriginalExtensionsController.kt,待运行验证/继续语义审阅,未运行验证
 客户端请求,configRequirements/read,待接入,,P4,未运行验证
 客户端请求,account/read,调用及界面代码已接入，未运行验证,core/src/main/kotlin/cn/codex/core/original/OriginalCodexClient.kt,待运行验证/继续语义审阅,未运行验证
 客户端请求,getConversationSummary,待接入,,P4,未运行验证

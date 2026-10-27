@@ -65,6 +65,52 @@ class OriginalExtensionsTest {
             wire.reply(removal.getValue("id"), buildJsonObject {}); uninstall.await()
         } } finally { scope.cancel() }
     }
+    @Test fun versionedConfigWritePropagatesFailureWithoutAutomaticRetry() = runBlocking {
+        val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+        try { Wire(scope).use { wire ->
+            val api = OriginalCodexClient(wire.rpc)
+            val write = async { runCatching { api.writeConfig(OriginalConfigSnapshot("/config.toml", "v7"), OriginalConfigEdits.plugin("demo@market", false)) } }
+            val request = wire.read()
+            assertEquals("config/batchWrite", request.getValue("method").jsonPrimitive.content)
+            val params = request.getValue("params").jsonObject
+            assertEquals("v7", params.getValue("expectedVersion").jsonPrimitive.content)
+            assertEquals("/config.toml", params.getValue("filePath").jsonPrimitive.content)
+            wire.fail(request.getValue("id"))
+            assertTrue(write.await().isFailure)
+            // wrapper 只发送一次；冲突不能改用新版本再提交用户尚未确认的内容。
+            assertFalse(wire.reader.ready())
+        } } finally { scope.cancel() }
+    }
+    @Test fun policyOverrideShowsEffectivePluginStateInsteadOfOptimisticToggle() = runBlocking {
+        val dispatcher = Executors.newSingleThreadExecutor().asCoroutineDispatcher()
+        val scope = CoroutineScope(SupervisorJob() + dispatcher)
+        try { Wire(scope).use { wire ->
+            val api = OriginalCodexClient(wire.rpc)
+            val controller = OriginalExtensionsController(scope, "/project") { false }
+            fun catalog(enabled: Boolean) = buildJsonObject { put("marketplaces", buildJsonArray { add(buildJsonObject {
+                put("name", "market"); put("plugins", buildJsonArray { add(plugin(installed = true).let { JsonObject(it.summary + ("enabled" to JsonPrimitive(enabled))) }) })
+            }) }) }
+            suspend fun reload(version: String) {
+                repeat(2) { val request = wire.read(); wire.reply(request.getValue("id"), catalog(true)) }
+                val hooks = wire.read(); wire.reply(hooks.getValue("id"), buildJsonObject { put("data", buildJsonArray {}) })
+                val config = wire.read(); wire.reply(config.getValue("id"), buildJsonObject { put("layers", buildJsonArray { add(buildJsonObject {
+                    put("name", buildJsonObject { put("type", "user"); put("file", "/config.toml") }); put("version", version)
+                }) }) })
+            }
+            withContext(dispatcher) { controller.bind(api); controller.refresh() }
+            reload("v1")
+            val first = withTimeout(3000) { controller.state.first { !it.busy && it.configSnapshot != null } }
+            withContext(dispatcher) { controller.togglePlugin(first.plugins.single()) }
+            val installed = wire.read(); wire.reply(installed.getValue("id"), catalog(true))
+            val write = wire.read(); assertEquals("config/batchWrite", write.getValue("method").jsonPrimitive.content)
+            assertEquals("v1", write.getValue("params").jsonObject.getValue("expectedVersion").jsonPrimitive.content)
+            wire.reply(write.getValue("id"), buildJsonObject { put("status", "okOverridden"); put("overriddenMetadata", buildJsonObject { put("message", "管理员覆盖") }) })
+            reload("v2")
+            val effective = withTimeout(3000) { controller.state.first { !it.busy && it.configSnapshot?.version == "v2" } }
+            assertTrue(effective.plugins.single().enabled)
+            assertEquals("管理员覆盖", effective.error)
+        } } finally { scope.cancel(); dispatcher.close() }
+    }
     @Test fun offlineCatalogStillLoadsInstalledHooksAndReconnectIgnoresOldResponse() = runBlocking {
         val dispatcher = Executors.newSingleThreadExecutor().asCoroutineDispatcher()
         val scope = CoroutineScope(SupervisorJob() + dispatcher)
@@ -79,6 +125,8 @@ class OriginalExtensionsTest {
             fresh.reply(installed.getValue("id"), buildJsonObject { put("marketplaces", buildJsonArray { add(buildJsonObject { put("name", "market"); put("plugins", buildJsonArray { add(plugin(installed = true).summary) }) }) }) })
             val hooks = fresh.read(); assertEquals("hooks/list", hooks.getValue("method").jsonPrimitive.content)
             fresh.reply(hooks.getValue("id"), buildJsonObject { put("data", buildJsonArray {}) })
+            val config = fresh.read(); assertEquals("config/read", config.getValue("method").jsonPrimitive.content)
+            fresh.reply(config.getValue("id"), buildJsonObject {})
             val state = withTimeout(3000) { controller.state.first { !it.busy && it.plugins.isNotEmpty() } }
             assertEquals(1, state.plugins.size); assertTrue(state.plugins.single().installed)
             assertTrue(state.marketplaceErrors.any { it.contains("offline") })

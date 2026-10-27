@@ -148,7 +148,7 @@
       "args": [],
       "ipc": "stdin/stdout 的 FramedReader/FramedWriter 分帧协议及 ClientHello 握手；不是 app-server 的逐行 JSON-RPC",
       "stop": "上游 kill_on_drop 与独立进程组；应用最终子树回收",
-      "status": "Android 名称解析及构建入口已补；V8 交叉构建/链接/运行均待验证",
+      "status": "Android 命名与构建入口、V8 供应校验已写；真实 Android V8 源构建/链接/运行仍待完成",
       "refs": [
         {
           "path": "codex-rs/install-context/src/lib.rs",
@@ -219,18 +219,18 @@
     },
     {
       "name": "ripgrep",
-      "package": "外部工具，未作为本脚本 Cargo workspace bin 构建",
+      "package": "外部工具 ripgrep 15.2.0；固定提交 e89fff89ac9af12e8d4ce9d5fd07beb408ca730f",
       "binary": "rg",
       "requiredBy": [
         "原版 thread-store 本机会话检索路径"
       ],
-      "androidInstall": null,
+      "androidInstall": "nativeLibraryDir/libcodex_rg.so",
       "args": [
         "由原版检索器构造"
       ],
       "ipc": "子进程输出与退出码",
       "stop": "原版检索取消和应用子树回收",
-      "status": "缺口：待固定外部源码版本、Android 构建和查找路径；不能声称全工具运行环境已齐备",
+      "status": "版本固定、Android 构建入口和安装路径适配已写；未构建/运行；PCRE2 仍待适配",
       "refs": [
         {
           "path": "codex-rs/install-context/src/lib.rs",
@@ -239,9 +239,16 @@
         {
           "path": "codex-rs/thread-store/src/local/search_threads.rs",
           "sha256": "d09554c4837d84bb402778badf286c9fc11978db38ac67ebda37753082dde945"
+        },
+        {
+          "path": "scripts/codex_package/rg",
+          "sha256": "41a10ca63365560d899a82b6f825fd7b420a18b34f660a98bffeece77eeae1f1"
         }
       ],
-      "abi": [],
+      "abi": [
+        "arm64-v8a",
+        "x86_64"
+      ],
       "environment": "CODEX_HOME/HOME/TMPDIR/Android CA；账号与MCP走Keystore桥；不得记录凭证"
     },
     {
