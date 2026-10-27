@@ -116,4 +116,27 @@ class AppServerConnectionTest {
         val patched = OriginalThreadView.patch(emptyList(), "file", changes).single()
         assertTrue(patched.text.contains("a.txt → b.txt")); assertTrue(patched.text.contains("+new"))
     }
+    @Test fun saturatedNotificationQueueFailsPendingRpcInsteadOfDeadlockingReader() = runBlocking {
+        Wire().use { wire ->
+            val pending = async { runCatching { wire.rpc.request("must-not-hang", timeoutMs = 5000) } }
+            wire.read() // 留有未返回的请求；暂时不消费通知流
+            for (i in 0 until 100) {
+                val sent = runCatching { wire.send(buildJsonObject { put("method", "test/flood"); put("params", buildJsonObject { put("n", i) }) }) }
+                if (sent.isFailure) break
+            }
+            val result = withTimeout(3000) { pending.await() }
+            assertIs<IOException>(result.exceptionOrNull())
+            assertFalse(result.exceptionOrNull() is TimeoutCancellationException)
+        }
+    }
+    @Test fun invalidUtf8IsNotSilentlyReplacedInsideJsonMessages() = runBlocking {
+        val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+        // JSON 字符串中插入非法 UTF-8 字节；原版协议只能接收严格 UTF-8。
+        val data = byteArrayOf(123, 34, 109, 101, 116, 104, 111, 100, 34, 58, 34, 0xC3.toByte(), 34, 125, 10)
+        val rpc = AppServerConnection(ByteArrayInputStream(data), ByteArrayOutputStream(), scope, {})
+        try {
+            assertFails { withTimeout(3000) { rpc.messages.first() } }
+        } finally { rpc.close(); scope.cancel() }
+    }
+
 }
