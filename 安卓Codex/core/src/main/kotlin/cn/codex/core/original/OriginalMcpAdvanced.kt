@@ -66,7 +66,10 @@ object OriginalMcpAdvanced {
         if (secret != null) {
             require(secret.isNotBlank() && !oAuthClientId(oauth).isNullOrBlank()) { "OAuth 客户端密钥需要非空 client_id" }
         }
-        if (oauth.containsKey("token_endpoint_auth_method")) {
+        oauth["token_endpoint_auth_method"]?.let {
+            require(string(it, "oauth.token_endpoint_auth_method") in setOf("client_secret_basic", "client_secret_post")) {
+                "EMA 令牌认证只接受 client_secret_basic 或 client_secret_post"
+            }
             require(auth == "ema_auth" && secret != null) { "token_endpoint_auth_method 只可用于带客户端密钥的 ema_auth" }
         }
         if (oauth.containsKey("authorization_server_issuer")) require(auth == "ema_auth") { "issuer 仅用于 ema_auth" }
