@@ -67,6 +67,22 @@ object OriginalConfigEdits {
     fun hookRules(previous: JsonObject, rules: JsonObject): List<JsonObject> {
         require(rules.keys.all { it in hookEvents }) { "规则事件名不正确；信任状态请在规则卡片中修改" }
         require(rules.values.all { it is JsonArray }) { "每个事件需要填写匹配组数组" }
+        for ((event, value) in rules) {
+            (value as JsonArray).forEachIndexed { index, raw ->
+                require(raw is JsonObject) { "$event 第 ${index + 1} 组必须是 JSON 对象" }
+                val matcher = raw["matcher"]
+                require(matcher == null || matcher is JsonPrimitive && matcher.isString) { "规则 matcher 必须是字符串" }
+                val handlers = raw["hooks"] as? JsonArray
+                require(handlers != null && handlers.isNotEmpty()) { "规则组至少需要一个处理器" }
+                handlers.forEach { item ->
+                    require(item is JsonObject && item["type"] is JsonPrimitive &&
+                        (item["type"] as JsonPrimitive).isString && (item["type"] as JsonPrimitive).content.isNotBlank()) { "处理器必须声明 type" }
+                    if ((item as JsonObject).string("type") == "command") {
+                        require(item.string("command").isNotBlank()) { "命令处理器不能为空" }
+                    }
+                }
+            }
+        }
         return ((previous.keys - "state") + rules.keys).map { event -> buildJsonObject {
             put("keyPath", childPath("hooks", event)); put("mergeStrategy", "replace"); put("value", rules[event] ?: JsonNull)
         } }
