@@ -90,9 +90,9 @@
   {
     "kind": "客户端请求",
     "method": "thread/metadata/update",
-    "status": "待接入",
-    "entry": "",
-    "phase": "P3",
+    "status": "调用及界面代码已接入，未运行验证",
+    "entry": "core/src/main/kotlin/cn/codex/core/original/OriginalCodexClient.kt;app/src/main/java/cn/codex/android/OriginalCoreHost.kt;app/src/main/java/cn/codex/android/OriginalSessionScreen.kt",
+    "phase": "待运行验证/继续语义审阅",
     "validation": "未运行验证"
   },
   {
@@ -114,9 +114,9 @@
   {
     "kind": "客户端请求",
     "method": "thread/attachmentOwner/list",
-    "status": "待接入",
-    "entry": "",
-    "phase": "P3",
+    "status": "调用及界面代码已接入，未运行验证",
+    "entry": "core/src/main/kotlin/cn/codex/core/original/OriginalCodexClient.kt;app/src/main/java/cn/codex/android/OriginalCoreHost.kt;app/src/main/java/cn/codex/android/OriginalSessionScreen.kt",
+    "phase": "待运行验证/继续语义审阅",
     "validation": "未运行验证"
   },
   {
@@ -218,9 +218,9 @@
   {
     "kind": "客户端请求",
     "method": "thread/loaded/list",
-    "status": "待接入",
-    "entry": "",
-    "phase": "P3",
+    "status": "调用及界面代码已接入，未运行验证",
+    "entry": "core/src/main/kotlin/cn/codex/core/original/OriginalCodexClient.kt;app/src/main/java/cn/codex/android/OriginalCoreHost.kt;app/src/main/java/cn/codex/android/OriginalSessionScreen.kt",
+    "phase": "待运行验证/继续语义审阅",
     "validation": "未运行验证"
   },
   {
@@ -259,16 +259,16 @@
     "kind": "客户端请求",
     "method": "skills/list",
     "status": "调用及界面代码已接入，未运行验证",
-    "entry": "core/src/main/kotlin/cn/codex/core/original/OriginalCodexClient.kt",
+    "entry": "core/src/main/kotlin/cn/codex/core/original/OriginalCodexClient.kt;core/src/main/kotlin/cn/codex/core/original/OriginalExtensionsController.kt",
     "phase": "待运行验证/继续语义审阅",
     "validation": "未运行验证"
   },
   {
     "kind": "客户端请求",
     "method": "skills/extraRoots/set",
-    "status": "待接入",
-    "entry": "",
-    "phase": "P2",
+    "status": "调用及界面代码已接入，未运行验证",
+    "entry": "core/src/main/kotlin/cn/codex/core/original/OriginalCodexClient.kt;core/src/main/kotlin/cn/codex/core/original/OriginalExtensionsController.kt",
+    "phase": "待运行验证/继续语义审阅",
     "validation": "未运行验证"
   },
   {
@@ -338,9 +338,9 @@
   {
     "kind": "客户端请求",
     "method": "plugin/skill/read",
-    "status": "待接入",
-    "entry": "",
-    "phase": "P2",
+    "status": "调用及界面代码已接入，未运行验证",
+    "entry": "core/src/main/kotlin/cn/codex/core/original/OriginalCodexClient.kt;core/src/main/kotlin/cn/codex/core/original/OriginalExtensionsController.kt",
+    "phase": "待运行验证/继续语义审阅",
     "validation": "未运行验证"
   },
   {
@@ -482,9 +482,9 @@
   {
     "kind": "客户端请求",
     "method": "skills/config/write",
-    "status": "待接入",
-    "entry": "",
-    "phase": "P2",
+    "status": "调用及界面代码已接入，未运行验证",
+    "entry": "core/src/main/kotlin/cn/codex/core/original/OriginalCodexClient.kt;core/src/main/kotlin/cn/codex/core/original/OriginalExtensionsController.kt",
+    "phase": "待运行验证/继续语义审阅",
     "validation": "未运行验证"
   },
   {
@@ -530,9 +530,9 @@
   {
     "kind": "客户端请求",
     "method": "review/start",
-    "status": "待接入",
-    "entry": "",
-    "phase": "P3",
+    "status": "调用及界面代码已接入，未运行验证",
+    "entry": "core/src/main/kotlin/cn/codex/core/original/OriginalCodexClient.kt;app/src/main/java/cn/codex/android/OriginalCoreHost.kt;app/src/main/java/cn/codex/android/OriginalSessionScreen.kt",
+    "phase": "待运行验证/继续语义审阅",
     "validation": "未运行验证"
   },
   {
@@ -970,9 +970,9 @@
   {
     "kind": "服务端通知",
     "method": "thread/status/changed",
-    "status": "待接入",
-    "entry": "",
-    "phase": "P3",
+    "status": "通知分支已接入，未运行验证",
+    "entry": "app/src/main/java/cn/codex/android/OriginalCoreHost.kt",
+    "phase": "待验证/继续语义审阅",
     "validation": "未运行验证"
   },
   {
@@ -1026,9 +1026,9 @@
   {
     "kind": "服务端通知",
     "method": "skills/changed",
-    "status": "待接入",
-    "entry": "",
-    "phase": "P4",
+    "status": "通知分支已接入，未运行验证",
+    "entry": "app/src/main/java/cn/codex/android/OriginalCoreHost.kt",
+    "phase": "待验证/继续语义审阅",
     "validation": "未运行验证"
   },
   {

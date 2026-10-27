@@ -26,7 +26,7 @@ class OriginalCodexClient(val connection: AppServerConnection) {
     suspend fun history(threadId: String, cursor: String? = null) = call("thread/items/list", buildJsonObject {
         put("threadId", threadId); put("limit", 100); put("sortDirection", "desc"); cursor?.let { put("cursor", it) }
     })
-    suspend fun read(threadId: String) = call("thread/read", buildJsonObject { put("threadId", threadId); put("includeTurns", true) })
+    suspend fun read(threadId: String, includeTurns: Boolean = true) = call("thread/read", buildJsonObject { put("threadId", threadId); put("includeTurns", includeTurns) })
     suspend fun fork(threadId: String) = call("thread/fork", buildJsonObject { put("threadId", threadId) })
     suspend fun archive(threadId: String, archived: Boolean) = call(if (archived) "thread/archive" else "thread/unarchive", id(threadId))
     suspend fun rename(threadId: String, title: String) = call("thread/name/set", buildJsonObject { put("threadId", threadId); put("name", title) })
@@ -47,7 +47,7 @@ class OriginalCodexClient(val connection: AppServerConnection) {
     suspend fun logout() = call("account/logout")
     suspend fun models(cursor: String? = null) = call("model/list", buildJsonObject { cursor?.let { put("cursor", it) }; put("limit", 100) })
     suspend fun rateLimits() = call("account/rateLimits/read")
-    suspend fun skills(cwd: String) = call("skills/list", buildJsonObject { put("cwds", buildJsonArray { add(cwd) }) })
+    suspend fun skills(cwd: String, forceReload: Boolean = false) = call("skills/list", buildJsonObject { put("cwds", buildJsonArray { add(cwd) }); put("forceReload", forceReload) })
     suspend fun mcp(cursor: String? = null, threadId: String? = null) = call("mcpServerStatus/list", buildJsonObject {
         cursor?.let { put("cursor", it) }; threadId?.let { put("threadId", it) }; put("limit", 30); put("detail", "full")
     })
@@ -113,6 +113,13 @@ class OriginalCodexClient(val connection: AppServerConnection) {
     suspend fun copyFile(source: String, destination: String, recursive: Boolean) = call("fs/copy", buildJsonObject { put("sourcePath", source); put("destinationPath", destination); put("recursive", recursive) })
     suspend fun watchFiles(watchId: String, path: String) = call("fs/watch", buildJsonObject { put("watchId", watchId); put("path", path) })
     suspend fun unwatchFiles(watchId: String) = call("fs/unwatch", buildJsonObject { put("watchId", watchId) })
+    suspend fun review(threadId: String, target: JsonObject) = call("review/start", buildJsonObject { put("threadId", threadId); put("target", target); put("delivery", "inline") })
+    suspend fun loadedThreads(cursor: String? = null) = call("thread/loaded/list", buildJsonObject { put("limit", 30); cursor?.let { put("cursor", it) } })
+    suspend fun updateThreadGit(threadId: String, patch: JsonObject) = call("thread/metadata/update", buildJsonObject { put("threadId", threadId); put("gitInfo", patch) })
+    suspend fun attachmentOwners(type: String, key: String, cursor: String? = null) = call("thread/attachmentOwner/list", buildJsonObject { put("attachmentType", type); put("identityKey", key); put("limit", 30); cursor?.let { put("cursor", it) } })
+    suspend fun setSkillEnabled(path: String, enabled: Boolean) = call("skills/config/write", buildJsonObject { put("path", path); put("enabled", enabled) })
+    suspend fun setSkillRoots(roots: List<String>) = call("skills/extraRoots/set", buildJsonObject { put("extraRoots", buildJsonArray { roots.forEach { add(it) } }) })
+    suspend fun pluginSkill(plugin: OriginalPlugin, name: String) = call("plugin/skill/read", OriginalSkillConfig.remoteParams(plugin, name))
     private fun id(threadId: String) = buildJsonObject { put("threadId", threadId) }
     companion object {
         fun textInput(text: String) = buildJsonArray { add(buildJsonObject { put("type", "text"); put("text", text); put("text_elements", buildJsonArray {}) }) }

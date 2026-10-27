@@ -154,13 +154,21 @@ private data class HookConfirmation(val hook: JsonObject, val trust: Boolean, va
             }
         }, confirmButton = { TextButton(onClick = { confirm = null; controller.closeDetail(); if (install) controller.install(plugin) else controller.uninstall(plugin) }, enabled = !state.busy && state.connected && allowChanges && (!install || detail != null)) { Text(if (install) "确认安装" else "确认卸载") } }, dismissButton = { TextButton(onClick = { confirm = null; controller.closeDetail() }) { Text("取消") } })
     }
-    if (state.detail != null && confirm == null) AlertDialog(onDismissRequest = controller::closeDetail, title = { Text("插件详情") }, text = {
+    if (state.detail != null && confirm == null && state.skillContents == null) AlertDialog(onDismissRequest = controller::closeDetail, title = { Text("插件详情") }, text = {
         val detail = state.detail!!
         Column(Modifier.heightIn(max = 460.dp).verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            state.error?.let { Text(it, color = MaterialTheme.colorScheme.error) }
             Text(detail.string("description", "暂无说明"))
             listOf("skills" to "技能", "hooks" to "Hooks", "mcpServers" to "MCP 服务", "apps" to "连接服务", "scheduledTasks" to "插件声明的计划任务").forEach { (key, title) ->
                 val entries = (detail[key] as? JsonArray).orEmpty()
-                if (entries.isNotEmpty()) { Text(title, style = MaterialTheme.typography.titleSmall); entries.forEach { value -> Text(if (value is JsonObject) value.string("name", value.string("id", value.string("eventName", "详情见插件说明"))) else value.jsonPrimitive.content) } }
+                if (entries.isNotEmpty()) { Text(title, style = MaterialTheme.typography.titleSmall); entries.forEach { value ->
+                    val label = if (value is JsonObject) value.string("name", value.string("id", value.string("eventName", "详情见插件说明"))) else value.jsonPrimitive.content
+                    Text(label)
+                    if (key == "skills") {
+                        val plugin = state.plugins.singleOrNull { it.key == state.detailKey }
+                        if (plugin != null && plugin.marketplacePath == null && plugin.summary.string("remotePluginId").isNotBlank()) TextButton(onClick = { controller.readPluginSkill(label) }, enabled = !state.busy) { Text("阅读远程技能说明") }
+                    }
+                } }
             }
             Text("此页展示插件声明。入门指令、服务授权与计划任务的实际启用状态还需分别核查。", style = MaterialTheme.typography.bodySmall)
         }

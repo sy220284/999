@@ -37,6 +37,7 @@ import kotlinx.serialization.json.*
     var commandManager by remember { mutableStateOf(false) }
     var settingsManager by remember { mutableStateOf(false) }
     var filesManager by remember { mutableStateOf(false) }
+    var skillsManager by remember { mutableStateOf(false) }
     var sessionManager by remember { mutableStateOf(false) }
     var extensions by remember { mutableStateOf(false) }
     var consent by remember { mutableStateOf(false) }
@@ -44,6 +45,7 @@ import kotlinx.serialization.json.*
     var renamed by remember { mutableStateOf<String?>(null) }
     val context = LocalContext.current
     state.requests.firstOrNull()?.let { request -> key(state.connectionEpoch, request.id) { OriginalRequestDialog(request, state.items, { host.answer(request, it) }) } }
+    OriginalSkillPreview(host.extensions)
     if (state.agent != null) {
         val agent = state.agent!!
         AlertDialog(onDismissRequest = host::closeAgent, title = { Text("代理会话 ${agent.string("id").takeLast(8)}") }, text = {
@@ -57,6 +59,7 @@ import kotlinx.serialization.json.*
             }
         }, confirmButton = { TextButton(onClick = { host.closeAgent(); host.openThread(agent.string("id")) }, enabled = !state.working && state.turnId == null && !state.loading) { Text("切换到此会话") } }, dismissButton = { TextButton(onClick = host::closeAgent) { Text("关闭查看") } })
     }
+    if (skillsManager) { OriginalSkillsScreen(host.extensions, allowChanges = !state.working && state.turnId == null && !state.loading && !mcpState.mutating && !settingsState.mutating && !filesState.mutating && !fullTerminalState.running && !networkGit.running && !commandState.running) { skillsManager = false }; return }
     if (filesManager) { OriginalFilesScreen(host.files, allowChanges = !state.working && state.turnId == null && !state.loading && !extensionState.mutating && !mcpState.mutating && !settingsState.mutating && !filesState.mutating && !fullTerminalState.running && !networkGit.running && !commandState.running) { filesManager = false }; return }
     if (settingsManager) { OriginalSettingsScreen(host.settings, allowChanges = !state.working && state.turnId == null && !state.loading && !extensionState.mutating && !mcpState.mutating && !settingsState.mutating && !filesState.mutating && !fullTerminalState.running && !networkGit.running && !commandState.running) { settingsManager = false }; return }
     if (commandManager) { OriginalCommandScreen(host.commands, host.commandWorkspace()) { commandManager = false }; return }
@@ -109,6 +112,7 @@ import kotlinx.serialization.json.*
                     OutlinedButton(onClick = { commandManager = true }, enabled = state.connected && !state.loading) { Text("独立命令与交互输入") }
                     OutlinedButton(onClick = { settingsManager = true; host.settings.refresh() }, enabled = !state.loading) { Text("账号用量、策略与实验功能") }
                     OutlinedButton(onClick = { filesManager = true; host.files.refresh() }, enabled = !state.loading) { Text("原版项目文件") }
+                    OutlinedButton(onClick = { skillsManager = true; host.extensions.refreshSkills() }, enabled = !state.loading) { Text("原版技能管理") }
                     Text(state.account, style = MaterialTheme.typography.titleSmall)
                     Text("账号与 MCP 凭证由 Android Keystore 加密保存在手机，退出核心后仍可恢复。", style = MaterialTheme.typography.bodySmall)
                     Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -153,6 +157,7 @@ import kotlinx.serialization.json.*
                     Surface(color = if (state.threadId == id) MaterialTheme.colorScheme.secondaryContainer else MaterialTheme.colorScheme.surfaceContainerLow, shape = RoundedCornerShape(14.dp)) {
                         Column(Modifier.fillMaxWidth().padding(12.dp)) {
                             TextButton(onClick = { host.openThread(id) }, enabled = editable) { Text(thread.string("name").ifBlank { thread.string("preview").ifBlank { "新对话" } }.take(100), Modifier.fillMaxWidth(), maxLines = 2) }
+                            Text(OriginalSessionActions.threadStatus(state.threadStatuses[id]), style = MaterialTheme.typography.labelSmall)
                             TextButton(onClick = { host.archive(id, !state.archived) }, enabled = editable) { Text(if (state.archived) "恢复会话" else "归档") }
                         }
                     }
@@ -165,7 +170,7 @@ import kotlinx.serialization.json.*
                         TextButton(onClick = { host.fork() }, enabled = editable) { Text("分叉") }
                         TextButton(onClick = { renamed = "" }, enabled = editable) { Text("重命名") }
                         TextButton(onClick = { host.compact() }, enabled = editable) { Text("压缩上下文") }
-                        listOf("配额", "技能", "MCP", "钩子", "插件").forEach { title -> TextButton(onClick = { host.inspect(title) }, enabled = !state.loading) { Text(title) } }
+                        listOf("配额", "技能", "MCP", "钩子", "插件").forEach { title -> TextButton(onClick = { if (title == "技能") { skillsManager = true; host.extensions.refreshSkills() } else host.inspect(title) }, enabled = !state.loading) { Text(title) } }
                     }
                 }
                 if (state.historyCursor != null) item { TextButton(onClick = { host.loadHistory() }, enabled = !state.loading) { Text("加载更早消息") } }
@@ -173,6 +178,13 @@ import kotlinx.serialization.json.*
                     if (item.type in setOf("userMessage", "agentMessage")) {
                         Surface(shape = RoundedCornerShape(16.dp), color = if (item.type == "userMessage") MaterialTheme.colorScheme.surfaceContainer else MaterialTheme.colorScheme.background) {
                             Column(Modifier.fillMaxWidth().padding(14.dp)) { Text(if (item.type == "userMessage") "你" else "Codex", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.primary); Spacer(Modifier.height(8.dp)); Text(item.text) }
+                        }
+                    } else if (item.type in setOf("enteredReviewMode", "exitedReviewMode")) {
+                        Surface(shape = RoundedCornerShape(16.dp), color = MaterialTheme.colorScheme.surfaceContainerLow) {
+                            Column(Modifier.fillMaxWidth().padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                                Text(if (item.type == "enteredReviewMode") "开始代码审查" else "代码审查结果", style = MaterialTheme.typography.titleMedium)
+                                androidx.compose.foundation.text.selection.SelectionContainer { Text(item.text, style = MaterialTheme.typography.bodyMedium) }
+                            }
                         }
                     } else Column {
                         ExpandableCard(originalItemTitle(item.type), item.text, Icons.Outlined.Code)

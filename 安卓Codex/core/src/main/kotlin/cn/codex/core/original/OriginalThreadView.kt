@@ -9,6 +9,7 @@ object OriginalThreadView {
     fun item(value: JsonObject): OriginalItem {
         val type = value.string("type")
         val text = when (type) {
+            "enteredReviewMode", "exitedReviewMode" -> value.string("review")
             "agentMessage", "plan" -> value.string("text")
             "userMessage" -> (value["content"] as? JsonArray).orEmpty().mapNotNull { it as? JsonObject }.joinToString("\n") { it.string("text", "[附件]") }
             "reasoning" -> (value["summary"] as? JsonArray).orEmpty().joinToString("\n") { it.jsonPrimitive.content }

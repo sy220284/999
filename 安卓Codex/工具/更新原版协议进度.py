@@ -29,12 +29,14 @@ for kind, file in [("客户端请求", "ClientRequest.ts"), ("服务端请求", 
             elif method in facade:
                 entry = client_path
                 status = "调用及界面代码已接入，未运行验证"
-                if method.startswith("plugin/") or method in {"hooks/list", "config/read", "config/batchWrite"}:
+                if method.startswith(("plugin/", "skills/")) or method in {"hooks/list", "config/read", "config/batchWrite"}:
                     entry += ";" + extension_path
                 if method in {"mcpServerStatus/list", "config/mcpServer/reload", "config/read", "config/batchWrite"}:
                     entry += ";" + mcp_path
                 if method in {"account/usage/read", "account/workspaceMessages/read", "modelProvider/capabilities/read", "configRequirements/read", "permissionProfile/list", "experimentalFeature/list", "experimentalFeature/enablement/set"}:
                     entry += ";" + settings_path
+                if method in {"review/start", "thread/metadata/update", "thread/loaded/list", "thread/attachmentOwner/list"}:
+                    entry += ";" + host_path + ";app/src/main/java/cn/codex/android/OriginalSessionScreen.kt"
                 if method.startswith("fs/"):
                     entry += ";" + files_path
                 phase = "待运行验证/继续语义审阅"

@@ -2,6 +2,7 @@ package cn.codex.core.original
 
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.collect
 import kotlinx.serialization.json.*
 import org.junit.Test
 import kotlin.test.*
@@ -137,6 +138,33 @@ class AppServerConnectionTest {
         try {
             assertFails { withTimeout(3000) { rpc.messages.first() } }
         } finally { rpc.close(); scope.cancel() }
+    }
+
+    @Test fun closingDiscardsQueuedEventsAndPreservesTheIoFailureForAnActiveCollector() = runBlocking {
+        Wire().use { wire ->
+            wire.send(buildJsonObject { put("method", "thread/started"); put("params", buildJsonObject { put("threadId", "old") }) })
+            val barrier = async { wire.rpc.request("barrier") }
+            val frame = wire.read(); wire.response(frame.getValue("id"), "read")
+            barrier.await() // reader 已处理前一帧，通知仍在队列中。
+            wire.rpc.close()
+            val received = mutableListOf<ServerMessage>()
+            val failure = runCatching { withTimeout(3000) { wire.rpc.messages.collect { received += it } } }.exceptionOrNull()
+            assertTrue(received.isEmpty()); assertIs<IOException>(failure)
+            assertTrue(currentCoroutineContext().isActive)
+        }
+    }
+    @Test fun overflowingQueueDoesNotDeliverPreviouslyQueuedApprovalsAfterDisconnect() = runBlocking {
+        Wire().use { wire ->
+            val pending = async { runCatching { wire.rpc.request("pending") } }
+            wire.read()
+            for (i in 0..70) {
+                if (runCatching { wire.send(buildJsonObject { put("id", "old-$i"); put("method", "item/fileChange/requestApproval") }) }.isFailure) break
+            }
+            assertIs<IOException>(withTimeout(3000) { pending.await() }.exceptionOrNull())
+            val received = mutableListOf<ServerMessage>()
+            val failure = runCatching { withTimeout(3000) { wire.rpc.messages.collect { received += it } } }.exceptionOrNull()
+            assertTrue(received.isEmpty()); assertIs<IOException>(failure)
+        }
     }
 
 }

@@ -5,11 +5,17 @@ import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.*
 import kotlinx.serialization.json.*
 import java.util.UUID
+import java.io.File
+import java.nio.ByteBuffer
+import java.nio.charset.CodingErrorAction
 
 /** 主线程调用；每次绑定新连接递增代次，旧请求和旧详情不能覆盖新状态。 */
 data class OriginalHookDraft(val snapshot: OriginalConfigSnapshot, val hooks: JsonObject)
 
 data class OriginalExtensionsState(
+    val skills: List<JsonObject> = emptyList(), val skillErrors: List<String> = emptyList(),
+    val skillNotice: String = "尚未扫描技能", val skillsDirty: Boolean = false, val skillsRevision: Long = 0,
+    val extraRoots: List<String>? = null, val skillContents: String? = null, val skillTitle: String = "",
     val connected: Boolean = false, val busy: Boolean = false, val mutating: Boolean = false,
     val plugins: List<OriginalPlugin> = emptyList(), val marketplaceErrors: List<String> = emptyList(),
     val hooks: List<JsonObject> = emptyList(), val hookRuns: List<OriginalItem> = emptyList(),
@@ -77,6 +83,55 @@ class OriginalExtensionsController(private val scope: CoroutineScope, private va
     fun detail(plugin: OriginalPlugin) = operation { api, stamp ->
         val result = api.pluginDetail(plugin).jsonObject.getValue("plugin").jsonObject
         if (stamp == generation) mutable.update { it.copy(detail = result, detailKey = plugin.key) }
+    }
+    fun skillsChanged() { mutable.update { it.copy(skillsDirty = true, skillsRevision = it.skillsRevision + 1) } }
+    fun closeSkill() { mutable.update { it.copy(skillContents = null, skillTitle = "") } }
+    private suspend fun loadSkills(api: OriginalCodexClient, stamp: Long) {
+        val revision = state.value.skillsRevision
+        val response = api.skills(cwd, forceReload = true).jsonObject
+        val entry = response.getValue("data").jsonArray.map { it.jsonObject }.singleOrNull { it.string("cwd") == cwd }
+            ?: error("技能响应未包含当前工作目录")
+        val skills = entry.getValue("skills").jsonArray.map { it.jsonObject }
+        val errors = (entry["errors"] as? JsonArray).orEmpty().map { val error = it.jsonObject; error.string("path") + "：" + error.string("message") }
+        if (stamp == generation) mutable.update { it.copy(skills = skills, skillErrors = errors, skillsDirty = it.skillsRevision != revision, skillNotice = "已扫描 ${skills.size} 个技能") }
+    }
+    fun refreshSkills() = operation { api, stamp -> loadSkills(api, stamp) }
+    fun setSkillEnabled(expected: JsonObject, enabled: Boolean) = operation(mutating = true) { api, stamp ->
+        val path = expected.string("path")
+        require(File(path).isAbsolute) { "此技能没有可用于设置的本机路径" }
+        require(state.value.skills.singleOrNull { it.string("path") == path } == expected) { "技能目录已变化，请刷新后重新确认" }
+        api.setSkillEnabled(path, enabled)
+        if (stamp != generation) return@operation
+        loadSkills(api, stamp)
+        if (stamp == generation) {
+            val actual = state.value.skills.singleOrNull { it.string("path") == path }?.get("enabled")?.jsonPrimitive?.booleanOrNull
+            mutable.update { it.copy(skillNotice = if (actual == enabled) "已重新扫描并确认技能${if (enabled) "开启" else "关闭"}" else "设置请求已返回，但扫描结果仍未变为所选状态；请核查管理来源或加载错误") }
+        }
+    }
+    fun setExtraSkillRoots(text: String) = operation(mutating = true) { api, stamp ->
+        val roots = OriginalSkillConfig.roots(text)
+        withContext(Dispatchers.IO) { require(roots.all { File(it).isDirectory && File(it).canRead() }) { "存在无法读取的技能目录，请使用手机可访问的实际目录" } }
+        api.setSkillRoots(roots)
+        if (stamp != generation) return@operation
+        mutable.update { it.copy(extraRoots = roots) }
+        loadSkills(api, stamp)
+        if (stamp == generation) mutable.update { it.copy(skillNotice = "核心已接收当前进程的额外目录，并重新扫描；重启核心后需重新设置") }
+    }
+    fun readSkill(skill: JsonObject) = operation { _, stamp ->
+        val path = skill.string("path")
+        require(state.value.skills.any { it.string("path") == path && it.string("name") == skill.string("name") }) { "技能目录已变化" }
+        val contents = withContext(Dispatchers.IO) {
+            val file = File(path); require(file.isFile && file.length() <= 512 * 1024) { "技能说明不可读或超过 512 KiB" }
+            Charsets.UTF_8.newDecoder().onMalformedInput(CodingErrorAction.REPORT).onUnmappableCharacter(CodingErrorAction.REPORT).decode(ByteBuffer.wrap(file.readBytes())).toString()
+        }
+        if (stamp == generation) mutable.update { it.copy(skillContents = contents, skillTitle = skill.string("name")) }
+    }
+    fun readPluginSkill(name: String) = operation { api, stamp ->
+        val key = state.value.detailKey ?: error("请先打开插件详情")
+        val plugin = state.value.plugins.singleOrNull { it.key == key } ?: error("插件目录已变化")
+        val response = api.pluginSkill(plugin, name).jsonObject
+        val contents = response["contents"]?.jsonPrimitive?.contentOrNull ?: error("服务未提供该技能正文")
+        if (stamp == generation && state.value.detailKey == key) mutable.update { it.copy(skillContents = contents, skillTitle = name) }
     }
     fun install(plugin: OriginalPlugin) = operation(mutating = true) { api, stamp ->
         // 重新检查当前目录中的状态；不信任已打开确认框中的旧对象。

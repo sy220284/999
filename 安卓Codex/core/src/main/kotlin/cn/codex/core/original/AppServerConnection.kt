@@ -4,6 +4,8 @@ import kotlinx.coroutines.*
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.catch
+import java.util.concurrent.atomic.AtomicReference
 import kotlinx.serialization.json.*
 import java.io.*
 import java.util.concurrent.ConcurrentHashMap
@@ -22,16 +24,20 @@ class AppServerConnection(
     private val scope = CoroutineScope(parent.coroutineContext + owner + Dispatchers.IO)
     private val pending = ConcurrentHashMap<String, CompletableDeferred<JsonElement>>()
     private val ids = AtomicLong()
-    private val closed = AtomicBoolean()
+    private val closed = AtomicReference<Throwable?>(null)
     private val writeLock = Any()
     private data class BufferedMessage(val value: ServerMessage, val size: Int)
     private val bufferedBytes = AtomicLong()
     private val maxBufferedBytes = 32L * 1024 * 1024
-    private val incoming = Channel<BufferedMessage>(64)
+    private val incoming = Channel<BufferedMessage>(64, onUndeliveredElement = { item -> bufferedBytes.addAndGet(-item.size.toLong()); Unit })
     // 有界帧数 + 有界字节数：解码后立即释放队列预算，杜绝通知洪泛拖垮手机内存。
     val messages = incoming.receiveAsFlow().map { item ->
         bufferedBytes.addAndGet(-item.size.toLong())
+        closed.get()?.let { throw it }
         item.value
+    }.catch { failure ->
+        currentCoroutineContext().ensureActive()
+        throw (closed.get() ?: failure)
     }
     private val reader = scope.launch {
         try {
@@ -75,7 +81,7 @@ class AppServerConnection(
     }
 
     suspend fun request(method: String, params: JsonElement? = null, timeoutMs: Long = 60_000): JsonElement {
-        check(!closed.get()) { "原版核心未连接" }
+        check(closed.get() == null) { "原版核心未连接" }
         val id = JsonPrimitive(ids.incrementAndGet())
         val waiter = CompletableDeferred<JsonElement>()
         pending[id.toString()] = waiter
@@ -106,7 +112,7 @@ class AppServerConnection(
         send(buildJsonObject { put("id", id); put("error", buildJsonObject { put("code", code); put("message", message) }) })
     }
     private fun send(frame: JsonObject) = synchronized(writeLock) {
-        check(!closed.get()) { "原版核心未连接" }
+        check(closed.get() == null) { "原版核心未连接" }
         val bytes = frame.toString().toByteArray(Charsets.UTF_8)
         require(bytes.size <= maxFrameBytes) { "协议请求过大" }
         output.write(bytes); output.write(10); output.flush()
@@ -128,9 +134,11 @@ class AppServerConnection(
         }
     }
     private fun shutdown(cause: Throwable) {
-        if (!closed.compareAndSet(false, true)) return
+        if (!closed.compareAndSet(null, cause)) return
         pending.values.forEach { it.completeExceptionally(cause) }; pending.clear()
-        incoming.close(cause)
+        // close 会保留已排队帧；断连必须丢弃旧审批/通知并释放队列预算。
+        // Flow 向仍活跃的宿主保留原始错误，宿主据此清理连接与界面状态。
+        incoming.cancel(CancellationException("原版协议已结束", cause))
         // 必须先终止进程再关管道，防止另一个线程持有输入流锁时 close 永久等待。
         runCatching(terminate)
         runCatching { output.close() }; runCatching { input.close() }
