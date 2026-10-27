@@ -1,6 +1,6 @@
 {
   "upstream_commit": "970111f6cb62cc02fe36a82ea7d71b37a2889c97",
-  "evidence": "静态源码审阅，无构建或运行结果",
+  "evidence": "固定上游提交的 10 项条目、23 份唯一源码证据；Android 路径为静态接线记录，无构建/运行结果",
   "entries": [
     {
       "name": "app-server",
@@ -148,7 +148,7 @@
       "args": [],
       "ipc": "stdin/stdout 的 FramedReader/FramedWriter 分帧协议及 ClientHello 握手；不是 app-server 的逐行 JSON-RPC",
       "stop": "上游 kill_on_drop 与独立进程组；应用最终子树回收",
-      "status": "Android 命名与构建入口、V8 供应校验已写；真实 Android V8 源构建/链接/运行仍待完成",
+      "status": "Android code-mode 宿主路径已有源码，双 ABI 构建目录隔离和 GN/Ninja 独立 SHA 锁定要求已加入；工具锁与实际 V8、绑定、Android 链接及执行未验证",
       "refs": [
         {
           "path": "codex-rs/install-context/src/lib.rs",
@@ -230,7 +230,7 @@
       ],
       "ipc": "子进程输出与退出码",
       "stop": "原版检索取消和应用子树回收",
-      "status": "固定来源、Android 构建/路径、PCRE2 静态特性及许可证整理已写；未构建/运行；shell 中 rg 命令别名仍待适配",
+      "status": "rg/PCRE2 锁源、Android 安装目录查找和 shell rg 别名已有源码；未构建或执行，性能/取消/权限/16KB 待验证",
       "refs": [
         {
           "path": "codex-rs/install-context/src/lib.rs",
