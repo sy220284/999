@@ -32,6 +32,7 @@ import kotlinx.serialization.json.*
 private data class Destination(val id: String, val title: String, val icon: ImageVector)
 private val destinations = listOf(
     Destination("files", "项目文件", Icons.Outlined.FolderOpen), Destination("changes", "查看修改", Icons.Outlined.Difference),
+    Destination("git", "Git 仓库", Icons.Outlined.AccountTree),
     Destination("terminal", "本机终端", Icons.Outlined.Terminal), Destination("skills", "项目技能", Icons.Outlined.AutoAwesome),
     Destination("mcp", "工具连接", Icons.Outlined.Extension), Destination("settings", "连接与偏好", Icons.Outlined.Tune),
     Destination("original", "原版核心", Icons.Outlined.Memory),
@@ -43,6 +44,8 @@ private val destinations = listOf(
 }
 private object NoMotion: MotionDurationScale { override val scaleFactor = 0f }
 @Composable private fun CodexLayout(controller: RuntimeController, state: ScreenState, send: (String, Boolean) -> Unit) {
+    val networkGit by (LocalContext.current.applicationContext as CodexApplication).gitOperations.state.collectAsState()
+    val fullTerminal by (LocalContext.current.applicationContext as CodexApplication).fullTerminal.state.collectAsState()
     var page by rememberSaveable { mutableStateOf("chat") }
     val composer: ComposerState = viewModel(key = "composer:${state.project}")
     var draft by composer.draft
@@ -157,13 +160,14 @@ private object NoMotion: MotionDurationScale { override val scaleFactor = 0f }
                     }
                     AnimatedContent(targetState = page, transitionSpec = { fadeIn(tween(if (state.config.motion) 220 else 0)) + slideInHorizontally { it / 32 } togetherWith fadeOut(tween(if (state.config.motion) 120 else 0)) }, label = "页面切换", modifier = Modifier.weight(1f)) { current ->
                         when (current) {
-                            "chat" -> ChatScreen(state, draft, { draft = it }, { page = "settings" }, controller, { text ->
+                            "chat" -> ChatScreen(state, draft, { draft = it }, { page = "settings" }, controller, fullTerminal.running || networkGit.running, { text ->
                                 if (state.config.model.isBlank() || (state.config.apiKey.isBlank() && !state.config.allowLoopbackHttp)) { controller.fail("先连接模型，再开始对话"); page = "settings" }
                                 else { haptic.performHapticFeedback(HapticFeedbackType.LongPress); send(text, false); draft = "" }
                             })
-                            "files" -> FilesScreen(controller, state)
-                            "changes" -> ChangesScreen(controller, state)
-                            "terminal" -> TerminalScreen(state, controller) { send(it, true) }
+                            "files" -> FilesScreen(controller, state.copy(busy = state.busy || networkGit.running))
+                            "changes" -> ChangesScreen(controller, state.copy(busy = state.busy || networkGit.running))
+                            "git" -> GitScreen(controller, state)
+                            "terminal" -> FullTerminalScreen(controller.workspace(state.project).root)
                             "settings" -> SettingsScreen(controller, state)
                             "original" -> OriginalCoreScreen((LocalContext.current.applicationContext as CodexApplication).originalCore)
                             "skills" -> SkillsScreen(controller, state)

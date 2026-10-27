@@ -30,7 +30,7 @@ import cn.codex.core.*
 import kotlinx.coroutines.*
 import kotlinx.serialization.json.*
 
-@Composable fun ChatScreen(state: ScreenState, draft: String, onDraft: (String) -> Unit, settings: () -> Unit, controller: RuntimeController, send: (String) -> Unit) {
+@Composable fun ChatScreen(state: ScreenState, draft: String, onDraft: (String) -> Unit, settings: () -> Unit, controller: RuntimeController, executionBlocked: Boolean, send: (String) -> Unit) {
     val list = rememberLazyListState()
     val scope = rememberCoroutineScope()
     val context = LocalContext.current
@@ -94,7 +94,7 @@ import kotlinx.serialization.json.*
                         if (state.canSteer && draft.isNotBlank()) {
                             TextButton(onClick = { controller.steer(draft); onDraft("") }) { Text("追加指令") }
                         }
-                        FilledIconButton(onClick = { if (state.busy) controller.stop() else if (draft.isNotBlank()) send(draft) }, enabled = state.busy || (draft.isNotBlank() && !attachLoading), modifier = Modifier.size(48.dp)) { AnimatedContent(state.busy, transitionSpec = { fadeIn(tween(if (state.config.motion) 180 else 0)) togetherWith fadeOut(tween(if (state.config.motion) 120 else 0)) }, label = "发送与停止") { busy -> Icon(if (busy) Icons.Outlined.Stop else Icons.Outlined.ArrowUpward, if (busy) "停止任务" else "发送任务") } }
+                        FilledIconButton(onClick = { if (state.busy) controller.stop() else if (draft.isNotBlank()) send(draft) }, enabled = !executionBlocked && (state.busy || (draft.isNotBlank() && !attachLoading)), modifier = Modifier.size(48.dp)) { AnimatedContent(state.busy, transitionSpec = { fadeIn(tween(if (state.config.motion) 180 else 0)) togetherWith fadeOut(tween(if (state.config.motion) 120 else 0)) }, label = "发送与停止") { busy -> Icon(if (busy) Icons.Outlined.Stop else Icons.Outlined.ArrowUpward, if (busy) "停止任务" else "发送任务") } }
                     }
                 }
             }

@@ -236,7 +236,7 @@ class RuntimeController(private val context: Context) {
                 }
             } else {
                 require(snapshot.config.model.isNotBlank()) { "请先在设置中选择模型并填写 API 密钥" }
-                val extras = listOf(GitTools(fs), McpTools(context))
+                val extras = listOf(GitTools(fs, GitCredentialStore(context)), McpTools(context))
                 val tools = LocalTools(fs, runner, extras) { record(it, snapshot.project, initial.id, initial.lastTurnId) }
                 val runtime = AgentRuntime(ResponsesClient(snapshot.config), tools, ::approve, steeringInbox, toolJournal)
                 val attachments = attachmentInputs.toList()

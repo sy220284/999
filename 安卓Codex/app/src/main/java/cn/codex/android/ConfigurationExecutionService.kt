@@ -25,9 +25,9 @@ class ConfigurationExecutionService : Service() {
         }
         return START_NOT_STICKY
     }
-    override fun onTimeout(startId: Int, fgsType: Int) { app.originalCore.close(); stopSelf() }
+    override fun onTimeout(startId: Int, fgsType: Int) { app.gitOperations.cancel(); app.fullTerminal.stop(false); app.originalCore.close(); stopSelf() }
     override fun onDestroy() {
-        if (app.configurationJournal.active.value != null) app.originalCore.close()
+        if (app.configurationJournal.active.value != null) { app.gitOperations.cancel(); app.fullTerminal.stop(false); app.originalCore.close() }
         scope.cancel(); super.onDestroy()
     }
 }

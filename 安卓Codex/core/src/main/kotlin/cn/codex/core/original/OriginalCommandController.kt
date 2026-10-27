@@ -37,7 +37,8 @@ class OriginalCommandController(private val scope: CoroutineScope, private val b
     fun bind(api: OriginalCodexClient?) { generation++; job?.cancel(); control?.cancel(); client = api; mutable.value = if (api == null) state.value.copy(connected = false, running = false, controlBusy = false, status = "连接已结束，请核查最后命令结果") else OriginalCommandState(connected = true) }
     private fun append(text: String) { mutable.update { it.copy(output = (it.output + text).takeLast(1_048_576)) } }
     fun run(command: String, cwd: String, tty: Boolean, timeoutMs: Long, rows: Int = 24, cols: Int = 80) {
-        if (state.value.running || busyElsewhere()) return
+        if (state.value.running) return
+        if (busyElsewhere()) { mutable.update { it.copy(error = "请先结束其他任务、终端或仓库操作") }; return }
         val api = client ?: return
         require(command.isNotBlank() && timeoutMs > 0 && timeoutMs <= Long.MAX_VALUE - 10_000 && rows > 0 && cols > 0)
         val ticket = try { lifecycle.begin() } catch (failure: Exception) { mutable.update { it.copy(error = failure.message) }; return }

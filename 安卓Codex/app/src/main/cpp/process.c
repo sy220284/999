@@ -282,3 +282,9 @@ JNIEXPORT void JNICALL Java_cn_codex_android_NativeCoreBridge_terminate(JNIEnv *
     core_kill_tree(pid);
     while (waitpid(pid, NULL, 0) < 0 && errno == EINTR) {}
 }
+
+JNIEXPORT void JNICALL Java_cn_codex_android_TerminalProcessTree_terminate(JNIEnv *env, jclass cls, jint pid) {
+    (void)env; (void)cls;
+    core_kill_tree(pid);
+    // TerminalSession 的 waiter 回收根进程，不能在这里抢走退出状态。
+}

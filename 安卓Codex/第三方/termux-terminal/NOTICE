@@ -1,0 +1,5 @@
+Terminal components from Termux (https://github.com/termux/termux-app), based on Terminal Emulator for Android (https://github.com/jackpal/Android-Terminal-Emulator).
+
+Only terminal-emulator and terminal-view are included. Upstream LICENSE.md expressly lists these two libraries as Apache License 2.0 exceptions. The Termux application and termux-shared are excluded.
+
+Fixed source: v0.118.3 / 5b657c6adf4304e5198951ce815fe0205dcac29c. Copyright belongs to the original project contributors. Original source notices are retained. Local Android 17 adaptations are described in 适配说明.md and recorded in git.

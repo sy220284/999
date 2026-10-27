@@ -1,0 +1,6 @@
+cmake_minimum_required(VERSION 3.22.1)
+project(codex_terminal C)
+add_library(termux SHARED termux.c)
+target_compile_definitions(termux PRIVATE _GNU_SOURCE)
+target_compile_features(termux PRIVATE c_std_11)
+target_link_options(termux PRIVATE "-Wl,-z,max-page-size=16384")
