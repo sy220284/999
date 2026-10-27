@@ -89,13 +89,43 @@ class OriginalConfigEditsTest {
         val previous = buildJsonObject { put("state", buildJsonObject { put("id", buildJsonObject { put("trusted_hash", "abc") }) }) }
         val rules = buildJsonObject { put("PreToolUse", buildJsonArray { add(buildJsonObject {
             put("matcher", "git"); put("hooks", buildJsonArray { add(buildJsonObject {
-                put("type", "prompt"); put("prompt", "按原规则提醒")
+                put("type", "prompt")
             }) })
         }) }) }
         val edits = OriginalConfigEdits.hookRules(previous, rules)
         assertEquals(1, edits.size)
         assertEquals("hooks.\"PreToolUse\"", edits.single().getValue("keyPath").jsonPrimitive.content)
         assertEquals(rules["PreToolUse"], edits.single()["value"])
+    }
+
+    @Test fun supportedHandlersMatchOriginalFourVariantsAndPreserveWindowsOptions() {
+        val valid = buildJsonObject {
+            put("PreToolUse", buildJsonArray {
+                add(buildJsonObject { put("hooks", buildJsonArray {
+                    add(buildJsonObject { put("type", "command"); put("command", "echo hi"); put("commandWindows", "cmd /c echo hi")
+                        put("async", true); put("timeout", 10); put("additionalContextLimit", 0) })
+                    add(buildJsonObject { put("type", "mcp_tool"); put("server", "secure"); put("tool", "scan")
+                        put("input", buildJsonObject { put("path", "${tool_input.path}"); put("strict", true) }) })
+                    add(buildJsonObject { put("type", "prompt") })
+                    add(buildJsonObject { put("type", "agent") })
+                } ) })
+            })
+        }
+        assertEquals(valid["PreToolUse"], OriginalConfigEdits.hookRules(buildJsonObject {}, valid).single()["value"])
+    }
+    @Test fun unknownHandlerAndMcpNullInputAreRejectedBeforeWrite() {
+        fun rule(handler: JsonObject) = buildJsonObject { put("PreToolUse", buildJsonArray {
+            add(buildJsonObject { put("hooks", buildJsonArray { add(handler) }) })
+        }) }
+        listOf(
+            buildJsonObject { put("type", "future_handler"); put("command", "echo hi") },
+            buildJsonObject { put("type", "mcp_tool"); put("server", "scanner"); put("tool", "scan"); put("input", buildJsonObject { put("value", JsonNull) }) },
+            buildJsonObject { put("type", "command"); put("command", "echo ok"); put("timeout", -1) },
+            buildJsonObject { put("type", "agent"); put("unknown", "bad") },
+            buildJsonObject { put("type", "prompt"); put("prompt", "unrecognized") }
+        ).forEach { handler ->
+            assertFailsWith<IllegalArgumentException> { OriginalConfigEdits.hookRules(buildJsonObject {}, rule(handler)) }
+        }
     }
 
 }
