@@ -230,16 +230,64 @@ private data class McpConfirmation(val entry: OriginalMcpEntry, val snapshot: Or
 
 
 @Composable private fun OriginalMcpAdvancedEditor(editor: OriginalMcpEditor, busy: Boolean, enabled: Boolean, error: String?, dismiss: () -> Unit, save: (JsonObject) -> Unit) {
+    fun lines(key: String) = (editor.original[key] as? JsonArray).orEmpty().joinToString("\n") { it.jsonPrimitive.content }
     var text by remember(editor) { mutableStateOf(Json { prettyPrint = true }.encodeToString(JsonObject.serializer(), editor.original)) }
+    var allowed by remember(editor) { mutableStateOf(lines("enabled_tools")) }
+    var denied by remember(editor) { mutableStateOf(lines("disabled_tools")) }
+    var defaultMode by remember(editor) { mutableStateOf(editor.original.string("default_tools_approval_mode")) }
+    var toolName by remember(editor) { mutableStateOf("") }
+    var toolMode by remember(editor) { mutableStateOf("") }
+    var budget by remember(editor) { mutableStateOf("") }
+    var referenceName by remember(editor) { mutableStateOf("") }
+    var referenceSource by remember(editor) { mutableStateOf("local") }
     var localError by remember(editor) { mutableStateOf<String?>(null) }
-    AlertDialog(onDismissRequest = { if (!busy) dismiss() }, title = { Text("${editor.name} · 高级配置") }, text = {
-        Column(Modifier.heightIn(max = 500.dp).verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-            Text("编辑原版完整用户条目：工具允许/禁用名单、每工具审批与输出预算、环境、请求头及授权配置都在此处保存。原版负责校验字段，保存后重新连接。", style = MaterialTheme.typography.bodySmall)
-            Text("此处内容会写入用户配置文件。账号授权请优先使用服务卡片的授权入口。", style = MaterialTheme.typography.bodySmall)
-            OutlinedTextField(text, { text = it }, enabled = !busy, label = { Text("服务配置（JSON 对象）") }, modifier = Modifier.fillMaxWidth())
+    fun modify(transform: (JsonObject) -> JsonObject) {
+        runCatching { transform(Json.parseToJsonElement(text).jsonObject) }
+            .onSuccess { text = Json { prettyPrint = true }.encodeToString(JsonObject.serializer(), it); localError = null }
+            .onFailure { localError = it.message ?: "高级设置不正确" }
+    }
+    AlertDialog(onDismissRequest = { if (!busy) dismiss() }, title = { Text((editor.name ?: "新服务") + " · 高级配置") }, text = {
+        Column(Modifier.heightIn(max = 530.dp).verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            Text("按固定原版字段调整策略。点击“应用到草稿”只修改本地草稿；最后确认才会版本化保存并重新连接。", style = MaterialTheme.typography.bodySmall)
+            OutlinedTextField(allowed, { allowed = it }, enabled = !busy, label = { Text("仅允许这些工具（每行一个，空表示不限制）") }, modifier = Modifier.fillMaxWidth())
+            OutlinedTextField(denied, { denied = it }, enabled = !busy, label = { Text("禁用工具（每行一个）") }, modifier = Modifier.fillMaxWidth())
+            Text("默认工具审批模式", style = MaterialTheme.typography.labelLarge)
+            Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                listOf("" to "继承", "auto" to "自动", "prompt" to "每次确认", "writes" to "写入确认", "approve" to "允许").forEach { (mode, title) ->
+                    FilterChip(defaultMode == mode, { defaultMode = mode }, enabled = !busy, label = { Text(title) })
+                }
+            }
+            OutlinedButton(onClick = { modify { OriginalMcpAdvanced.lists(it, allowed, denied, defaultMode) } }, enabled = !busy) { Text("应用服务策略到草稿") }
+            HorizontalDivider()
+            Text("单个工具策略", style = MaterialTheme.typography.titleMedium)
+            OutlinedTextField(toolName, { toolName = it }, enabled = !busy, label = { Text("原版工具名称（精确匹配）") }, modifier = Modifier.fillMaxWidth())
+            Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                listOf("" to "继承", "auto" to "自动", "prompt" to "每次确认", "writes" to "写入确认", "approve" to "允许").forEach { (mode, title) ->
+                    FilterChip(toolMode == mode, { toolMode = mode }, enabled = !busy, label = { Text(title) })
+                }
+            }
+            OutlinedTextField(budget, { budget = it }, enabled = !busy, label = { Text("输出预算（正整数 token；空表示继承）") }, modifier = Modifier.fillMaxWidth())
+            Text("清空审批模式和预算后应用，可删除该工具的单独策略。", style = MaterialTheme.typography.bodySmall)
+            OutlinedButton(onClick = { modify { OriginalMcpAdvanced.tool(it, toolName, toolMode, budget) } }, enabled = !busy && toolName.isNotBlank()) { Text("应用工具策略到草稿") }
+            HorizontalDivider()
+            Text("stdio 环境变量引用", style = MaterialTheme.typography.titleMedium)
+            Text("仅引用已有环境变量，不输入令牌明文；本机或远端来源均由实际 MCP 执行环境解析。", style = MaterialTheme.typography.bodySmall)
+            OutlinedTextField(referenceName, { referenceName = it }, enabled = !busy, label = { Text("环境变量名") }, modifier = Modifier.fillMaxWidth())
+            Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                listOf("local" to "本机", "remote" to "远端", "remove" to "移除引用").forEach { (source, title) ->
+                    FilterChip(referenceSource == source, { referenceSource = source }, enabled = !busy, label = { Text(title) })
+                }
+            }
+            OutlinedButton(onClick = { modify { OriginalMcpAdvanced.reference(it, referenceName, referenceSource) } }, enabled = !busy && referenceName.isNotBlank()) { Text("应用环境引用到草稿") }
+            HorizontalDivider()
+            Text("完整原版条目（JSON，可编辑其余已支持的环境、授权和超时字段）", style = MaterialTheme.typography.labelLarge)
+            OutlinedTextField(text, { text = it }, enabled = !busy, label = { Text("最终服务配置") }, modifier = Modifier.fillMaxWidth(), minLines = 5)
+            Text("明文 env/http_headers 会进入原版用户配置；涉及密钥优先使用 env_vars、bearer_token_env_var 或独立 OAuth。", style = MaterialTheme.typography.bodySmall)
             (localError ?: error)?.let { Text(it, color = MaterialTheme.colorScheme.error) }
         }
     }, confirmButton = { TextButton(onClick = {
-        runCatching { Json.parseToJsonElement(text).jsonObject }.onSuccess { localError = null; save(it) }.onFailure { localError = "请填写有效的 JSON 对象" }
-    }, enabled = !busy && enabled) { Text(if (busy) "正在保存…" else "保存并重新连接") } }, dismissButton = { TextButton(onClick = dismiss, enabled = !busy) { Text("取消") } })
+        runCatching { OriginalMcpAdvanced.validate(Json.parseToJsonElement(text).jsonObject) }
+            .onSuccess { localError = null; save(it) }
+            .onFailure { localError = it.message ?: "高级配置格式不正确" }
+    }, enabled = !busy && enabled) { Text(if (busy) "正在保存…" else "确认保存并重连") } }, dismissButton = { TextButton(onClick = dismiss, enabled = !busy) { Text("取消") } })
 }
