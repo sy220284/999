@@ -27,6 +27,11 @@ if git -C "$source_root" apply --check "$script_dir/安卓依赖适配.patch"; t
 else
   git -C "$source_root" apply --reverse --check "$script_dir/安卓依赖适配.patch"
 fi
+if [[ -f "$source_root/codex-rs/keyring-store/src/android.rs" ]] && ! cmp -s "$script_dir/补充源码/android_keyring.rs" "$source_root/codex-rs/keyring-store/src/android.rs"; then
+  echo '构建副本的 Android 凭证后端与当前版本不同，请指定新的 CODEX_ANDROID_BUILD_DIR；不会覆盖本地修改。' >&2
+  exit 2
+fi
+install -m 644 "$script_dir/补充源码/android_keyring.rs" "$source_root/codex-rs/keyring-store/src/android.rs"
 export RUSTUP_TOOLCHAIN=1.99.1
 rustup toolchain install "$RUSTUP_TOOLCHAIN" --profile minimal
 rustup target add --toolchain "$RUSTUP_TOOLCHAIN" "$target"

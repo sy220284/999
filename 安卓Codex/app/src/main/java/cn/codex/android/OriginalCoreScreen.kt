@@ -24,6 +24,7 @@ import kotlinx.serialization.json.*
     val state by host.state.collectAsState()
     var consent by remember { mutableStateOf(false) }
     var draft by remember { mutableStateOf("") }
+    var mcpName by remember { mutableStateOf("") }
     var renamed by remember { mutableStateOf<String?>(null) }
     val context = LocalContext.current
     val active = state.working || state.turnId != null
@@ -48,12 +49,24 @@ import kotlinx.serialization.json.*
             if (state.connected) {
                 item {
                     Text(state.account, style = MaterialTheme.typography.titleSmall)
-                    Text("登录信息仅保留到核心退出。设置中的 API 密钥仍由 Android Keystore 加密保存。", style = MaterialTheme.typography.bodySmall)
+                    Text("账号与 MCP 凭证由 Android Keystore 加密保存在手机，退出核心后仍可恢复。", style = MaterialTheme.typography.bodySmall)
                     Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         OutlinedButton(onClick = { host.login(true) }, enabled = !state.loading && !active) { Text("设备码登录") }
                         OutlinedButton(onClick = { host.login(false) }, enabled = !state.loading && !active) { Text("浏览器登录") }
+                        TextButton(onClick = { host.loginSavedApiKey() }, enabled = editable) { Text("使用设置中的密钥") }
                         TextButton(onClick = { host.logout() }, enabled = editable) { Text("退出账号") }
                         TextButton(onClick = host::close, enabled = !state.loading && !active) { Text("关闭核心") }
+                    }
+                }
+                item {
+                    OutlinedTextField(mcpName, { mcpName = it }, label = { Text("需要登录的 MCP 连接标识") }, singleLine = true, modifier = Modifier.fillMaxWidth())
+                    TextButton(onClick = { host.startMcpLogin(mcpName) }, enabled = editable && mcpName.isNotBlank() && state.mcpAuthorizationUrl == null) { Text("登录 MCP 服务") }
+                    state.mcpAuthorizationUrl?.let { url ->
+                        Text("请在服务页面完成 ${state.mcpAuthorizationName.orEmpty()} 授权。")
+                        Row {
+                            OutlinedButton(onClick = { openOriginalLogin(context, url) }) { Text("打开服务授权") }
+                            TextButton(onClick = host::dismissMcpLogin) { Text("关闭提示") }
+                        }
                     }
                 }
                 if (state.loginUrl != null) item {

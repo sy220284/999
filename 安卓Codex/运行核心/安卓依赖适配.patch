@@ -47,3 +47,52 @@ diff --git a/codex-rs/mxc-sandbox/src/lib.rs b/codex-rs/mxc-sandbox/src/lib.rs
 +#[cfg(all(test, not(target_os = "android")))]
  #[path = "policy_tests.rs"]
  mod tests;
+diff --git a/codex-rs/keyring-store/Cargo.toml b/codex-rs/keyring-store/Cargo.toml
+--- a/codex-rs/keyring-store/Cargo.toml
++++ b/codex-rs/keyring-store/Cargo.toml
+@@ -25,6 +25,9 @@
+ [target.'cfg(any(target_os = "freebsd", target_os = "openbsd"))'.dependencies]
+ keyring = { workspace = true, features = ["sync-secret-service"] }
+
++[target.'cfg(target_os = "android")'.dependencies]
++libc = { workspace = true }
++
+ [dev-dependencies]
+ pretty_assertions = { workspace = true }
+
+diff --git a/codex-rs/keyring-store/src/lib.rs b/codex-rs/keyring-store/src/lib.rs
+--- a/codex-rs/keyring-store/src/lib.rs
++++ b/codex-rs/keyring-store/src/lib.rs
+@@ -1,8 +1,10 @@
++#[cfg(not(target_os = "android"))]
+ use keyring::Entry;
+ use keyring::Error as KeyringError;
+ use std::error::Error;
+ use std::fmt;
+ use std::fmt::Debug;
++#[cfg(not(target_os = "android"))]
+ use tracing::trace;
+
+ pub enum CredentialStoreError {
+@@ -74,6 +76,10 @@
+ #[derive(Debug, Clone, Copy)]
+ pub struct DefaultKeyringStore;
+
++#[cfg(target_os = "android")]
++mod android;
++
++#[cfg(not(target_os = "android"))]
+ impl KeyringStore for DefaultKeyringStore {
+     fn load(&self, service: &str, account: &str) -> Result<Option<String>, CredentialStoreError> {
+         trace!("keyring.load start");
+diff --git a/codex-rs/Cargo.lock b/codex-rs/Cargo.lock
+--- a/codex-rs/Cargo.lock
++++ b/codex-rs/Cargo.lock
+@@ -3835,6 +3835,7 @@
+ version = "0.0.0"
+ dependencies = [
+  "keyring",
++ "libc",
+  "pretty_assertions",
+  "secret-service",
+  "security-framework 3.5.1",

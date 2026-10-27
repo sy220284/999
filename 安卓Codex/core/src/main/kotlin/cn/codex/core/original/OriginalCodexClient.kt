@@ -53,6 +53,9 @@ class OriginalCodexClient(val connection: AppServerConnection) {
         if (threadId == null) put("cwds", buildJsonArray { add(cwd) }) else put("threadId", threadId)
     })
     suspend fun installedPlugins(cwd: String) = call("plugin/installed", buildJsonObject { put("cwds", buildJsonArray { add(cwd) }) })
+    suspend fun mcpLogin(name: String, threadId: String?) = call("mcpServer/oauth/login", buildJsonObject {
+        put("name", name); threadId?.let { put("threadId", it) }; put("timeoutSecs", 180)
+    })
     suspend fun config() = call("config/read", buildJsonObject { put("includeLayers", true) })
     private fun id(threadId: String) = buildJsonObject { put("threadId", threadId) }
     companion object {

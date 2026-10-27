@@ -21,6 +21,7 @@ data class OriginalState(
     val account: String = "尚未读取账号", val error: String? = null, val status: String = "未启动原版核心",
     val loginUrl: String? = null, val loginCode: String? = null, val loginId: String? = null,
     val historyCursor: String? = null,
+    val mcpAuthorizationUrl: String? = null, val mcpAuthorizationName: String? = null, val mcpLoginId: String? = null,
     val models: List<String> = emptyList(), val model: String = "", val report: String = ""
 )
 class OriginalCoreHost(private val context: Context) {
@@ -29,6 +30,7 @@ class OriginalCoreHost(private val context: Context) {
     val state = mutable.asStateFlow()
     private val startup = Mutex()
     private var process: NativeCoreProcess? = null
+    private var vaultServer: OriginalVaultServer? = null
     private var connection: AppServerConnection? = null
     private var client: OriginalCodexClient? = null
     private var listener: Job? = null
@@ -61,11 +63,20 @@ class OriginalCoreHost(private val context: Context) {
         val config = SecureSettings(context).load()
         val endpoint = URI(config.endpoint)
         require(endpoint.scheme == "https" || config.allowLoopbackHttp && endpoint.scheme == "http" && endpoint.host in setOf("localhost", "127.0.0.1", "[::1]", "::1")) { "原版核心仅接受 HTTPS 或已允许的本机 HTTP 模型地址" }
+        require(!endpoint.host.isNullOrBlank()) { "模型地址需要有效主机名" }
         require(endpoint.rawUserInfo == null && endpoint.rawQuery == null && endpoint.rawFragment == null) { "模型地址不可包含凭证、查询或片段" }
-        val args = mutableListOf("--listen", "stdio://", "-c", "cli_auth_credentials_store=\"ephemeral\"", "-c", "mcp_oauth_credentials_store=\"keyring\"", "-c", "shell_environment_policy.inherit=\"core\"")
+        val args = mutableListOf("--listen", "stdio://", "-c", "cli_auth_credentials_store=\"keyring\"", "-c", "mcp_oauth_credentials_store=\"keyring\"", "-c", "shell_environment_policy.inherit=\"core\"")
+        for (server in McpTools(context).connections()) {
+            val mcpUrl = URI(server.url)
+            require(mcpUrl.scheme == "https" && !mcpUrl.host.isNullOrBlank() && mcpUrl.rawUserInfo == null) { "MCP 连接需要不含凭证的 HTTPS 地址" }
+            require(server.name.matches(Regex("[A-Za-z0-9_-]{1,32}"))) { "MCP 连接标识不适用于原版配置" }
+            args += listOf("-c", "mcp_servers.${server.name}.url=${JsonPrimitive(server.url)}")
+        }
         val trust = AndroidTrustBundle.write(engineHome)
+        val vault = OriginalVaultServer(context, scope).also { vaultServer = it }
         val env = System.getenv().toMutableMap().apply {
             put("CODEX_HOME", engineHome.absolutePath); put("HOME", engineHome.absolutePath)
+            put("CODEX_ANDROID_VAULT_SOCKET", vault.path); put("CODEX_ANDROID_VAULT_HOST_PID", android.os.Process.myPid().toString())
             put("TMPDIR", context.cacheDir.absolutePath); put("SHELL", "/system/bin/sh")
             put("CODEX_CA_CERTIFICATE", trust.absolutePath); put("SSL_CERT_FILE", trust.absolutePath)
             remove("SSL_CERT_DIR")
@@ -78,6 +89,7 @@ class OriginalCoreHost(private val context: Context) {
         }
         val child = NativeCoreProcess(binary, args, env, workspace)
         process = child
+        vault.authorize(child.pid)
         // 丢弃 stderr，避免上游错误带入令牌；绝不把协议/环境/API key 原样写日志。
         scope.launch(Dispatchers.IO) { runCatching { child.errors.use { stream -> val buffer = ByteArray(4096); while (stream.read(buffer) >= 0) { /* drain */ } } } }
         val rpc = AppServerConnection(child.input, child.output, scope, child::close)
@@ -95,11 +107,11 @@ class OriginalCoreHost(private val context: Context) {
         }
         val api = OriginalCodexClient(rpc)
         api.initialize()
-        if (config.apiKey.isNotBlank() && config.endpoint.trimEnd('/') == "https://api.openai.com/v1") api.loginApiKey(config.apiKey)
+        if (config.apiKey.isNotBlank() && config.endpoint.trimEnd('/') == "https://api.openai.com/v1" && api.account().jsonObject["account"] == JsonNull) api.loginApiKey(config.apiKey)
         withContext(Dispatchers.Main.immediate) {
             check(connection === rpc && !state.value.closing) { "原版核心在初始化期间退出" }
             client = api
-            mutable.update { it.copy(connected = true, status = "原版核心已连接 · 凭证仅保留在进程内存", model = config.model) }
+            mutable.update { it.copy(connected = true, status = "原版核心已连接 · 凭证由手机 Keystore 加密保存", model = config.model) }
         }
         refreshThreads(api, false)
         readAccount(api)
@@ -108,12 +120,12 @@ class OriginalCoreHost(private val context: Context) {
         if (state.value.closing) return
         completion?.completeExceptionally(IllegalStateException("原版核心已停止")); completion = null
         listener?.cancel(); listener = null
-        val rpc = connection; val child = process
-        connection = null; client = null; process = null
+        val rpc = connection; val child = process; val vault = vaultServer
+        connection = null; client = null; process = null; vaultServer = null
         mutable.update { OriginalState(model = it.model, closing = true, status = "正在关闭核心") }
         closingJob = scope.launch(Dispatchers.IO) {
             try { rpc?.close(); child?.close() }
-            finally { mutable.update { it.copy(closing = false, status = "原版核心已关闭") } }
+            finally { runCatching { vault?.close() }; mutable.update { it.copy(closing = false, status = "原版核心已关闭") } }
         }
     }
     fun refresh(archived: Boolean = state.value.archived, more: Boolean = false) = operation { api -> refreshThreads(api, archived, more) }
@@ -171,6 +183,18 @@ class OriginalCoreHost(private val context: Context) {
         mutable.update { it.copy(loginId = result.string("loginId").ifBlank { null }, loginUrl = result.string(if (deviceCode) "verificationUrl" else "authUrl").ifBlank { null }, loginCode = result.string("userCode").ifBlank { null }) }
     }
     fun cancelLogin() = operation { api -> state.value.loginId?.let { api.cancelLogin(it) }; mutable.update { it.copy(loginId = null, loginUrl = null, loginCode = null) } }
+    fun loginSavedApiKey() = operation { api ->
+        check(!state.value.working && state.value.turnId == null)
+        val key = withContext(Dispatchers.IO) { SecureSettings(context).load().apiKey }
+        require(key.isNotBlank()) { "请先在连接设置中保存 API 密钥" }
+        api.loginApiKey(key); readAccount(api)
+    }
+    fun startMcpLogin(name: String) = operation { api ->
+        require(name.isNotBlank()); check(state.value.mcpAuthorizationUrl == null) { "已有 MCP 授权正在等待处理" }
+        val result = api.mcpLogin(name.trim(), state.value.threadId).jsonObject
+        mutable.update { it.copy(mcpAuthorizationUrl = result.string("authorizationUrl").ifBlank { null }, mcpAuthorizationName = name.trim(), mcpLoginId = result.string("loginId").ifBlank { null }) }
+    }
+    fun dismissMcpLogin() { mutable.update { it.copy(mcpAuthorizationUrl = null) } }
     fun logout() = operation { api -> check(!state.value.working && state.value.turnId == null); api.logout(); readAccount(api) }
     private suspend fun readAccount(api: OriginalCodexClient) {
         val account = api.account().jsonObject["account"] as? JsonObject
@@ -253,10 +277,18 @@ class OriginalCoreHost(private val context: Context) {
     }
     private suspend fun notification(method: String, params: JsonObject) {
         if (method == "account/login/completed") {
+            if (state.value.loginId != null && params.string("loginId") != state.value.loginId) return
             val success = params["success"]?.jsonPrimitive?.booleanOrNull == true
             mutable.update { it.copy(loginId = null, loginUrl = null, loginCode = null, error = if (success) null else params.string("error", "登录未完成")) }
             // 不在读取循环里等待另一条 RPC，否则响应无人读取而死锁。
             if (success) scope.launch { runSuspendCatching { client?.let { readAccount(it) } }.onFailure(::error) }
+            return
+        }
+        if (method == "mcpServer/oauthLogin/completed") {
+            val snapshot = state.value
+            if (params.string("name") != snapshot.mcpAuthorizationName || snapshot.mcpLoginId != null && params.string("loginId") != snapshot.mcpLoginId) return
+            val success = params["success"]?.jsonPrimitive?.booleanOrNull == true
+            mutable.update { it.copy(mcpAuthorizationUrl = null, mcpLoginId = null, mcpAuthorizationName = null, status = if (success) "MCP 授权完成" else "MCP 授权未完成", error = if (success) null else params.string("error", "授权失败")) }
             return
         }
         if (method == "account/updated") {
