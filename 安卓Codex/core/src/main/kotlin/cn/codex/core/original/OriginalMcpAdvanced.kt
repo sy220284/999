@@ -61,7 +61,7 @@ object OriginalMcpAdvanced {
         return input
     }
 
-    private fun lines(input: String) = input.lineSequence().map(String::trim).filter(String::isNotEmpty).toList()
+    private fun lines(input: String) = input.lineSequence().map { it.trim() }.filter { it.isNotEmpty() }.toList()
     fun lists(input: JsonObject, allowed: String, denied: String, defaultApproval: String): JsonObject {
         require(defaultApproval.isBlank() || defaultApproval in modes) { "不支持的默认审批模式" }
         val out = input.toMutableMap()
@@ -77,7 +77,7 @@ object OriginalMcpAdvanced {
     fun tool(input: JsonObject, toolName: String, approval: String, budget: String): JsonObject {
         require(toolName.isNotBlank()) { "请填写工具原始名称" }
         require(approval.isBlank() || approval in modes) { "工具审批模式不正确" }
-        val value = budget.trim().takeIf(String::isNotEmpty)?.toLongOrNull()
+        val value = budget.trim().takeIf { it.isNotEmpty() }?.toLongOrNull()
         require(budget.isBlank() || value != null && value > 0) { "输出预算必须是正整数" }
         val tools = ((input["tools"] as? JsonObject)?.toMutableMap() ?: mutableMapOf())
         val settings = ((tools[toolName] as? JsonObject)?.toMutableMap() ?: mutableMapOf())
