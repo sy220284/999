@@ -54,4 +54,14 @@ class ElicitationFormTest {
         assertFalse(schema("""{"type":"object","${'$'}ref":"#"}""").supported)
     }
 
+    @Test fun unsupportedFormatsInvalidRegexAndMalformedTypesAreNotMarkedSupported() {
+        assertFalse(schema("""{"type":"string","format":"hostname"}""").supported)
+        assertFalse(schema("""{"type":"object","patternProperties":{"[":{"type":"string"}}}""").supported)
+        assertFalse(schema("""{"type":["string","future"]}""").supported)
+        assertFalse(schema("""{"type":"object","required":"name"}""").supported)
+        assertFalse(schema("""{"type":"object","dependentRequired":{"a":"b"}}""").supported)
+        assertTrue(schema("""{"type":"string","format":"email"}""").supported)
+        assertTrue(schema("""{"type":"array","items":{"type":"integer"}}""").supported)
+    }
+
 }
