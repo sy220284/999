@@ -58,12 +58,22 @@ object OriginalMcpConfig {
             text("cwd", cwd)
             // 原版 env_vars 也支持带 source 的对象；未编辑时保留原始对象，避免降级成字符串。
             val names = (original["env_vars"] as? JsonArray).orEmpty().joinToString("\n") { if (it is JsonObject) it.string("name") else it.jsonPrimitive.content }
-            if (envVars != names || switching) lines("env_vars", envVars)
+            if (envVars != names || switching) {
+                // 编辑普通名称列表时，对未移除的变量保留原版 source=local/remote 信息。
+                // 仅新增的变量采用简写；用户要改来源请进入高级引用编辑。
+                val existing = (original["env_vars"] as? JsonArray).orEmpty().associateBy {
+                    if (it is JsonObject) it.string("name") else it.jsonPrimitive.content
+                }
+                val requested = envVars.lineSequence().map { it.trim() }.filter { it.isNotBlank() }.toList()
+                require(requested.distinct().size == requested.size) { "环境变量名称重复" }
+                if (requested.isEmpty()) fields.remove("env_vars")
+                else fields["env_vars"] = JsonArray(requested.map { name -> existing[name] ?: JsonPrimitive(name) })
+            }
         }
         seconds("startup_timeout_sec", startup); seconds("tool_timeout_sec", timeout)
         // 秒数优先，移除等价旧字段以免两个设置相互冲突。
         fields.remove("startup_timeout_ms")
         fields["enabled"] = JsonPrimitive(enabled)
-        return JsonObject(fields)
+        return OriginalMcpAdvanced.validate(JsonObject(fields))
     }
 }
