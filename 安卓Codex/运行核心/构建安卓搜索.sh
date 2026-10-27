@@ -35,8 +35,10 @@ export "CARGO_TARGET_${cargo_target}_RUSTFLAGS=-C link-arg=-Wl,-z,max-page-size=
 export "CC_${target//-/_}=$ndk_bin/$cc"
 export "AR_${target//-/_}=$ndk_bin/llvm-ar"
 export CARGO_TARGET_DIR="$work_root/target"
-# 默认 Rust regex；PCRE2 功能待其 Android 静态依赖适配，不冒用桌面二进制。
-cargo build --manifest-path "$source_root/Cargo.toml" --locked --release --target "$target" --bin rg
+# pcre2-sys 0.2.10 的受支持开关：跳过宿主 pkg-config，编译锁文件中的内置 PCRE2。
+# 上游对 aarch64-linux-android 自动禁用 JIT；保留解释执行，不注入空库。
+export PCRE2_SYS_STATIC=1
+cargo build --manifest-path "$source_root/Cargo.toml" --locked --release --target "$target" --bin rg --features pcre2
 binary="$CARGO_TARGET_DIR/$target/release/rg"
 "$ndk_bin/llvm-readelf" -h -l -d "$binary"
 output="$app_root/app/src/main/jniLibs/$abi"
@@ -46,5 +48,7 @@ install -m 755 "$binary" "$output/libcodex_rg.so"
 license_output="$app_root/app/src/main/assets/licenses/ripgrep"
 mkdir -p "$license_output"
 for license in COPYING LICENSE-MIT UNLICENSE; do install -m 644 "$source_root/$license" "$license_output/$license"; done
+cargo metadata --manifest-path "$source_root/Cargo.toml" --locked --format-version 1 --features pcre2 --filter-platform "$target" > "$work_root/metadata-$target.json"
+python3 "$app_root/工具/整理搜索许可证.py" --metadata "$work_root/metadata-$target.json" --output "$app_root/app/src/main/assets/licenses"
 sha256sum "$output/libcodex_rg.so"
 echo '仅构建搜索程序；仍需设备验证搜索、取消、大目录及 16 KB 页兼容性。'

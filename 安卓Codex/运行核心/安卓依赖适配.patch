@@ -148,3 +148,72 @@ diff --git a/codex-rs/shell-command/src/shell_detect.rs b/codex-rs/shell-command
          }
      }
  }
+diff --git a/codex-rs/install-context/src/lib_tests.rs b/codex-rs/install-context/src/lib_tests.rs
+--- a/codex-rs/install-context/src/lib_tests.rs
++++ b/codex-rs/install-context/src/lib_tests.rs
+@@ -161,6 +161,7 @@
+         /*method_override*/ None,
+         /*codex_home*/ Some(codex_home.path()),
+     );
++    #[cfg(not(target_os = "android"))]
+     assert_eq!(context.rg_command(), default_rg_command());
+     Ok(())
+ }
+@@ -236,6 +237,7 @@
+             .join(CODE_MODE_HOST_EXECUTABLE_NAME)
+             .into_path_buf()
+     );
++    #[cfg(not(target_os = "android"))]
+     assert_eq!(
+         context.rg_command(),
+         canonical_path_dir
+@@ -324,6 +326,7 @@
+             }),
+         }
+     );
++    #[cfg(not(target_os = "android"))]
+     assert_eq!(
+         context.rg_command(),
+         canonical_path_dir
+@@ -357,6 +360,7 @@
+     );
+     assert_eq!(context.method, InstallMethod::Npm);
+     assert!(context.package_layout.is_some());
++    #[cfg(not(target_os = "android"))]
+     assert_eq!(
+         context.rg_command(),
+         canonical_path_dir
+@@ -381,6 +385,7 @@
+         /*method_override*/ None,
+         /*codex_home*/ None,
+     );
++    #[cfg(not(target_os = "android"))]
+     assert_eq!(context.rg_command(), default_rg_command());
+     Ok(())
+ }
+@@ -411,6 +416,7 @@
+         context.code_mode_host_program_from_exe(Some(&fallback_exe_path)),
+         package_dir.path().join(CODE_MODE_HOST_EXECUTABLE_NAME)
+     );
++    #[cfg(not(target_os = "android"))]
+     assert_eq!(context.rg_command(), default_rg_command());
+     assert_eq!(context.bundled_resource(TEST_RESOURCE_NAME), None);
+     Ok(())
+@@ -516,3 +522,17 @@
+
+ #[path = "bundle_tests.rs"]
+ mod bundle_tests;
++
++#[cfg(target_os = "android")]
++#[test]
++fn android_rg_uses_installed_executable_directory_instead_of_desktop_layout() -> std::io::Result<()> {
++    let home = tempfile::tempdir()?;
++    let fake_exe = home.path().join("desktop/bin/codex");
++    let context = InstallContext::from_exe_with_codex_home(
++        false, Some(&fake_exe), None, Some(home.path()),
++    );
++    let exe = std::env::current_exe()?;
++    let expected = exe.parent().expect("executable directory").join("libcodex_rg.so");
++    assert_eq!(context.rg_command(), expected);
++    Ok(())
++}

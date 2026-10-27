@@ -230,7 +230,7 @@
       ],
       "ipc": "子进程输出与退出码",
       "stop": "原版检索取消和应用子树回收",
-      "status": "版本固定、Android 构建入口和安装路径适配已写；未构建/运行；PCRE2 仍待适配",
+      "status": "固定来源、Android 构建/路径、PCRE2 静态特性及许可证整理已写；未构建/运行；shell 中 rg 命令别名仍待适配",
       "refs": [
         {
           "path": "codex-rs/install-context/src/lib.rs",
@@ -243,13 +243,27 @@
         {
           "path": "scripts/codex_package/rg",
           "sha256": "41a10ca63365560d899a82b6f825fd7b420a18b34f660a98bffeece77eeae1f1"
+        },
+        {
+          "path": "codex-rs/install-context/src/lib_tests.rs",
+          "sha256": "688191c368aa8a6d30a3b83fd0e9660ee5a98c08a528931a050be23ab61f1932"
         }
       ],
       "abi": [
         "arm64-v8a",
         "x86_64"
       ],
-      "environment": "CODEX_HOME/HOME/TMPDIR/Android CA；账号与MCP走Keystore桥；不得记录凭证"
+      "environment": "CODEX_HOME/HOME/TMPDIR/Android CA；账号与MCP走Keystore桥；不得记录凭证",
+      "pcre2": {
+        "crate": "pcre2 0.2.11",
+        "crate_sha256": "9e970b0fcce0c7ee6ef662744ff711f21ccd6f11b7cf03cd187a80e89797fc67",
+        "sys_crate": "pcre2-sys 0.2.10",
+        "sys_crate_sha256": "18b9073c1a2549bd409bf4a32c94d903bb1a09bf845bc306ae148897fa0760a4",
+        "sys_source_commit": "fd05026e1bf3ad62b3876cf9bd952dc742368462",
+        "bundled_version": "10.46",
+        "build_env": "PCRE2_SYS_STATIC=1",
+        "arm64_jit": "上游该 target 分支禁用，解释器保留；未构建验证"
+      }
     },
     {
       "name": "desktop-sandboxes",
