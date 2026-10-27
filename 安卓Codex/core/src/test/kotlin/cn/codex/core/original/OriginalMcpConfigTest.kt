@@ -46,4 +46,34 @@ class OriginalMcpConfigTest {
         assertEquals(original["http_headers"], result["http_headers"])
         assertEquals(original["oauth"], result["oauth"])
     }
+    @Test fun commonEditorKeepsUnchangedRemoteEnvSourcesWhenAddingVariable() {
+        val original = buildJsonObject {
+            put("command", "/system/bin/sh")
+            put("env_vars", buildJsonArray {
+                add(buildJsonObject { put("name", "SERVICE_TOKEN"); put("source", "remote") })
+                add("HOME")
+            })
+        }
+        val result = OriginalMcpConfig.form(original, "", "/system/bin/sh", "", "",
+            "SERVICE_TOKEN\nHOME\nPATH", "", "", "", "", true, http = false)
+        val items = result["env_vars"]!!.jsonArray
+        assertEquals(original["env_vars"]!!.jsonArray[0], items[0])
+        assertEquals(JsonPrimitive("PATH"), items[2])
+        assertFailsWith<IllegalArgumentException> {
+            OriginalMcpConfig.form(original, "", "/system/bin/sh", "", "",
+                "SERVICE_TOKEN\nSERVICE_TOKEN", "", "", "", "", true, http = false)
+        }
+    }
+    @Test fun commonEditorRejectsInvalidTransportCombinationsAndLeavesUneditedArgsLiteral() {
+        val original = buildJsonObject {
+            put("command", "/system/bin/sh"); put("args", buildJsonArray { add(""); add("hello world") })
+        }
+        val kept = OriginalMcpConfig.form(original, "", "/system/bin/sh", "\nhello world", "", "",
+            "", "", "", "", true, http = false)
+        assertEquals(original["args"], kept["args"])
+        assertFailsWith<IllegalArgumentException> { OriginalMcpAdvanced.validate(buildJsonObject {
+            put("url", "https://example.com"); put("args", buildJsonArray { add("-v") })
+        }) }
+    }
+
 }
