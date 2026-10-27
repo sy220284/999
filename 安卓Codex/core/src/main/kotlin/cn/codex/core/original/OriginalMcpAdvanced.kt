@@ -38,10 +38,10 @@ object OriginalMcpAdvanced {
         val number = p?.takeUnless { it.isString }?.doubleOrNull
         require(number != null && number.isFinite() && number >= 0) { "$field 必须是非负秒数" }
     }
-    private fun stringList(value: JsonElement?, field: String, unique: Boolean = false) {
+    private fun stringList(value: JsonElement?, field: String, unique: Boolean = false, allowBlank: Boolean = false) {
         val array = value as? JsonArray ?: throw IllegalArgumentException("$field 必须是字符串数组")
         val items = array.map { string(it, field) }
-        require(items.all { it.isNotBlank() }) { "$field 不能有空项" }
+        if (!allowBlank) require(items.all { it.isNotBlank() }) { "$field 不能有空项" }
         if (unique) require(items.size == items.distinct().size) { "$field 含重复项" }
     }
     private fun stringMap(value: JsonElement?, field: String, envNames: Boolean = false) {
@@ -84,7 +84,7 @@ object OriginalMcpAdvanced {
                 input["oauth"] == null && input["oauth_resource"] == null) { "stdio 不接受 HTTP 授权/请求头字段" }
             require(string(input["command"], "command").isNotBlank()) { "命令不能为空" }
             input["cwd"]?.let { string(it, "cwd") }
-            input["args"]?.let { stringList(it, "args") }
+            input["args"]?.let { stringList(it, "args", allowBlank = true) }
             input["env"]?.let { stringMap(it, "env", true) }
             input["env_vars"]?.let { raw ->
                 val items = raw as? JsonArray ?: throw IllegalArgumentException("env_vars 必须是数组")
