@@ -29,6 +29,7 @@ data class OriginalState(
     val attachmentOwners: OriginalSessionPage<JsonObject> = OriginalSessionPage(),
     val ownerType: String = "", val ownerKey: String = "",
     val threadStatuses: Map<String, JsonObject> = emptyMap(),
+    val guardianReviews: List<JsonObject> = emptyList(),
     val sections: List<JsonObject> = emptyList(), val sectionCursor: String? = null,
     val turns: List<JsonObject> = emptyList(), val turnCursor: String? = null,
     val models: List<String> = emptyList(), val model: String = "", val report: String = ""
@@ -55,7 +56,7 @@ class OriginalCoreHost(
     private var operationJob: Job? = null
     private data class Outcome(val status: String, val error: String?)
     private data class TurnWaiter(val epoch: Long, val threadId: String, val requestId: String,
-        val finished: CompletableDeferred<Unit> = CompletableDeferred(), var turnId: String? = null,
+        val finished: CompletableDeferred<Unit> = CompletableDeferred(), val observedStart: CompletableDeferred<String> = CompletableDeferred(), var turnId: String? = null,
         val outcomes: LinkedHashMap<String, Outcome> = linkedMapOf())
     private var turnWaiter: TurnWaiter? = null
     private var reservedTask: OriginalTurnTask? = null
@@ -63,12 +64,12 @@ class OriginalCoreHost(
     private val workspace = File(context.filesDir, "工作区/原版项目").apply { mkdirs() }
     private val engineHome = File(context.filesDir, "原版核心数据").apply { mkdirs() }
     val configurationJournal get() = (context.applicationContext as CodexApplication).configurationJournal
-    val extensions: OriginalExtensionsController = OriginalExtensionsController(scope, workspace.absolutePath, configurationJournal.lifecycle("插件、技能与自动规则")) { state.value.working || state.value.turnId != null || state.value.loading || otherTaskRunning() || mcp.state.value.mutating || settings.state.value.mutating || files.state.value.mutating || commands.state.value.running || (context.applicationContext as CodexApplication).fullTerminal.state.value.running }
+    val extensions: OriginalExtensionsController = OriginalExtensionsController(scope, workspace.absolutePath, configurationJournal.lifecycle("插件、技能与自动规则")) { state.value.working || state.value.turnId != null || state.value.loading || otherTaskRunning() || managedChanging || mcp.state.value.mutating || settings.state.value.mutating || files.state.value.mutating || commands.state.value.running || (context.applicationContext as CodexApplication).fullTerminal.state.value.running }
     val mcp: OriginalMcpController = OriginalMcpController(scope, workspace.absolutePath,
-        activeTask = { state.value.working || state.value.turnId != null || state.value.loading || state.value.closing || otherTaskRunning() || extensions.state.value.mutating || settings.state.value.mutating || files.state.value.mutating || commands.state.value.running || (context.applicationContext as CodexApplication).fullTerminal.state.value.running },
+        activeTask = { state.value.working || state.value.turnId != null || state.value.loading || state.value.closing || otherTaskRunning() || managedChanging || extensions.state.value.mutating || settings.state.value.mutating || files.state.value.mutating || commands.state.value.running || (context.applicationContext as CodexApplication).fullTerminal.state.value.running },
         threadId = { state.value.threadId }, mutationLifecycle = configurationJournal.lifecycle("MCP 服务操作"))
     val commands: OriginalCommandController = OriginalCommandController(scope,
-        busyElsewhere = { state.value.working || state.value.turnId != null || state.value.loading || state.value.closing || otherTaskRunning() || extensions.state.value.mutating || mcp.state.value.mutating || settings.state.value.mutating || files.state.value.mutating || (context.applicationContext as CodexApplication).fullTerminal.state.value.running },
+        busyElsewhere = { state.value.working || state.value.turnId != null || state.value.loading || state.value.closing || otherTaskRunning() || managedChanging || extensions.state.value.mutating || mcp.state.value.mutating || settings.state.value.mutating || files.state.value.mutating || (context.applicationContext as CodexApplication).fullTerminal.state.value.running },
         lifecycle = configurationJournal.lifecycle("原版独立命令"))
     val settings: OriginalSettingsController = OriginalSettingsController(scope, workspace.absolutePath,
         activeTask = { state.value.working || state.value.turnId != null || state.value.loading || state.value.closing || otherTaskRunning() || configurationChanging },
@@ -76,8 +77,15 @@ class OriginalCoreHost(
     val files: OriginalFilesController = OriginalFilesController(scope, workspace,
         activeTask = { state.value.working || state.value.turnId != null || state.value.loading || state.value.closing || otherTaskRunning() || configurationChanging },
         lifecycle = configurationJournal.lifecycle("原版项目文件"))
+    val library: OriginalLibraryController = OriginalLibraryController(scope, workspace.absolutePath, { state.value.threadId },
+        { state.value.working || state.value.turnId != null || state.value.loading || state.value.closing || otherTaskRunning() || configurationChanging }, configurationJournal.lifecycle("市场、分享与应用目录"))
+    val services: OriginalServicesController = OriginalServicesController(scope, { state.value.threadId },
+        { state.value.working || state.value.turnId != null || state.value.loading || state.value.closing || otherTaskRunning() || configurationChanging }, configurationJournal.lifecycle("账号授权与反馈"), CreditResetRequestStore(context))
+    val migration: OriginalMigrationController = OriginalMigrationController(scope, workspace.absolutePath,
+        { state.value.working || state.value.turnId != null || state.value.loading || state.value.closing || otherTaskRunning() || configurationChanging }, configurationJournal.lifecycle("配置与迁移"))
     fun commandWorkspace() = workspace.absolutePath
-    val configurationChanging get() = (context.applicationContext as CodexApplication).gitOperations.state.value.running || (context.applicationContext as CodexApplication).fullTerminal.state.value.running || commands.state.value.running || extensions.state.value.mutating || mcp.state.value.mutating || settings.state.value.mutating || files.state.value.mutating
+    val managedChanging get() = library.operations.state.value.mutating || services.operations.state.value.mutating || migration.operations.state.value.mutating
+    val configurationChanging get() = (context.applicationContext as CodexApplication).gitOperations.state.value.running || (context.applicationContext as CodexApplication).fullTerminal.state.value.running || commands.state.value.running || extensions.state.value.mutating || mcp.state.value.mutating || settings.state.value.mutating || files.state.value.mutating || managedChanging
     fun mcpImports() = McpTools(context).connections().map { it.name to it.url }
     private fun error(error: Throwable) { mutable.update { it.copy(error = error.message ?: "原版核心操作失败") } }
     fun dismissError() { mutable.update { it.copy(error = null) } }
@@ -86,13 +94,10 @@ class OriginalCoreHost(
         val api = client ?: run { error(IllegalStateException("请先启动原版核心")); return null }
         mutable.update { it.copy(loading = true, error = null) }
         return scope.launch {
-            try { block(api) }
-            catch (cancelled: CancellationException) {
+            try { block(api) } catch (cancelled: CancellationException) {
                 if (cancelled is TimeoutCancellationException) { if (client === api) error(IllegalStateException("原版请求超时，请刷新实际状态；不会自动重放操作")) }
                 else throw cancelled
-            }
-            catch (failure: Exception) { if (client === api) error(failure) }
-            finally { if (client === api) mutable.update { it.copy(loading = false) } }
+            } catch (failure: Exception) { if (client === api) error(failure) } finally { if (client === api) mutable.update { it.copy(loading = false) } }
         }.also { operationJob = it }
     }
     private fun current(epoch: Long, rpc: AppServerConnection? = connection) = lifecycle.isCurrent(epoch) && connection === rpc
@@ -103,16 +108,13 @@ class OriginalCoreHost(
         val epoch = lifecycle.beginConnection()
         mutable.update { it.copy(connectionEpoch = epoch, loading = true, error = null) }
         return scope.launch {
-            try { withTimeout(startupTimeoutMs) { startup.withLock { closingJob?.join(); startProcess(epoch) } } }
-            catch (cancelled: CancellationException) {
+            try { withTimeout(startupTimeoutMs) { startup.withLock { closingJob?.join(); startProcess(epoch) } } } catch (cancelled: CancellationException) {
                 if (lifecycle.isCurrent(epoch)) {
                     closeSession(cancelStartup = false)
                     if (cancelled is TimeoutCancellationException) error(IllegalStateException("原版核心启动超时，已关闭启动中的进程，请核查后重试"))
                 }
                 if (cancelled !is TimeoutCancellationException) throw cancelled
-            }
-            catch (failure: Exception) { if (lifecycle.isCurrent(epoch)) { closeSession(cancelStartup = false); error(failure) } }
-            finally { if (lifecycle.isCurrent(epoch)) mutable.update { it.copy(loading = false) } }
+            } catch (failure: Exception) { if (lifecycle.isCurrent(epoch)) { closeSession(cancelStartup = false); error(failure) } } finally { if (lifecycle.isCurrent(epoch)) mutable.update { it.copy(loading = false) } }
         }.also { startupJob = it }
     }
     private suspend fun startProcess(epoch: Long) {
@@ -125,16 +127,14 @@ class OriginalCoreHost(
         engine = session
         val rpc = session.connection
         listener = scope.launch {
-            try { rpc.messages.collect { message -> if (current(epoch, rpc)) onMessage(epoch, rpc, message) } }
-            catch (cancelled: CancellationException) { throw cancelled }
-            catch (failure: Exception) { if (current(epoch, rpc)) { close(); error(IllegalStateException("原版核心连接已中断，请重新启动后恢复会话")) } }
+            try { rpc.messages.collect { message -> if (current(epoch, rpc)) onMessage(epoch, rpc, message) } } catch (cancelled: CancellationException) { throw cancelled } catch (failure: Exception) { if (current(epoch, rpc)) { close(); error(IllegalStateException("原版核心连接已中断，请重新启动后恢复会话")) } }
         }
         val api = OriginalCodexClient(rpc)
         api.initialize()
         ensureCurrent(epoch, rpc)
         if (config.apiKey.isNotBlank() && config.endpoint.trimEnd('/') == "https://api.openai.com/v1" && api.account().jsonObject["account"] == JsonNull) api.loginApiKey(config.apiKey)
         ensureCurrent(epoch, rpc)
-        client = api; extensions.bind(api); mcp.bind(api); commands.bind(api); settings.bind(api); files.bind(api)
+        client = api; extensions.bind(api); mcp.bind(api); commands.bind(api); settings.bind(api); files.bind(api); library.bind(api); services.bind(api); migration.bind(api)
         mutable.update { it.copy(connected = true, status = "原版核心已连接 · 凭证由手机 Keystore 加密保存", model = config.model) }
         refreshThreads(api, false); readAccount(api, epoch)
     }
@@ -146,16 +146,14 @@ class OriginalCoreHost(
         operationJob?.cancel(); operationJob = null
         reservedTask = null
         stopping?.cancel(); stopping = null
-        extensions.bind(null); mcp.bind(null); commands.bind(null); settings.bind(null); files.bind(null)
+        extensions.bind(null); mcp.bind(null); commands.bind(null); settings.bind(null); files.bind(null); library.bind(null); services.bind(null); migration.bind(null)
         turnWaiter?.finished?.completeExceptionally(IllegalStateException("原版核心已停止")); turnWaiter = null
         listener?.cancel(); listener = null
         val session = engine
         engine = null; client = null
         mutable.update { OriginalState(connectionEpoch = lifecycle.state.connectionEpoch, model = it.model, closing = true, status = "正在关闭核心") }
         closingJob = scope.launch(Dispatchers.IO) {
-            try { session?.close() }
-            catch (_: Exception) { mutable.update { it.copy(error = "核心资源回收未能确认，请检查进程状态后再启动") } }
-            finally { mutable.update { it.copy(closing = false, status = "原版核心已关闭") } }
+            try { session?.close() } catch (_: Exception) { mutable.update { it.copy(error = "核心资源回收未能确认，请检查进程状态后再启动") } } finally { mutable.update { it.copy(closing = false, status = "原版核心已关闭") } }
         }
     }
     fun refresh(archived: Boolean = state.value.archived, more: Boolean = false) = operation { api -> refreshThreads(api, archived, more) }
@@ -350,6 +348,28 @@ class OriginalCoreHost(
         if (text.isBlank()) return
         reserve(OriginalTurnTask.Prompt(text), text)
     }
+    fun shellCommand(command: String, timeout: String) {
+        try {
+            require(command.isNotBlank()) { "请填写命令" }
+            val limit = timeout.takeIf { it.isNotBlank() }?.toLong()?.also { require(it >= 0) { "超时不能为负数；0 表示立即超时" } }
+            reserve(OriginalTurnTask.Shell(requireNotNull(state.value.threadId), command, limit), "会话 shell 命令")
+        } catch (failure: Exception) { error(failure) }
+    }
+    fun injectItems(text: String) = operation { api ->
+        val thread = idleThread(); val items = withContext(Dispatchers.Default) { OriginalRemainingContracts.history(text) }
+        val tracking = configurationJournal.lifecycle("补入模型历史"); val ticket = tracking.begin(); var confirmed = false
+        try { api.injectHistory(thread, items); confirmed = true; mutable.update { it.copy(status = "历史补入请求已返回，内容供后续模型回合使用") } } finally { tracking.finish(ticket, confirmed) }
+    }
+    fun approveGuardian(notification: JsonObject) = operation { api ->
+        val thread = idleThread()
+        check(notification.string("threadId") == thread && state.value.guardianReviews.any { it == notification }) { "拒绝事件已变化，请重新核查" }
+        val event = OriginalRemainingContracts.guardianEvent(notification)
+        val tracking = configurationJournal.lifecycle("人工批准守护拒绝动作"); val ticket = tracking.begin(); var confirmed = false
+        try {
+            api.approveGuardian(thread, event); confirmed = true
+            mutable.update { it.copy(guardianReviews = it.guardianReviews.filterNot { row -> row == notification }, status = "人工许可意见已提交到会话上下文，后续回合再决定执行") }
+        } finally { tracking.finish(ticket, confirmed) }
+    }
     fun startReview(type: String, value: String, title: String) {
         try {
             val target = OriginalSessionActions.reviewTarget(type, value, title)
@@ -363,8 +383,7 @@ class OriginalCoreHost(
         if (otherTaskRunning()) { error(IllegalStateException("另一个任务正在运行")); return }
         reservedTask = task
         mutable.update { it.copy(working = true, error = null) }
-        try { startTask(label) }
-        catch (failure: Exception) { reservedTask = null; mutable.update { it.copy(working = false) }; error(failure) }
+        try { startTask(label) } catch (failure: Exception) { reservedTask = null; mutable.update { it.copy(working = false) }; error(failure) }
     }
     @Suppress("UNUSED_PARAMETER")
     suspend fun runReserved(text: String) {
@@ -387,10 +406,11 @@ class OriginalCoreHost(
             val response = when (task) {
                 is OriginalTurnTask.Prompt -> api.turn(thread, task.text, configLoader().reasoning)
                 is OriginalTurnTask.Review -> { check(thread == task.threadId) { "审查所属会话已变化" }; api.review(thread, task.target) }
+                is OriginalTurnTask.Shell -> { check(thread == task.threadId); api.threadShell(thread, task.command, task.timeoutMs) }
             }.jsonObject
             if (task is OriginalTurnTask.Review) require(response.string("reviewThreadId") == thread) { "核心返回的审查会话与当前会话不同" }
             ensureCurrent(epoch, api.connection)
-            val turnId = (response["turn"] as? JsonObject)?.string("id").orEmpty()
+            val turnId = if (task is OriginalTurnTask.Shell) withTimeout(60_000) { waiting.observedStart.await() } else (response["turn"] as? JsonObject)?.string("id").orEmpty()
             require(turnId.isNotBlank()) { "原版任务启动响应缺少回合标识，不能确认任务状态" }
             waiting.turnId = turnId
             lifecycle.accept(epoch, OriginalLifecycleEvent.StartResponded(request, thread, turnId)); syncLifecycle()
@@ -477,6 +497,12 @@ class OriginalCoreHost(
             if (params.string("threadId") == state.value.threadId) mutable.update { it.copy(goal = null) }
             return
         }
+        if (method == "account/gatewayOAuth/changed") { services.gatewayChanged(params); return }
+        if (method == "externalAgentConfig/import/progress") { migration.importProgress(params, false); return }
+        if (method == "externalAgentConfig/import/completed") { migration.importProgress(params, true); return }
+        if (method == "item/autoApprovalReview/completed") {
+            mutable.update { it.copy(guardianReviews = (it.guardianReviews.filterNot { row -> row.string("reviewId") == params.string("reviewId") && row.string("threadId") == params.string("threadId") } + params).takeLast(64)) }; return
+        }
         if (method == "skills/changed") { extensions.skillsChanged(); return }
         if (method == "thread/status/changed") {
             val id = params.string("threadId"); val status = params["status"] as? JsonObject ?: return
@@ -515,6 +541,7 @@ class OriginalCoreHost(
         when (method) {
             "turn/started" -> {
                 val id = (params["turn"] as? JsonObject)?.string("id").orEmpty()
+                if (id.isNotBlank() && id !in lifecycle.state.completedTurnIds) turnWaiter?.takeIf { it.epoch == epoch && it.threadId == params.string("threadId") }?.observedStart?.complete(id)
                 lifecycle.accept(epoch, OriginalLifecycleEvent.TurnStarted(params.string("threadId"), id)); syncLifecycle()
                 if (lifecycle.state.turnId == id && id.isNotBlank()) mutable.update { it.copy(status = "正在处理") }
             }

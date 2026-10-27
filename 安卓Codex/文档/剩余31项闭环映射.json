@@ -1,0 +1,250 @@
+[
+  {
+    "method": "thread/shellCommand",
+    "client": "threadShell",
+    "action": "shellCommand",
+    "controller": "app/src/main/java/cn/codex/android/OriginalCoreHost.kt",
+    "ui": "app/src/main/java/cn/codex/android/OriginalThreadAdvanced.kt",
+    "state": "代码接入并静态复查，运行验收待执行"
+  },
+  {
+    "method": "thread/approveGuardianDeniedAction",
+    "client": "approveGuardian",
+    "action": "approveGuardian",
+    "controller": "app/src/main/java/cn/codex/android/OriginalCoreHost.kt",
+    "ui": "app/src/main/java/cn/codex/android/OriginalThreadAdvanced.kt",
+    "state": "代码接入并静态复查，运行验收待执行"
+  },
+  {
+    "method": "thread/inject_items",
+    "client": "injectHistory",
+    "action": "injectItems",
+    "controller": "app/src/main/java/cn/codex/android/OriginalCoreHost.kt",
+    "ui": "app/src/main/java/cn/codex/android/OriginalThreadAdvanced.kt",
+    "state": "代码接入并静态复查，运行验收待执行"
+  },
+  {
+    "method": "marketplace/add",
+    "client": "addMarketplace",
+    "action": "addMarket",
+    "controller": "core/src/main/kotlin/cn/codex/core/original/OriginalLibraryController.kt",
+    "ui": "app/src/main/java/cn/codex/android/OriginalLibraryScreen.kt",
+    "state": "代码接入并静态复查，运行验收待执行"
+  },
+  {
+    "method": "marketplace/remove",
+    "client": "removeMarketplace",
+    "action": "removeMarket",
+    "controller": "core/src/main/kotlin/cn/codex/core/original/OriginalLibraryController.kt",
+    "ui": "app/src/main/java/cn/codex/android/OriginalLibraryScreen.kt",
+    "state": "代码接入并静态复查，运行验收待执行"
+  },
+  {
+    "method": "marketplace/upgrade",
+    "client": "upgradeMarketplace",
+    "action": "upgradeMarket",
+    "controller": "core/src/main/kotlin/cn/codex/core/original/OriginalLibraryController.kt",
+    "ui": "app/src/main/java/cn/codex/android/OriginalLibraryScreen.kt",
+    "state": "代码接入并静态复查，运行验收待执行"
+  },
+  {
+    "method": "plugin/reconcile",
+    "client": "reconcilePlugins",
+    "action": "reconcile",
+    "controller": "core/src/main/kotlin/cn/codex/core/original/OriginalLibraryController.kt",
+    "ui": "app/src/main/java/cn/codex/android/OriginalLibraryScreen.kt",
+    "state": "代码接入并静态复查，运行验收待执行"
+  },
+  {
+    "method": "plugin/share/save",
+    "client": "savePluginShare",
+    "action": "saveShare",
+    "controller": "core/src/main/kotlin/cn/codex/core/original/OriginalLibraryController.kt",
+    "ui": "app/src/main/java/cn/codex/android/OriginalLibraryScreen.kt",
+    "state": "代码接入并静态复查，运行验收待执行"
+  },
+  {
+    "method": "plugin/share/updateTargets",
+    "client": "updatePluginShare",
+    "action": "updateShare",
+    "controller": "core/src/main/kotlin/cn/codex/core/original/OriginalLibraryController.kt",
+    "ui": "app/src/main/java/cn/codex/android/OriginalLibraryScreen.kt",
+    "state": "代码接入并静态复查，运行验收待执行"
+  },
+  {
+    "method": "plugin/share/list",
+    "client": "pluginShares",
+    "action": "refreshShares",
+    "controller": "core/src/main/kotlin/cn/codex/core/original/OriginalLibraryController.kt",
+    "ui": "app/src/main/java/cn/codex/android/OriginalLibraryScreen.kt",
+    "state": "代码接入并静态复查，运行验收待执行"
+  },
+  {
+    "method": "plugin/share/checkout",
+    "client": "checkoutPluginShare",
+    "action": "checkoutShare",
+    "controller": "core/src/main/kotlin/cn/codex/core/original/OriginalLibraryController.kt",
+    "ui": "app/src/main/java/cn/codex/android/OriginalLibraryScreen.kt",
+    "state": "代码接入并静态复查，运行验收待执行"
+  },
+  {
+    "method": "plugin/share/delete",
+    "client": "deletePluginShare",
+    "action": "deleteShare",
+    "controller": "core/src/main/kotlin/cn/codex/core/original/OriginalLibraryController.kt",
+    "ui": "app/src/main/java/cn/codex/android/OriginalLibraryScreen.kt",
+    "state": "代码接入并静态复查，运行验收待执行"
+  },
+  {
+    "method": "app/read",
+    "client": "readApps",
+    "action": "appDetail",
+    "controller": "core/src/main/kotlin/cn/codex/core/original/OriginalLibraryController.kt",
+    "ui": "app/src/main/java/cn/codex/android/OriginalLibraryScreen.kt",
+    "state": "代码接入并静态复查，运行验收待执行"
+  },
+  {
+    "method": "app/list",
+    "client": "apps",
+    "action": "loadApps",
+    "controller": "core/src/main/kotlin/cn/codex/core/original/OriginalLibraryController.kt",
+    "ui": "app/src/main/java/cn/codex/android/OriginalLibraryScreen.kt",
+    "state": "代码接入并静态复查，运行验收待执行"
+  },
+  {
+    "method": "app/installed",
+    "client": "installedApps",
+    "action": "loadInstalled",
+    "controller": "core/src/main/kotlin/cn/codex/core/original/OriginalLibraryController.kt",
+    "ui": "app/src/main/java/cn/codex/android/OriginalLibraryScreen.kt",
+    "state": "代码接入并静态复查，运行验收待执行"
+  },
+  {
+    "method": "account/gatewayOAuth/read",
+    "client": "gatewayStatus",
+    "action": "gatewayStatus",
+    "controller": "core/src/main/kotlin/cn/codex/core/original/OriginalServicesController.kt",
+    "ui": "app/src/main/java/cn/codex/android/OriginalServicesScreen.kt",
+    "state": "代码接入并静态复查，运行验收待执行"
+  },
+  {
+    "method": "account/gatewayOAuth/login",
+    "client": "loginGateway",
+    "action": "loginGateway",
+    "controller": "core/src/main/kotlin/cn/codex/core/original/OriginalServicesController.kt",
+    "ui": "app/src/main/java/cn/codex/android/OriginalServicesScreen.kt",
+    "state": "代码接入并静态复查，运行验收待执行"
+  },
+  {
+    "method": "account/gatewayOAuth/cancel",
+    "client": "cancelGateway",
+    "action": "cancelGateway",
+    "controller": "core/src/main/kotlin/cn/codex/core/original/OriginalServicesController.kt",
+    "ui": "app/src/main/java/cn/codex/android/OriginalServicesScreen.kt",
+    "state": "代码接入并静态复查，运行验收待执行"
+  },
+  {
+    "method": "account/rateLimitResetCredit/consume",
+    "client": "consumeResetCredit",
+    "action": "consumeCredit",
+    "controller": "core/src/main/kotlin/cn/codex/core/original/OriginalServicesController.kt",
+    "ui": "app/src/main/java/cn/codex/android/OriginalServicesScreen.kt",
+    "state": "代码接入并静态复查，运行验收待执行"
+  },
+  {
+    "method": "account/sendAddCreditsNudgeEmail",
+    "client": "nudgeCredits",
+    "action": "sendCreditEmail",
+    "controller": "core/src/main/kotlin/cn/codex/core/original/OriginalServicesController.kt",
+    "ui": "app/src/main/java/cn/codex/android/OriginalServicesScreen.kt",
+    "state": "代码接入并静态复查，运行验收待执行"
+  },
+  {
+    "method": "feedback/upload",
+    "client": "uploadFeedback",
+    "action": "feedback",
+    "controller": "core/src/main/kotlin/cn/codex/core/original/OriginalServicesController.kt",
+    "ui": "app/src/main/java/cn/codex/android/OriginalServicesScreen.kt",
+    "state": "代码接入并静态复查，运行验收待执行"
+  },
+  {
+    "method": "feedback/save",
+    "client": "saveFeedback",
+    "action": "feedback",
+    "controller": "core/src/main/kotlin/cn/codex/core/original/OriginalServicesController.kt",
+    "ui": "app/src/main/java/cn/codex/android/OriginalServicesScreen.kt",
+    "state": "代码接入并静态复查，运行验收待执行"
+  },
+  {
+    "method": "externalAgentConfig/detect",
+    "client": "detectExternal",
+    "action": "detect",
+    "controller": "core/src/main/kotlin/cn/codex/core/original/OriginalMigrationController.kt",
+    "ui": "app/src/main/java/cn/codex/android/OriginalMigrationScreen.kt",
+    "state": "代码接入并静态复查，运行验收待执行"
+  },
+  {
+    "method": "externalAgentConfig/import",
+    "client": "importExternal",
+    "action": "importSelected",
+    "controller": "core/src/main/kotlin/cn/codex/core/original/OriginalMigrationController.kt",
+    "ui": "app/src/main/java/cn/codex/android/OriginalMigrationScreen.kt",
+    "state": "代码接入并静态复查，运行验收待执行"
+  },
+  {
+    "method": "externalAgentConfig/import/recordHistory",
+    "client": "recordImport",
+    "action": "recordHistory",
+    "controller": "core/src/main/kotlin/cn/codex/core/original/OriginalMigrationController.kt",
+    "ui": "app/src/main/java/cn/codex/android/OriginalMigrationScreen.kt",
+    "state": "代码接入并静态复查，运行验收待执行"
+  },
+  {
+    "method": "externalAgentConfig/import/readHistories",
+    "client": "importHistories",
+    "action": "readHistories",
+    "controller": "core/src/main/kotlin/cn/codex/core/original/OriginalMigrationController.kt",
+    "ui": "app/src/main/java/cn/codex/android/OriginalMigrationScreen.kt",
+    "state": "代码接入并静态复查，运行验收待执行"
+  },
+  {
+    "method": "config/value/write",
+    "client": "writeConfigValue",
+    "action": "writeValue",
+    "controller": "core/src/main/kotlin/cn/codex/core/original/OriginalMigrationController.kt",
+    "ui": "app/src/main/java/cn/codex/android/OriginalMigrationScreen.kt",
+    "state": "代码接入并静态复查，运行验收待执行"
+  },
+  {
+    "method": "getConversationSummary",
+    "client": "conversationSummary",
+    "action": "summary",
+    "controller": "core/src/main/kotlin/cn/codex/core/original/OriginalMigrationController.kt",
+    "ui": "app/src/main/java/cn/codex/android/OriginalMigrationScreen.kt",
+    "state": "代码接入并静态复查，运行验收待执行"
+  },
+  {
+    "method": "gitDiffToRemote",
+    "client": "remoteDiff",
+    "action": "diff",
+    "controller": "core/src/main/kotlin/cn/codex/core/original/OriginalMigrationController.kt",
+    "ui": "app/src/main/java/cn/codex/android/OriginalMigrationScreen.kt",
+    "state": "代码接入并静态复查，运行验收待执行"
+  },
+  {
+    "method": "getAuthStatus",
+    "client": "authStatus",
+    "action": "auth",
+    "controller": "core/src/main/kotlin/cn/codex/core/original/OriginalMigrationController.kt",
+    "ui": "app/src/main/java/cn/codex/android/OriginalMigrationScreen.kt",
+    "state": "代码接入并静态复查，运行验收待执行"
+  },
+  {
+    "method": "fuzzyFileSearch",
+    "client": "fuzzySearch",
+    "action": "search",
+    "controller": "core/src/main/kotlin/cn/codex/core/original/OriginalMigrationController.kt",
+    "ui": "app/src/main/java/cn/codex/android/OriginalMigrationScreen.kt",
+    "state": "代码接入并静态复查，运行验收待执行"
+  }
+]

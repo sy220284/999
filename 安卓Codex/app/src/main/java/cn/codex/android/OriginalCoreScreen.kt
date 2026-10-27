@@ -26,6 +26,10 @@ import kotlinx.serialization.json.*
     val mcpState by host.mcp.state.collectAsState()
     val settingsState by host.settings.state.collectAsState()
     val filesState by host.files.state.collectAsState()
+    val libraryStatus by host.library.operations.state.collectAsState()
+    val servicesStatus by host.services.operations.state.collectAsState()
+    val migrationStatus by host.migration.operations.state.collectAsState()
+    val managedBusy = libraryStatus.mutating || servicesStatus.mutating || migrationStatus.mutating
     val configurationRecords by host.configurationJournal.records.collectAsState()
     val configurationReadError by host.configurationJournal.readError.collectAsState()
     val activeConfiguration by host.configurationJournal.active.collectAsState()
@@ -38,6 +42,7 @@ import kotlinx.serialization.json.*
     var settingsManager by remember { mutableStateOf(false) }
     var filesManager by remember { mutableStateOf(false) }
     var skillsManager by remember { mutableStateOf(false) }
+    var advancedManager by remember { mutableStateOf<String?>(null) }
     var sessionManager by remember { mutableStateOf(false) }
     var extensions by remember { mutableStateOf(false) }
     var consent by remember { mutableStateOf(false) }
@@ -59,21 +64,30 @@ import kotlinx.serialization.json.*
             }
         }, confirmButton = { TextButton(onClick = { host.closeAgent(); host.openThread(agent.string("id")) }, enabled = !state.working && state.turnId == null && !state.loading) { Text("切换到此会话") } }, dismissButton = { TextButton(onClick = host::closeAgent) { Text("关闭查看") } })
     }
-    if (skillsManager) { OriginalSkillsScreen(host.extensions, allowChanges = !state.working && state.turnId == null && !state.loading && !mcpState.mutating && !settingsState.mutating && !filesState.mutating && !fullTerminalState.running && !networkGit.running && !commandState.running) { skillsManager = false }; return }
-    if (filesManager) { OriginalFilesScreen(host.files, allowChanges = !state.working && state.turnId == null && !state.loading && !extensionState.mutating && !mcpState.mutating && !settingsState.mutating && !filesState.mutating && !fullTerminalState.running && !networkGit.running && !commandState.running) { filesManager = false }; return }
-    if (settingsManager) { OriginalSettingsScreen(host.settings, allowChanges = !state.working && state.turnId == null && !state.loading && !extensionState.mutating && !mcpState.mutating && !settingsState.mutating && !filesState.mutating && !fullTerminalState.running && !networkGit.running && !commandState.running) { settingsManager = false }; return }
+    advancedManager?.let { page ->
+        val allow = !state.working && state.turnId == null && !state.loading && !extensionState.mutating && !mcpState.mutating && !settingsState.mutating && !filesState.mutating && !fullTerminalState.running && !networkGit.running && !commandState.running && !managedBusy
+        when (page) {
+            "市场、分享与应用" -> OriginalLibraryScreen(host.library, allow, host::close) { advancedManager = null }
+            "授权、额度与反馈" -> OriginalServicesScreen(host.services, host.commandWorkspace(), allow, host::close) { advancedManager = null }
+            "迁移、配置与工具" -> OriginalMigrationScreen(host.migration, host.commandWorkspace(), state.threadId, allow, host::close) { advancedManager = null }
+        }
+        return
+    }
+    if (skillsManager) { OriginalSkillsScreen(host.extensions, allowChanges = !state.working && state.turnId == null && !state.loading && !mcpState.mutating && !settingsState.mutating && !filesState.mutating && !fullTerminalState.running && !networkGit.running && !managedBusy && !commandState.running) { skillsManager = false }; return }
+    if (filesManager) { OriginalFilesScreen(host.files, allowChanges = !state.working && state.turnId == null && !state.loading && !extensionState.mutating && !mcpState.mutating && !settingsState.mutating && !filesState.mutating && !fullTerminalState.running && !networkGit.running && !managedBusy && !commandState.running) { filesManager = false }; return }
+    if (settingsManager) { OriginalSettingsScreen(host.settings, allowChanges = !state.working && state.turnId == null && !state.loading && !extensionState.mutating && !mcpState.mutating && !settingsState.mutating && !filesState.mutating && !fullTerminalState.running && !networkGit.running && !managedBusy && !commandState.running) { settingsManager = false }; return }
     if (commandManager) { OriginalCommandScreen(host.commands, host.commandWorkspace()) { commandManager = false }; return }
     if (sessionManager) { OriginalSessionScreen(host) { sessionManager = false }; return }
     if (mcpManager) {
-        OriginalMcpScreen(host.mcp, allowChanges = !state.working && state.turnId == null && !state.loading && !extensionState.mutating && !settingsState.mutating && !filesState.mutating && !fullTerminalState.running && !networkGit.running,
+        OriginalMcpScreen(host.mcp, allowChanges = !state.working && state.turnId == null && !state.loading && !extensionState.mutating && !settingsState.mutating && !filesState.mutating && !fullTerminalState.running && !networkGit.running && !managedBusy,
             imports = imports, authorizationUrl = state.mcpAuthorizationUrl, authorizationName = state.mcpAuthorizationName,
             hostError = state.error, onDismissHostError = host::dismissError, onLogin = { host.startMcpLogin(it) },
             onDismissAuthorization = host::dismissMcpLogin, onBack = { mcpManager = false })
         return
     }
-    if (extensions) { OriginalExtensionsScreen(host.extensions, allowChanges = !state.working && state.turnId == null && !state.loading && !mcpState.mutating && !settingsState.mutating && !filesState.mutating && !fullTerminalState.running && !networkGit.running, onBack = { extensions = false }); return }
+    if (extensions) { OriginalExtensionsScreen(host.extensions, allowChanges = !state.working && state.turnId == null && !state.loading && !mcpState.mutating && !settingsState.mutating && !filesState.mutating && !fullTerminalState.running && !networkGit.running && !managedBusy, onBack = { extensions = false }); return }
     val active = state.working || state.turnId != null
-    val editable = state.connected && !state.loading && !extensionState.mutating && !mcpState.mutating && !settingsState.mutating && !filesState.mutating && !commandState.running && !fullTerminalState.running && !networkGit.running && !active
+    val editable = state.connected && !state.loading && !extensionState.mutating && !mcpState.mutating && !settingsState.mutating && !filesState.mutating && !commandState.running && !fullTerminalState.running && !networkGit.running && !managedBusy && !active
     Column(Modifier.fillMaxSize().imePadding()) {
         LazyColumn(Modifier.weight(1f).fillMaxWidth(), contentPadding = PaddingValues(20.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
             item {
@@ -113,6 +127,7 @@ import kotlinx.serialization.json.*
                     OutlinedButton(onClick = { settingsManager = true; host.settings.refresh() }, enabled = !state.loading) { Text("账号用量、策略与实验功能") }
                     OutlinedButton(onClick = { filesManager = true; host.files.refresh() }, enabled = !state.loading) { Text("原版项目文件") }
                     OutlinedButton(onClick = { skillsManager = true; host.extensions.refreshSkills() }, enabled = !state.loading) { Text("原版技能管理") }
+                    listOf("市场、分享与应用", "授权、额度与反馈", "迁移、配置与工具").forEach { title -> OutlinedButton(onClick = { advancedManager = title }, enabled = !state.loading) { Text(title) } }
                     Text(state.account, style = MaterialTheme.typography.titleSmall)
                     Text("账号与 MCP 凭证由 Android Keystore 加密保存在手机，退出核心后仍可恢复。", style = MaterialTheme.typography.bodySmall)
                     Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -120,7 +135,7 @@ import kotlinx.serialization.json.*
                         OutlinedButton(onClick = { host.login(false) }, enabled = !state.loading && !active) { Text("浏览器登录") }
                         TextButton(onClick = { host.loginSavedApiKey() }, enabled = editable) { Text("使用设置中的密钥") }
                         TextButton(onClick = { host.logout() }, enabled = editable) { Text("退出账号") }
-                        TextButton(onClick = host::close, enabled = !state.loading && !extensionState.mutating && !mcpState.mutating && !settingsState.mutating && !filesState.mutating && !commandState.running && !fullTerminalState.running && !networkGit.running && !active) { Text("关闭核心") }
+                        TextButton(onClick = host::close, enabled = !state.loading && !extensionState.mutating && !mcpState.mutating && !settingsState.mutating && !filesState.mutating && !commandState.running && !fullTerminalState.running && !networkGit.running && !managedBusy && !active) { Text("关闭核心") }
                     }
                 }
                 state.mcpAuthorizationUrl?.let { url -> item {
@@ -202,7 +217,7 @@ import kotlinx.serialization.json.*
                 OutlinedTextField(draft, { draft = it }, label = { Text(if (active) "追加本次任务的指令" else "交给 Codex 的任务") }, modifier = Modifier.fillMaxWidth(), maxLines = 6, shape = RoundedCornerShape(18.dp))
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
                     if (active) TextButton(onClick = { host.stop() }) { Text("停止任务") }
-                    Button(onClick = { if (active) host.steer(draft) else host.send(draft); draft = "" }, enabled = draft.isNotBlank() && !state.loading && !extensionState.mutating && !mcpState.mutating && !settingsState.mutating && !filesState.mutating && !commandState.running && !fullTerminalState.running && !networkGit.running && (!active || state.turnId != null)) { Text(if (active) "追加指令" else "发送") }
+                    Button(onClick = { if (active) host.steer(draft) else host.send(draft); draft = "" }, enabled = draft.isNotBlank() && !state.loading && !extensionState.mutating && !mcpState.mutating && !settingsState.mutating && !filesState.mutating && !commandState.running && !fullTerminalState.running && !networkGit.running && !managedBusy && (!active || state.turnId != null)) { Text(if (active) "追加指令" else "发送") }
                 }
             }
         }
@@ -280,7 +295,16 @@ internal fun openOriginalLogin(context: android.content.Context, url: String) {
                 .onFailure { formError = it.message ?: "请检查填写内容" }
         }) { Text(if (params.string("mode") == "url") "已完成授权" else "提交表单") }
         else if (!elicitation) TextButton(onClick = {
-            respond(if (question) buildJsonObject { put("answers", buildJsonObject { questions.forEach { q -> put(q.string("id"), buildJsonObject { put("answers", buildJsonArray { add(answers[q.string("id")].orEmpty()) }) }) } }) else decision(true))
+            val result = if (question) buildJsonObject {
+                put("answers", buildJsonObject {
+                    questions.forEach { q ->
+                        put(q.string("id"), buildJsonObject {
+                            put("answers", buildJsonArray { add(answers[q.string("id")].orEmpty()) })
+                        })
+                    }
+                })
+            } else decision(true)
+            respond(result)
         }, enabled = if (question) questions.all { !answers[it.string("id")].isNullOrBlank() } else canReview) { Text(if (question) "提交回答" else "允许此次操作") }
     }, dismissButton = { TextButton(onClick = ::decline) { Text(if (question) "暂不回答" else "拒绝") } })
 }

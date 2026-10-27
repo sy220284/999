@@ -18,6 +18,7 @@ facade = set(re.findall(r'call\("([^"]+)"', client)) | {"thread/archive", "threa
 notifications = set(re.findall(r'"method": "([^"]+)"', (ROOT / "源码对照/ServerNotification.ts").read_text()))
 handled = {m for m in notifications if f'"{m}" ->' in host or f'method == "{m}"' in host}
 queued = {"item/commandExecution/requestApproval", "item/fileChange/requestApproval", "item/tool/requestUserInput", "mcpServer/elicitation/request", "item/permissions/requestApproval"}
+closure = {r['method']: r for r in json.loads((ROOT / "文档/剩余31项闭环映射.json").read_text())} if (ROOT / "文档/剩余31项闭环映射.json").exists() else {}
 rows = []
 for kind, file in [("客户端请求", "ClientRequest.ts"), ("服务端请求", "ServerRequest.ts"), ("服务端通知", "ServerNotification.ts")]:
     methods = list(dict.fromkeys(re.findall(r'"method": "([^"]+)"', (ROOT / "源码对照" / file).read_text())))
@@ -39,6 +40,8 @@ for kind, file in [("客户端请求", "ClientRequest.ts"), ("服务端请求", 
                     entry += ";" + host_path + ";app/src/main/java/cn/codex/android/OriginalSessionScreen.kt"
                 if method.startswith("fs/"):
                     entry += ";" + files_path
+                if method in closure:
+                    entry = client_path + ";" + closure[method]["controller"] + ";" + closure[method]["ui"]
                 phase = "待运行验证/继续语义审阅"
             elif method.startswith(("plugin/", "skills/", "mcpServer/", "config/mcpServer")):
                 phase = "P2"

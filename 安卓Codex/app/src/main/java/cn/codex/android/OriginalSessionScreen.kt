@@ -25,6 +25,9 @@ import kotlinx.serialization.json.*
     val networkGit by (androidx.compose.ui.platform.LocalContext.current.applicationContext as CodexApplication).gitOperations.state.collectAsState()
     val fullTerminal by (androidx.compose.ui.platform.LocalContext.current.applicationContext as CodexApplication).fullTerminal.state.collectAsState()
     val commands by host.commands.state.collectAsState()
+    val libraryStatus by host.library.operations.state.collectAsState()
+    val servicesStatus by host.services.operations.state.collectAsState()
+    val migrationStatus by host.migration.operations.state.collectAsState()
     var tab by remember { mutableStateOf("目标") }
     var goalEdit by remember { mutableStateOf(false) }
     var sectionEdit by remember { mutableStateOf<Pair<String?, String>?>(null) }
@@ -33,11 +36,11 @@ import kotlinx.serialization.json.*
     var ownerTypeInput by remember(state.ownerType) { mutableStateOf(state.ownerType) }
     var ownerKeyInput by remember(state.ownerKey) { mutableStateOf(state.ownerKey) }
     var before by remember(state.threadId) { mutableStateOf("") }
-    val editable = state.connected && !state.loading && !state.working && state.turnId == null && !extensions.mutating && !mcp.mutating && !settings.mutating && !files.mutating && !commands.running && !fullTerminal.running && !networkGit.running
+    val editable = state.connected && !state.loading && !state.working && state.turnId == null && !extensions.mutating && !mcp.mutating && !settings.mutating && !files.mutating && !commands.running && !fullTerminal.running && !networkGit.running && !libraryStatus.mutating && !servicesStatus.mutating && !migrationStatus.mutating
     BackHandler(onBack = onBack)
     LaunchedEffect(state.connectionEpoch, state.threadId) { confirm = null; goalEdit = false; sectionEdit = null; attachmentEdit = false }
     LaunchedEffect(tab, state.threadId) {
-        if (state.threadId != null || tab in setOf("分区", "内存会话", "资料所属")) when (tab) { "目标" -> host.loadGoal(); "资料" -> host.loadAttachments(); "分区" -> host.loadSections(); "历史" -> host.loadTurns(); "Git 资料" -> host.loadGitMetadata(); "内存会话" -> host.loadLoadedThreads() }
+        if (state.threadId != null || tab in setOf("分区", "内存会话", "资料所属", "高级操作")) when (tab) { "目标" -> host.loadGoal(); "资料" -> host.loadAttachments(); "分区" -> host.loadSections(); "历史" -> host.loadTurns(); "Git 资料" -> host.loadGitMetadata(); "内存会话" -> host.loadLoadedThreads() }
     }
     Column(Modifier.fillMaxSize()) {
         Row(Modifier.fillMaxWidth().padding(horizontal = 8.dp)) {
@@ -45,12 +48,13 @@ import kotlinx.serialization.json.*
             Text("会话管理", style = MaterialTheme.typography.titleLarge, modifier = Modifier.padding(top = 12.dp))
         }
         Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).padding(horizontal = 20.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            listOf("目标", "资料", "分区", "历史", "代码审查", "Git 资料", "内存会话", "资料所属").forEach { title -> FilterChip(tab == title, { tab = title }, enabled = !state.loading, label = { Text(title) }) }
+            listOf("目标", "资料", "分区", "历史", "代码审查", "Git 资料", "内存会话", "资料所属", "高级操作").forEach { title -> FilterChip(tab == title, { tab = title }, enabled = !state.loading, label = { Text(title) }) }
         }
         if (state.loading) LinearProgressIndicator(Modifier.fillMaxWidth())
         LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(20.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
             item { Text(state.threadId?.let { "当前会话：$it" } ?: "请先返回选择会话，或管理全局分区。", style = MaterialTheme.typography.bodySmall); Text(state.status, color = MaterialTheme.colorScheme.primary) }
             state.error?.let { message -> item { Text(message, color = MaterialTheme.colorScheme.error); TextButton(onClick = host::dismissError) { Text("知道了") } } }
+            if (tab == "高级操作" && state.threadId != null) item { OriginalThreadAdvanced(host, editable, onBack) }
             if (tab == "代码审查" && state.threadId != null) item {
                 OriginalReviewForm(editable) { type, value, title -> host.startReview(type, value, title); if (host.state.value.working) onBack() }
             }

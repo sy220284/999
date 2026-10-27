@@ -32,6 +32,7 @@ class OriginalCoreHostTest {
         var holdResume = false
         var turn: suspend (FakeSession, JsonObject) -> Unit = { _, _ -> }
         var review: suspend (FakeSession, JsonObject) -> Unit = { _, _ -> }
+        var shell: suspend (FakeSession, JsonObject) -> Unit = { _, _ -> }
         override val connection = AppServerConnection(incoming, clientOutput, scope, { serverOutput.close() })
         private val loop = scope.launch(Dispatchers.IO) {
             try {
@@ -48,6 +49,7 @@ class OriginalCoreHostTest {
                         "thread/start", "thread/resume" -> if (!holdResume || request.string("method") == "thread/start") reply(request, thread(resumedTurn))
                         "turn/start" -> { turnStarts.incrementAndGet(); turn(this@FakeSession, request) }
                         "review/start" -> review(this@FakeSession, request)
+                        "thread/shellCommand" -> shell(this@FakeSession, request)
                         "turn/interrupt", "test/barrier" -> reply(request, buildJsonObject {})
                         else -> emit(buildJsonObject { put("id", request.getValue("id")); put("error", buildJsonObject { put("code", -32601); put("message", "fake endpoint does not implement this method") }) })
                     }
@@ -238,6 +240,21 @@ class OriginalCoreHostTest {
             assertEquals("A", state.turnId); assertTrue(state.working)
             session.completed("A"); withTimeout(5000) { host.state.first { !it.working } }
         } finally { withContext(Dispatchers.Main) { host.close() }; session.dispose(); scope.cancel() }
+    }
+
+    @Test fun shellAcknowledgementWaitsForActualTurnCompletionAndKeepsZeroTimeout() = runBlocking {
+        val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
+        lateinit var session: FakeSession
+        val host = host(scope, OriginalEngineFactory { launch -> FakeSession(launch.scope).also { session = it; it.shell = { server, request -> assertEquals(JsonPrimitive(0),request.getValue("params").jsonObject["timeoutMs"]);server.started("S");server.reply(request,buildJsonObject {}) } } })
+        try {
+            withContext(Dispatchers.Main) { host.connect() };ready(host)
+            withContext(Dispatchers.Main) { host.openThread("thread") };withTimeout(5000) { host.state.first { !it.loading && it.threadId=="thread" } }
+            withContext(Dispatchers.Main) { host.shellCommand("printf test","0") }
+            withTimeout(5000) { host.state.first { it.turnId=="S" } }
+            assertTrue(host.state.value.working)
+            session.completed("S");withTimeout(5000) { host.state.first { !it.working } }
+            assertNull(host.state.value.turnId);assertEquals(0,session.turnStarts.get())
+        } finally { withContext(Dispatchers.Main) { host.close() };session.dispose();scope.cancel() }
     }
 
 }

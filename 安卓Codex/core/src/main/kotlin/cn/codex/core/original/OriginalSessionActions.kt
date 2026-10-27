@@ -6,6 +6,7 @@ data class OriginalMetadataEdit(val mode: String, val value: String = "")
 sealed interface OriginalTurnTask {
     data class Prompt(val text: String) : OriginalTurnTask
     data class Review(val threadId: String, val target: JsonObject) : OriginalTurnTask
+    data class Shell(val threadId: String, val command: String, val timeoutMs: Long?) : OriginalTurnTask
 }
 data class OriginalSessionPage<T>(val entries: List<T> = emptyList(), val nextCursor: String? = null,
     val seenCursors: Set<String> = emptySet(), val repeatedCursor: Boolean = false) {
