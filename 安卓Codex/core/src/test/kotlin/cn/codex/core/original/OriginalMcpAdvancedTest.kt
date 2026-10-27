@@ -42,7 +42,9 @@ class OriginalMcpAdvancedTest {
         assertEquals(3, added["env_vars"]!!.jsonArray.size)
         val replaced = OriginalMcpAdvanced.reference(added, "TOKEN", "local")
         assertEquals(3, replaced["env_vars"]!!.jsonArray.size)
-        assertEquals("local", replaced["env_vars"]!!.jsonArray[1].jsonObject["source"]!!.jsonPrimitive.content)
+        val token = replaced["env_vars"]!!.jsonArray.mapNotNull { it as? JsonObject }
+            .single { it["name"]?.jsonPrimitive?.content == "TOKEN" }
+        assertEquals("local", token["source"]!!.jsonPrimitive.content)
         val removed = OriginalMcpAdvanced.reference(replaced, "PATH", "remove")
         assertEquals(2, removed["env_vars"]!!.jsonArray.size)
         assertFailsWith<IllegalArgumentException> { OriginalMcpAdvanced.reference(base, "KEY", "other") }
