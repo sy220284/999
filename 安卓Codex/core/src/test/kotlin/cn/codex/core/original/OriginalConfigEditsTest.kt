@@ -71,4 +71,31 @@ class OriginalConfigEditsTest {
         assertFailsWith<IllegalArgumentException> { OriginalConfigEdits.hookRules(old, buildJsonObject { put("state", buildJsonObject {}) }) }
     }
 
+    @Test fun rulesRejectMalformedMatcherGroupsAndMissingHandlers() {
+        val empty = buildJsonObject {}
+        val missing = buildJsonObject { put("PreToolUse", buildJsonArray { add(buildJsonObject { put("matcher", "git") }) }) }
+        val invalid = buildJsonObject { put("PreToolUse", buildJsonArray { add(buildJsonObject {
+            put("matcher", 7); put("hooks", buildJsonArray { add(buildJsonObject { put("type", "command"); put("command", "echo ok") }) })
+        }) }) }
+        val blank = buildJsonObject { put("PreToolUse", buildJsonArray { add(buildJsonObject {
+            put("hooks", buildJsonArray { add(buildJsonObject { put("type", "command"); put("command", "") }) })
+        }) }) }
+        assertFailsWith<IllegalArgumentException> { OriginalConfigEdits.hookRules(empty, missing) }
+        assertFailsWith<IllegalArgumentException> { OriginalConfigEdits.hookRules(empty, invalid) }
+        assertFailsWith<IllegalArgumentException> { OriginalConfigEdits.hookRules(empty, blank) }
+    }
+
+    @Test fun rulesKeepAdvancedHandlersAndDoNotChangeTrustState() {
+        val previous = buildJsonObject { put("state", buildJsonObject { put("id", buildJsonObject { put("trusted_hash", "abc") }) }) }
+        val rules = buildJsonObject { put("PreToolUse", buildJsonArray { add(buildJsonObject {
+            put("matcher", "git"); put("hooks", buildJsonArray { add(buildJsonObject {
+                put("type", "prompt"); put("prompt", "按原规则提醒")
+            }) })
+        }) }) }
+        val edits = OriginalConfigEdits.hookRules(previous, rules)
+        assertEquals(1, edits.size)
+        assertEquals("hooks.\"PreToolUse\"", edits.single().getValue("keyPath").jsonPrimitive.content)
+        assertEquals(rules["PreToolUse"], edits.single()["value"])
+    }
+
 }
