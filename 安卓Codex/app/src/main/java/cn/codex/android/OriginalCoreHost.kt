@@ -33,6 +33,7 @@ data class OriginalState(
     val guardianReviews: List<JsonObject> = emptyList(),
     val turnProgress: Map<String, OriginalTurnProgress> = emptyMap(),
     val threadUpdates: OriginalThreadUpdatesState = OriginalThreadUpdatesState(), val threadListVersion: Long = 0,
+    val events: OriginalEventState = OriginalEventState(), val toolBusy: Boolean = false,
     val sections: List<JsonObject> = emptyList(), val sectionCursor: String? = null,
     val turns: List<JsonObject> = emptyList(), val turnCursor: String? = null,
     val models: List<String> = emptyList(), val model: String = "", val report: String = ""
@@ -66,7 +67,11 @@ class OriginalCoreHost(
     private var turnWaiter: TurnWaiter? = null
     private var reservedTask: OriginalTurnTask? = null
     private var stopping: Job? = null
+    private val remainingEvents = OriginalRemainingEvents()
+    val realtimeAudio = OriginalRealtimeAudio(context,scope)
     private val workspace = File(context.filesDir, "工作区/原版项目").apply { mkdirs() }
+    private val androidTools = OriginalAndroidTools(workspace)
+    private val toolJobs = mutableMapOf<ServerMessage.Request,Job>()
     private val engineHome = File(context.filesDir, "原版核心数据").apply { mkdirs() }
     val configurationJournal get() = (context.applicationContext as CodexApplication).configurationJournal
     val extensions: OriginalExtensionsController = OriginalExtensionsController(scope, workspace.absolutePath, configurationJournal.lifecycle("插件、技能与自动规则")) { state.value.working || state.value.turnId != null || state.value.loading || otherTaskRunning() || managedChanging || mcp.state.value.mutating || settings.state.value.mutating || files.state.value.mutating || commands.state.value.running || (context.applicationContext as CodexApplication).fullTerminal.state.value.running }
@@ -90,7 +95,7 @@ class OriginalCoreHost(
         { state.value.working || state.value.turnId != null || state.value.loading || state.value.closing || otherTaskRunning() || configurationChanging }, configurationJournal.lifecycle("配置与迁移"))
     fun commandWorkspace() = workspace.absolutePath
     val managedChanging get() = library.operations.state.value.mutating || services.operations.state.value.mutating || migration.operations.state.value.mutating
-    val configurationChanging get() = (context.applicationContext as CodexApplication).gitOperations.state.value.running || (context.applicationContext as CodexApplication).fullTerminal.state.value.running || commands.state.value.running || extensions.state.value.mutating || mcp.state.value.mutating || settings.state.value.mutating || files.state.value.mutating || managedChanging
+    val configurationChanging get() = state.value.toolBusy || (context.applicationContext as CodexApplication).gitOperations.state.value.running || (context.applicationContext as CodexApplication).fullTerminal.state.value.running || commands.state.value.running || extensions.state.value.mutating || mcp.state.value.mutating || settings.state.value.mutating || files.state.value.mutating || managedChanging
     fun mcpImports() = McpTools(context).connections().map { it.name to it.url }
     private fun error(error: Throwable) { mutable.update { it.copy(error = error.message ?: "原版核心操作失败") } }
     fun dismissError() { mutable.update { it.copy(error = null) } }
@@ -147,6 +152,7 @@ class OriginalCoreHost(
     private fun closeSession(cancelStartup: Boolean) {
         if (state.value.closing) return
         lifecycle.disconnect(lifecycle.state.connectionEpoch)
+        realtimeAudio.stop();remainingEvents.reset();toolJobs.values.toList().forEach { it.cancel() };toolJobs.clear()
         if (cancelStartup) startupJob?.cancel()
         operationJob?.cancel(); operationJob = null
         reservedTask = null
@@ -194,6 +200,7 @@ class OriginalCoreHost(
         mutable.update { it.copy(historyCursor = response.string("itemsBackwardsCursor").ifBlank { null }) }
     }
     private fun selectThread(thread: JsonObject, throughVersion: Long = state.value.threadUpdates.version) {
+        realtimeAudio.stop()
         val turns = (thread["turns"] as? JsonArray).orEmpty().mapNotNull { it as? JsonObject }
         val active = turns.lastOrNull { it.string("status") == "inProgress" }?.string("id")
         val items = OriginalThreadView.history(thread)
@@ -495,13 +502,37 @@ class OriginalCoreHost(
             if (current(epoch, rpc)) mutable.update { it.copy(requests = it.requests.filterNot { pending -> pending === request }) }
         } catch (failure: Exception) { if (current(epoch, rpc)) error(failure) }
     }
+    fun dismissRuntimeNotice(key: String) { remainingEvents.dismiss(key);mutable.update { it.copy(events = remainingEvents.state) } }
+    fun executeAndroidTool(request: ServerMessage.Request) {
+        if(request.method != "item/tool/call" || state.value.requests.none { it === request } || request in toolJobs)return
+        val rpc = connection ?: return;val epoch = lifecycle.state.connectionEpoch
+        val job = scope.launch(start = CoroutineStart.LAZY) {
+            mutable.update { it.copy(toolBusy = true) }
+            try {
+                val params = request.params as? JsonObject ?: buildJsonObject {}
+                val result = withContext(Dispatchers.IO) { androidTools.execute(params) }
+                if(current(epoch,rpc) && state.value.requests.any { it === request }) {
+                    rpc.respond(request.id,result)
+                    mutable.update { it.copy(requests = it.requests.filterNot { pending -> pending === request }) }
+                    remainingEvents.notice("tool/${request.id}","手机工具执行结果",result.toString(),params.string("threadId"),params.string("turnId"))
+                    mutable.update { it.copy(events = remainingEvents.state) }
+                }
+            } catch(cancelled: CancellationException) { throw cancelled } catch(failure: Exception) { if(current(epoch,rpc)) error(failure) } finally { toolJobs.remove(request);if(current(epoch,rpc))mutable.update { it.copy(toolBusy = toolJobs.isNotEmpty()) } }
+        }
+        toolJobs[request] = job;job.start()
+    }
     private suspend fun onMessage(epoch: Long, rpc: AppServerConnection, message: ServerMessage) {
         if (!current(epoch, rpc)) return
         when (message) {
             is ServerMessage.Request -> {
-                if (message.method in setOf("item/commandExecution/requestApproval", "item/fileChange/requestApproval", "item/tool/requestUserInput", "mcpServer/elicitation/request", "item/permissions/requestApproval", "execCommandApproval", "applyPatchApproval")) {
+                if (message.method in setOf("item/commandExecution/requestApproval", "item/fileChange/requestApproval", "item/tool/requestUserInput", "mcpServer/elicitation/request", "item/permissions/requestApproval", "execCommandApproval", "applyPatchApproval", "item/tool/call")) {
                     if (state.value.requests.size >= 32) rpc.reject(message.id, -32000, "待处理交互数量达到上限")
                     else mutable.update { it.copy(requests = it.requests + message) }
+                } else if(message.method == "account/chatgptAuthTokens/refresh" || message.method == "attestation/generate") {
+                    val reason = if(message.method == "attestation/generate") "当前Android包未接入受服务端认可的设备证明提供者；本连接未声明requestAttestation能力" else "当前使用原版核心管理的登录，未配置外部账号令牌刷新提供者；请在授权页重新登录"
+                    rpc.reject(message.id,-32001,reason)
+                    remainingEvents.notice(message.method,"外部认证能力暂不可用",reason)
+                    mutable.update { it.copy(events = remainingEvents.state) }
                 } else rpc.reject(message.id)
             }
             is ServerMessage.Notification -> notification(epoch, rpc, message.method, message.params as? JsonObject ?: return)
@@ -509,6 +540,19 @@ class OriginalCoreHost(
     }
     private suspend fun notification(epoch: Long, rpc: AppServerConnection, method: String, params: JsonObject) {
         if (!current(epoch, rpc)) return
+        if (method in OriginalRemainingEvents.methods) {
+            try {
+                remainingEvents.accept(method,params)
+                if(method == "thread/realtime/outputAudio/delta" && params.string("threadId") == state.value.threadId && remainingEvents.state.realtime[state.value.threadId]?.let { it.active && !it.sdpReceived } == true)
+                    (params["audio"] as? JsonObject)?.let(realtimeAudio::offer)
+                if(method in setOf("thread/realtime/closed","thread/realtime/started","thread/realtime/sdp","thread/realtime/error") && params.string("threadId") == state.value.threadId) realtimeAudio.stop()
+                mutable.update { it.copy(events = remainingEvents.state) }
+            } catch(failure: Exception) {
+                remainingEvents.notice("decode/$method","收到无法解析的运行信息", "$method：${failure.message.orEmpty().take(200)}")
+                mutable.update { it.copy(events = remainingEvents.state) }
+            }
+            return
+        }
         if (method in setOf("thread/started", "thread/readState/changed", "thread/archived", "thread/deleted", "thread/unarchived", "thread/closed", "thread/reverted", "thread/name/updated", "thread/attachment/updated", "thread/prediction/updated", "thread/queue/changed", "project/changed", "thread/project/updated", "thread/environment/connected", "thread/environment/disconnected", "thread/settings/updated")) {
             val updated = OriginalThreadUpdates.reduce(state.value.threadUpdates, method, params)
             val id = if (method == "thread/started") (params["thread"] as? JsonObject)?.string("id").orEmpty() else params.string("threadId")
@@ -581,7 +625,7 @@ class OriginalCoreHost(
         if (method == "account/updated") {
             scope.launch { runSuspendCatching { client?.let { readAccount(it) } }.onFailure { if (current(epoch, rpc)) error(it) } }; return
         }
-        if (method == "serverRequest/resolved") { mutable.update { it.copy(requests = it.requests.filterNot { r -> r.id == params["requestId"] }) }; return }
+        if (method == "serverRequest/resolved") { toolJobs.keys.filter { it.id == params["requestId"] }.toList().forEach { toolJobs.remove(it)?.cancel() }; mutable.update { it.copy(requests = it.requests.filterNot { r -> r.id == params["requestId"] }) }; return }
         if (params.string("threadId").isNotBlank() && params.string("threadId") != state.value.threadId) return
         if (state.value.threadUpdates.threads[state.value.threadId]?.availability in setOf("closed", "deleted") && (method.startsWith("turn/") || method.startsWith("item/"))) return
         when (method) {

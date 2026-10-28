@@ -43,6 +43,7 @@ import kotlinx.serialization.json.*
     var filesManager by remember { mutableStateOf(false) }
     var skillsManager by remember { mutableStateOf(false) }
     var advancedManager by remember { mutableStateOf<String?>(null) }
+    var eventsManager by remember { mutableStateOf(false) }
     var sessionManager by remember { mutableStateOf(false) }
     var sessionInitialTab by remember { mutableStateOf("目标") }
     var extensions by remember { mutableStateOf(false) }
@@ -50,7 +51,7 @@ import kotlinx.serialization.json.*
     var draft by remember { mutableStateOf("") }
     var renamed by remember { mutableStateOf<String?>(null) }
     val context = LocalContext.current
-    state.requests.firstOrNull()?.let { request -> key(state.connectionEpoch, request.id) { OriginalRequestDialog(request, state.items, { host.answer(request, it) }) } }
+    state.requests.firstOrNull()?.let { request -> key(state.connectionEpoch, request.id) { if(request.method == "item/tool/call") OriginalDynamicToolDialog(host,request) else OriginalRequestDialog(request, state.items, { host.answer(request, it) }) } }
     OriginalSkillPreview(host.extensions)
     if (state.agent != null) {
         val agent = state.agent!!
@@ -78,6 +79,7 @@ import kotlinx.serialization.json.*
     if (filesManager) { OriginalFilesScreen(host.files, allowChanges = !state.working && state.turnId == null && !state.loading && !extensionState.mutating && !mcpState.mutating && !settingsState.mutating && !filesState.mutating && !fullTerminalState.running && !networkGit.running && !managedBusy && !commandState.running) { filesManager = false }; return }
     if (settingsManager) { OriginalSettingsScreen(host.settings, allowChanges = !state.working && state.turnId == null && !state.loading && !extensionState.mutating && !mcpState.mutating && !settingsState.mutating && !filesState.mutating && !fullTerminalState.running && !networkGit.running && !managedBusy && !commandState.running) { settingsManager = false }; return }
     if (commandManager) { OriginalCommandScreen(host.commands, host.commandWorkspace()) { commandManager = false }; return }
+    if (eventsManager) { OriginalEventsScreen(host) { eventsManager = false }; return }
     if (sessionManager) { OriginalSessionScreen(host, initialTab = sessionInitialTab) { sessionManager = false }; return }
     if (mcpManager) {
         OriginalMcpScreen(host.mcp, allowChanges = !state.working && state.turnId == null && !state.loading && !extensionState.mutating && !settingsState.mutating && !filesState.mutating && !fullTerminalState.running && !networkGit.running && !managedBusy,
@@ -120,6 +122,17 @@ import kotlinx.serialization.json.*
                     Column(Modifier.padding(14.dp)) { Text(state.error.orEmpty(), color = MaterialTheme.colorScheme.onErrorContainer); TextButton(onClick = host::dismissError) { Text("知道了") } }
                 }
             }
+            state.events.notices.filter { it.threadId.isBlank() || it.threadId == state.threadId }.let { notices ->
+                notices.lastOrNull { it.key.startsWith("guardianWarning") || it.key.startsWith("autoApprovalReview/strictReviewRequired") || it.key.startsWith("configWarning") } ?: notices.lastOrNull()
+            }?.let { notice -> item {
+                Surface(shape = RoundedCornerShape(14.dp),color = MaterialTheme.colorScheme.surfaceContainer) {
+                    Column(Modifier.fillMaxWidth().padding(14.dp),verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Text(notice.title,style = MaterialTheme.typography.titleSmall)
+                        Text(notice.body.take(240),style = MaterialTheme.typography.bodySmall,maxLines = 4)
+                        Row { TextButton(onClick = { eventsManager = true }) { Text("查看运行动态") };TextButton(onClick = { host.dismissRuntimeNotice(notice.key) }) { Text("知道了") } }
+                    }
+                }
+            } }
             if (state.connected) {
                 item {
                     OutlinedButton(onClick = { extensions = true; host.extensions.refresh() }, enabled = !state.loading) { Icon(Icons.Outlined.Extension, null); Spacer(Modifier.width(8.dp)); Text("插件与自动规则") }
@@ -128,6 +141,7 @@ import kotlinx.serialization.json.*
                     OutlinedButton(onClick = { settingsManager = true; host.settings.refresh() }, enabled = !state.loading) { Text("账号用量、策略与实验功能") }
                     OutlinedButton(onClick = { filesManager = true; host.files.refresh() }, enabled = !state.loading) { Text("原版项目文件") }
                     OutlinedButton(onClick = { skillsManager = true; host.extensions.refreshSkills() }, enabled = !state.loading) { Text("原版技能管理") }
+                    TextButton(onClick = { eventsManager = true }) { Text("运行动态与能力") }
                     listOf("市场、分享与应用", "授权、额度与反馈", "迁移、配置与工具").forEach { title -> OutlinedButton(onClick = { advancedManager = title }, enabled = !state.loading) { Text(title) } }
                     Text(state.account, style = MaterialTheme.typography.titleSmall)
                     Text("账号与 MCP 凭证由 Android Keystore 加密保存在手机，退出核心后仍可恢复。", style = MaterialTheme.typography.bodySmall)

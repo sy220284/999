@@ -7,7 +7,7 @@ class OriginalCodexClient(val connection: AppServerConnection) {
     suspend fun initialize(): JsonElement {
         val result = call("initialize", buildJsonObject {
             put("clientInfo", buildJsonObject { put("name", "codex_android"); put("title", "Codex · 随行"); put("version", "0.1.0") })
-            put("capabilities", buildJsonObject { put("experimentalApi", true) })
+            put("capabilities", buildJsonObject { put("experimentalApi", true); put("requestAttestation", false) })
         })
         connection.notify("initialized")
         return result
@@ -21,6 +21,7 @@ class OriginalCodexClient(val connection: AppServerConnection) {
         put("cwd", cwd); model?.takeIf { it.isNotBlank() }?.let { put("model", it) }
         // Android UID 仅隔离其他应用，不能宣称桌面项目沙箱；UI 必须先披露并取得本次同意。
         put("sandbox", "danger-full-access"); put("approvalPolicy", "untrusted")
+        put("dynamicTools", OriginalAndroidTools.definitions())
     })
     suspend fun resume(threadId: String) = call("thread/resume", buildJsonObject { put("threadId", threadId) })
     suspend fun history(threadId: String, cursor: String? = null) = call("thread/items/list", buildJsonObject {

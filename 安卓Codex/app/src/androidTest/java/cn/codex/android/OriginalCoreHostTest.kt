@@ -338,4 +338,39 @@ class OriginalCoreHostTest {
         } finally { withContext(Dispatchers.Main) { host.close() }; session.dispose(); scope.cancel() }
     }
 
+    @Test fun dynamicToolWaitsForApprovalThenReturnsActualFileContent() = runBlocking {
+        val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
+        lateinit var session: FakeSession
+        val host = host(scope, OriginalEngineFactory { launch -> FakeSession(launch.scope).also { session = it } })
+        val file = java.io.File(host.commandWorkspace(),"dynamic-tool-test.txt")
+        try {
+            file.writeText("手机文件正文")
+            withContext(Dispatchers.Main) { host.connect() };ready(host)
+            session.emit(buildJsonObject { put("id","dynamic");put("method","item/tool/call");put("params",buildJsonObject {
+                put("threadId","thread");put("turnId","turn");put("callId","call");put("namespace",JsonNull);put("tool","android_project_read");put("arguments",obj("path" to file.name))
+            }) })
+            val request = withTimeout(5000) { host.state.first { it.requests.isNotEmpty() } }.requests.single()
+            assertEquals(0,session.clientResponses.get())
+            withContext(Dispatchers.Main) { host.executeAndroidTool(request) }
+            withTimeout(5000) { host.state.first { it.requests.isEmpty() && !it.toolBusy } }
+            session.connection.request("test/barrier")
+            assertEquals(1,session.clientResponses.get())
+            assertTrue(host.state.value.events.notices.any { it.body.contains("手机文件正文") })
+            withContext(Dispatchers.Main) { host.close() };closed(host)
+            assertTrue(host.state.value.events.notices.isEmpty())
+        } finally { file.delete();withContext(Dispatchers.Main) { host.close() };session.dispose();scope.cancel() }
+    }
+    @Test fun externalProviderRequestReturnsSpecificErrorWithoutExposingCredentials() = runBlocking {
+        val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
+        lateinit var session: FakeSession
+        val host = host(scope, OriginalEngineFactory { launch -> FakeSession(launch.scope).also { session = it } })
+        try {
+            withContext(Dispatchers.Main) { host.connect() };ready(host)
+            session.emit(buildJsonObject { put("id","attest");put("method","attestation/generate");put("params",buildJsonObject {}) })
+            val state = withTimeout(5000) { host.state.first { it.events.notices.any { row -> row.key == "attestation/generate" } } }
+            assertTrue(state.requests.isEmpty());assertTrue(state.connected)
+            assertTrue(state.events.notices.single().body.contains("证明提供者"))
+        } finally { withContext(Dispatchers.Main) { host.close() };session.dispose();scope.cancel() }
+    }
+
 }

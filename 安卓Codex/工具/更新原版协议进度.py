@@ -22,8 +22,11 @@ for group in re.findall(r'((?:"[^"\n]+"\s*,\s*)*"[^"\n]+")\s*->', host):
     branches.update(re.findall(r'"([^"\n]+)"', group))
 for group in re.findall(r'if\s*\(method in setOf\(([^)]*)\)', host):
     branches.update(re.findall(r'"([^"\n]+)"', group))
+events_path = "core/src/main/kotlin/cn/codex/core/original/OriginalRemainingEvents.kt"
+if 'method in OriginalRemainingEvents.methods' in host:
+    branches.update(notifications & set(re.findall(r'"([^"\n]+)"', (ROOT / events_path).read_text())))
 handled = {m for m in notifications if m in branches or f'method == "{m}"' in host}
-queued = {"item/commandExecution/requestApproval", "item/fileChange/requestApproval", "item/tool/requestUserInput", "mcpServer/elicitation/request", "item/permissions/requestApproval", "execCommandApproval", "applyPatchApproval"}
+queued = {"item/commandExecution/requestApproval", "item/fileChange/requestApproval", "item/tool/requestUserInput", "mcpServer/elicitation/request", "item/permissions/requestApproval", "execCommandApproval", "applyPatchApproval", "item/tool/call"}
 closure = {r['method']: r for r in json.loads((ROOT / "文档/剩余31项闭环映射.json").read_text())} if (ROOT / "文档/剩余31项闭环映射.json").exists() else {}
 rows = []
 for kind, file in [("客户端请求", "ClientRequest.ts"), ("服务端请求", "ServerRequest.ts"), ("服务端通知", "ServerNotification.ts")]:
@@ -58,12 +61,20 @@ for kind, file in [("客户端请求", "ClientRequest.ts"), ("服务端请求", 
                 status, entry, phase = "中文交互已接入，未运行验证", host_path, "待验证"
                 if method == "mcpServer/elicitation/request":
                     status, phase = "表单/URL 已接入；有限复杂 schema，未运行验证", "P2/待验证"
+            elif method in {"account/chatgptAuthTokens/refresh", "attestation/generate"}:
+                status, entry, phase = "缺少外部提供者，已有专用提示及协议拒绝", host_path, "外部依赖/待完成"
             else:
                 status, entry = "未接入，明确返回协议错误", host_path
         elif method.startswith("windows"):
             status, phase = "Windows 专用，Android 平台受限", "平台限制"
         elif method in handled:
             status, entry, phase = "通知分支已接入，未运行验证", host_path, "待验证/继续语义审阅"
+            if method.startswith("thread/realtime/"):
+                status, phase = "兼容接收/文字及PCM输出代码已接；实验发起未接，未运行验证", "实时会话发起/媒体验收"
+                if method == "thread/realtime/sdp":
+                    status, phase = "已标示WebRTC缺少媒体适配，未完成", "WebRTC依赖"
+            elif method in {"process/outputDelta", "process/exited", "fuzzyFileSearch/sessionUpdated", "fuzzyFileSearch/sessionCompleted"}:
+                status, phase = "兼容通知消费者已接，实验发起未接，未运行验证", "实验发起/待验证"
         elif method.startswith(("hook/", "mcpServer/")):
             phase = "P2"
         elif "Agent" in method or method.startswith(("thread/", "turn/")):

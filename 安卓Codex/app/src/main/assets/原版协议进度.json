@@ -914,25 +914,25 @@
   {
     "kind": "服务端请求",
     "method": "item/tool/call",
-    "status": "未接入，明确返回协议错误",
+    "status": "中文交互已接入，未运行验证",
     "entry": "app/src/main/java/cn/codex/android/OriginalCoreHost.kt",
-    "phase": "P4",
+    "phase": "待验证",
     "validation": "未运行验证"
   },
   {
     "kind": "服务端请求",
     "method": "account/chatgptAuthTokens/refresh",
-    "status": "未接入，明确返回协议错误",
+    "status": "缺少外部提供者，已有专用提示及协议拒绝",
     "entry": "app/src/main/java/cn/codex/android/OriginalCoreHost.kt",
-    "phase": "P4",
+    "phase": "外部依赖/待完成",
     "validation": "未运行验证"
   },
   {
     "kind": "服务端请求",
     "method": "attestation/generate",
-    "status": "未接入，明确返回协议错误",
+    "status": "缺少外部提供者，已有专用提示及协议拒绝",
     "entry": "app/src/main/java/cn/codex/android/OriginalCoreHost.kt",
-    "phase": "P4",
+    "phase": "外部依赖/待完成",
     "validation": "未运行验证"
   },
   {
@@ -1186,9 +1186,9 @@
   {
     "kind": "服务端通知",
     "method": "item/autoApprovalReview/started",
-    "status": "待接入",
-    "entry": "",
-    "phase": "P4",
+    "status": "通知分支已接入，未运行验证",
+    "entry": "app/src/main/java/cn/codex/android/OriginalCoreHost.kt",
+    "phase": "待验证/继续语义审阅",
     "validation": "未运行验证"
   },
   {
@@ -1202,9 +1202,9 @@
   {
     "kind": "服务端通知",
     "method": "autoApprovalReview/strictReviewRequired",
-    "status": "待接入",
-    "entry": "",
-    "phase": "P4",
+    "status": "通知分支已接入，未运行验证",
+    "entry": "app/src/main/java/cn/codex/android/OriginalCoreHost.kt",
+    "phase": "待验证/继续语义审阅",
     "validation": "未运行验证"
   },
   {
@@ -1218,17 +1218,17 @@
   {
     "kind": "服务端通知",
     "method": "rawResponseItem/completed",
-    "status": "待接入",
-    "entry": "",
-    "phase": "P4",
+    "status": "通知分支已接入，未运行验证",
+    "entry": "app/src/main/java/cn/codex/android/OriginalCoreHost.kt",
+    "phase": "待验证/继续语义审阅",
     "validation": "未运行验证"
   },
   {
     "kind": "服务端通知",
     "method": "rawResponse/completed",
-    "status": "待接入",
-    "entry": "",
-    "phase": "P4",
+    "status": "通知分支已接入，未运行验证",
+    "entry": "app/src/main/java/cn/codex/android/OriginalCoreHost.kt",
+    "phase": "待验证/继续语义审阅",
     "validation": "未运行验证"
   },
   {
@@ -1258,17 +1258,17 @@
   {
     "kind": "服务端通知",
     "method": "process/outputDelta",
-    "status": "待接入",
-    "entry": "",
-    "phase": "P4",
+    "status": "兼容通知消费者已接，实验发起未接，未运行验证",
+    "entry": "app/src/main/java/cn/codex/android/OriginalCoreHost.kt",
+    "phase": "实验发起/待验证",
     "validation": "未运行验证"
   },
   {
     "kind": "服务端通知",
     "method": "process/exited",
-    "status": "待接入",
-    "entry": "",
-    "phase": "P4",
+    "status": "兼容通知消费者已接，实验发起未接，未运行验证",
+    "entry": "app/src/main/java/cn/codex/android/OriginalCoreHost.kt",
+    "phase": "实验发起/待验证",
     "validation": "未运行验证"
   },
   {
@@ -1338,9 +1338,9 @@
   {
     "kind": "服务端通知",
     "method": "mcpServer/event/stream/notification",
-    "status": "待接入",
-    "entry": "",
-    "phase": "P2",
+    "status": "通知分支已接入，未运行验证",
+    "entry": "app/src/main/java/cn/codex/android/OriginalCoreHost.kt",
+    "phase": "待验证/继续语义审阅",
     "validation": "未运行验证"
   },
   {
@@ -1362,25 +1362,25 @@
   {
     "kind": "服务端通知",
     "method": "account/rateLimits/updated",
-    "status": "待接入",
-    "entry": "",
-    "phase": "P4",
+    "status": "通知分支已接入，未运行验证",
+    "entry": "app/src/main/java/cn/codex/android/OriginalCoreHost.kt",
+    "phase": "待验证/继续语义审阅",
     "validation": "未运行验证"
   },
   {
     "kind": "服务端通知",
     "method": "app/list/updated",
-    "status": "待接入",
-    "entry": "",
-    "phase": "P4",
+    "status": "通知分支已接入，未运行验证",
+    "entry": "app/src/main/java/cn/codex/android/OriginalCoreHost.kt",
+    "phase": "待验证/继续语义审阅",
     "validation": "未运行验证"
   },
   {
     "kind": "服务端通知",
     "method": "remoteControl/status/changed",
-    "status": "待接入",
-    "entry": "",
-    "phase": "P4",
+    "status": "通知分支已接入，未运行验证",
+    "entry": "app/src/main/java/cn/codex/android/OriginalCoreHost.kt",
+    "phase": "待验证/继续语义审阅",
     "validation": "未运行验证"
   },
   {
@@ -1418,9 +1418,9 @@
   {
     "kind": "服务端通知",
     "method": "item/reasoning/summaryPartAdded",
-    "status": "待接入",
-    "entry": "",
-    "phase": "P4",
+    "status": "通知分支已接入，未运行验证",
+    "entry": "app/src/main/java/cn/codex/android/OriginalCoreHost.kt",
+    "phase": "待验证/继续语义审阅",
     "validation": "未运行验证"
   },
   {
@@ -1442,49 +1442,49 @@
   {
     "kind": "服务端通知",
     "method": "model/rerouted",
-    "status": "待接入",
-    "entry": "",
-    "phase": "P4",
+    "status": "通知分支已接入，未运行验证",
+    "entry": "app/src/main/java/cn/codex/android/OriginalCoreHost.kt",
+    "phase": "待验证/继续语义审阅",
     "validation": "未运行验证"
   },
   {
     "kind": "服务端通知",
     "method": "model/verification",
-    "status": "待接入",
-    "entry": "",
-    "phase": "P4",
+    "status": "通知分支已接入，未运行验证",
+    "entry": "app/src/main/java/cn/codex/android/OriginalCoreHost.kt",
+    "phase": "待验证/继续语义审阅",
     "validation": "未运行验证"
   },
   {
     "kind": "服务端通知",
     "method": "modelProvider/authRecoveryStarted",
-    "status": "待接入",
-    "entry": "",
-    "phase": "P4",
+    "status": "通知分支已接入，未运行验证",
+    "entry": "app/src/main/java/cn/codex/android/OriginalCoreHost.kt",
+    "phase": "待验证/继续语义审阅",
     "validation": "未运行验证"
   },
   {
     "kind": "服务端通知",
     "method": "modelProvider/authRecoveryCompleted",
-    "status": "待接入",
-    "entry": "",
-    "phase": "P4",
+    "status": "通知分支已接入，未运行验证",
+    "entry": "app/src/main/java/cn/codex/android/OriginalCoreHost.kt",
+    "phase": "待验证/继续语义审阅",
     "validation": "未运行验证"
   },
   {
     "kind": "服务端通知",
     "method": "turn/moderationMetadata",
-    "status": "待接入",
-    "entry": "",
-    "phase": "P3",
+    "status": "通知分支已接入，未运行验证",
+    "entry": "app/src/main/java/cn/codex/android/OriginalCoreHost.kt",
+    "phase": "待验证/继续语义审阅",
     "validation": "未运行验证"
   },
   {
     "kind": "服务端通知",
     "method": "model/safetyBuffering/updated",
-    "status": "待接入",
-    "entry": "",
-    "phase": "P4",
+    "status": "通知分支已接入，未运行验证",
+    "entry": "app/src/main/java/cn/codex/android/OriginalCoreHost.kt",
+    "phase": "待验证/继续语义审阅",
     "validation": "未运行验证"
   },
   {
@@ -1498,129 +1498,129 @@
   {
     "kind": "服务端通知",
     "method": "guardianWarning",
-    "status": "待接入",
-    "entry": "",
-    "phase": "P4",
+    "status": "通知分支已接入，未运行验证",
+    "entry": "app/src/main/java/cn/codex/android/OriginalCoreHost.kt",
+    "phase": "待验证/继续语义审阅",
     "validation": "未运行验证"
   },
   {
     "kind": "服务端通知",
     "method": "deprecationNotice",
-    "status": "待接入",
-    "entry": "",
-    "phase": "P4",
+    "status": "通知分支已接入，未运行验证",
+    "entry": "app/src/main/java/cn/codex/android/OriginalCoreHost.kt",
+    "phase": "待验证/继续语义审阅",
     "validation": "未运行验证"
   },
   {
     "kind": "服务端通知",
     "method": "configWarning",
-    "status": "待接入",
-    "entry": "",
-    "phase": "P4",
+    "status": "通知分支已接入，未运行验证",
+    "entry": "app/src/main/java/cn/codex/android/OriginalCoreHost.kt",
+    "phase": "待验证/继续语义审阅",
     "validation": "未运行验证"
   },
   {
     "kind": "服务端通知",
     "method": "fuzzyFileSearch/sessionUpdated",
-    "status": "待接入",
-    "entry": "",
-    "phase": "P4",
+    "status": "兼容通知消费者已接，实验发起未接，未运行验证",
+    "entry": "app/src/main/java/cn/codex/android/OriginalCoreHost.kt",
+    "phase": "实验发起/待验证",
     "validation": "未运行验证"
   },
   {
     "kind": "服务端通知",
     "method": "fuzzyFileSearch/sessionCompleted",
-    "status": "待接入",
-    "entry": "",
-    "phase": "P4",
+    "status": "兼容通知消费者已接，实验发起未接，未运行验证",
+    "entry": "app/src/main/java/cn/codex/android/OriginalCoreHost.kt",
+    "phase": "实验发起/待验证",
     "validation": "未运行验证"
   },
   {
     "kind": "服务端通知",
     "method": "thread/realtime/started",
-    "status": "待接入",
-    "entry": "",
-    "phase": "P3",
+    "status": "兼容接收/文字及PCM输出代码已接；实验发起未接，未运行验证",
+    "entry": "app/src/main/java/cn/codex/android/OriginalCoreHost.kt",
+    "phase": "实时会话发起/媒体验收",
     "validation": "未运行验证"
   },
   {
     "kind": "服务端通知",
     "method": "thread/realtime/itemAdded",
-    "status": "待接入",
-    "entry": "",
-    "phase": "P3",
+    "status": "兼容接收/文字及PCM输出代码已接；实验发起未接，未运行验证",
+    "entry": "app/src/main/java/cn/codex/android/OriginalCoreHost.kt",
+    "phase": "实时会话发起/媒体验收",
     "validation": "未运行验证"
   },
   {
     "kind": "服务端通知",
     "method": "thread/realtime/item/started",
-    "status": "待接入",
-    "entry": "",
-    "phase": "P3",
+    "status": "兼容接收/文字及PCM输出代码已接；实验发起未接，未运行验证",
+    "entry": "app/src/main/java/cn/codex/android/OriginalCoreHost.kt",
+    "phase": "实时会话发起/媒体验收",
     "validation": "未运行验证"
   },
   {
     "kind": "服务端通知",
     "method": "thread/realtime/item/transcript/delta",
-    "status": "待接入",
-    "entry": "",
-    "phase": "P3",
+    "status": "兼容接收/文字及PCM输出代码已接；实验发起未接，未运行验证",
+    "entry": "app/src/main/java/cn/codex/android/OriginalCoreHost.kt",
+    "phase": "实时会话发起/媒体验收",
     "validation": "未运行验证"
   },
   {
     "kind": "服务端通知",
     "method": "thread/realtime/item/completed",
-    "status": "待接入",
-    "entry": "",
-    "phase": "P3",
+    "status": "兼容接收/文字及PCM输出代码已接；实验发起未接，未运行验证",
+    "entry": "app/src/main/java/cn/codex/android/OriginalCoreHost.kt",
+    "phase": "实时会话发起/媒体验收",
     "validation": "未运行验证"
   },
   {
     "kind": "服务端通知",
     "method": "thread/realtime/transcript/delta",
-    "status": "待接入",
-    "entry": "",
-    "phase": "P3",
+    "status": "兼容接收/文字及PCM输出代码已接；实验发起未接，未运行验证",
+    "entry": "app/src/main/java/cn/codex/android/OriginalCoreHost.kt",
+    "phase": "实时会话发起/媒体验收",
     "validation": "未运行验证"
   },
   {
     "kind": "服务端通知",
     "method": "thread/realtime/transcript/done",
-    "status": "待接入",
-    "entry": "",
-    "phase": "P3",
+    "status": "兼容接收/文字及PCM输出代码已接；实验发起未接，未运行验证",
+    "entry": "app/src/main/java/cn/codex/android/OriginalCoreHost.kt",
+    "phase": "实时会话发起/媒体验收",
     "validation": "未运行验证"
   },
   {
     "kind": "服务端通知",
     "method": "thread/realtime/outputAudio/delta",
-    "status": "待接入",
-    "entry": "",
-    "phase": "P3",
+    "status": "兼容接收/文字及PCM输出代码已接；实验发起未接，未运行验证",
+    "entry": "app/src/main/java/cn/codex/android/OriginalCoreHost.kt",
+    "phase": "实时会话发起/媒体验收",
     "validation": "未运行验证"
   },
   {
     "kind": "服务端通知",
     "method": "thread/realtime/sdp",
-    "status": "待接入",
-    "entry": "",
-    "phase": "P3",
+    "status": "已标示WebRTC缺少媒体适配，未完成",
+    "entry": "app/src/main/java/cn/codex/android/OriginalCoreHost.kt",
+    "phase": "WebRTC依赖",
     "validation": "未运行验证"
   },
   {
     "kind": "服务端通知",
     "method": "thread/realtime/error",
-    "status": "待接入",
-    "entry": "",
-    "phase": "P3",
+    "status": "兼容接收/文字及PCM输出代码已接；实验发起未接，未运行验证",
+    "entry": "app/src/main/java/cn/codex/android/OriginalCoreHost.kt",
+    "phase": "实时会话发起/媒体验收",
     "validation": "未运行验证"
   },
   {
     "kind": "服务端通知",
     "method": "thread/realtime/closed",
-    "status": "待接入",
-    "entry": "",
-    "phase": "P3",
+    "status": "兼容接收/文字及PCM输出代码已接；实验发起未接，未运行验证",
+    "entry": "app/src/main/java/cn/codex/android/OriginalCoreHost.kt",
+    "phase": "实时会话发起/媒体验收",
     "validation": "未运行验证"
   },
   {
