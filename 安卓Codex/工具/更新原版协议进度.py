@@ -20,6 +20,8 @@ notifications = set(re.findall(r'"method": "([^"]+)"', (ROOT / "源码对照/Ser
 branches = set()
 for group in re.findall(r'((?:"[^"\n]+"\s*,\s*)*"[^"\n]+")\s*->', host):
     branches.update(re.findall(r'"([^"\n]+)"', group))
+for group in re.findall(r'if\s*\(method in setOf\(([^)]*)\)', host):
+    branches.update(re.findall(r'"([^"\n]+)"', group))
 handled = {m for m in notifications if m in branches or f'method == "{m}"' in host}
 queued = {"item/commandExecution/requestApproval", "item/fileChange/requestApproval", "item/tool/requestUserInput", "mcpServer/elicitation/request", "item/permissions/requestApproval", "execCommandApproval", "applyPatchApproval"}
 closure = {r['method']: r for r in json.loads((ROOT / "文档/剩余31项闭环映射.json").read_text())} if (ROOT / "文档/剩余31项闭环映射.json").exists() else {}

@@ -44,6 +44,7 @@ import kotlinx.serialization.json.*
     var skillsManager by remember { mutableStateOf(false) }
     var advancedManager by remember { mutableStateOf<String?>(null) }
     var sessionManager by remember { mutableStateOf(false) }
+    var sessionInitialTab by remember { mutableStateOf("目标") }
     var extensions by remember { mutableStateOf(false) }
     var consent by remember { mutableStateOf(false) }
     var draft by remember { mutableStateOf("") }
@@ -77,7 +78,7 @@ import kotlinx.serialization.json.*
     if (filesManager) { OriginalFilesScreen(host.files, allowChanges = !state.working && state.turnId == null && !state.loading && !extensionState.mutating && !mcpState.mutating && !settingsState.mutating && !filesState.mutating && !fullTerminalState.running && !networkGit.running && !managedBusy && !commandState.running) { filesManager = false }; return }
     if (settingsManager) { OriginalSettingsScreen(host.settings, allowChanges = !state.working && state.turnId == null && !state.loading && !extensionState.mutating && !mcpState.mutating && !settingsState.mutating && !filesState.mutating && !fullTerminalState.running && !networkGit.running && !managedBusy && !commandState.running) { settingsManager = false }; return }
     if (commandManager) { OriginalCommandScreen(host.commands, host.commandWorkspace()) { commandManager = false }; return }
-    if (sessionManager) { OriginalSessionScreen(host) { sessionManager = false }; return }
+    if (sessionManager) { OriginalSessionScreen(host, initialTab = sessionInitialTab) { sessionManager = false }; return }
     if (mcpManager) {
         OriginalMcpScreen(host.mcp, allowChanges = !state.working && state.turnId == null && !state.loading && !extensionState.mutating && !settingsState.mutating && !filesState.mutating && !fullTerminalState.running && !networkGit.running && !managedBusy,
             imports = imports, authorizationUrl = state.mcpAuthorizationUrl, authorizationName = state.mcpAuthorizationName,
@@ -167,21 +168,30 @@ import kotlinx.serialization.json.*
                         TextButton(onClick = { host.refresh() }, enabled = !state.loading) { Text("刷新") }
                     }
                 }
+                if (state.threadUpdates.version > state.threadListVersion) item {
+                    Surface(shape = RoundedCornerShape(14.dp), color = MaterialTheme.colorScheme.surfaceContainer) {
+                        Row(Modifier.fillMaxWidth().padding(start = 16.dp, end = 8.dp), verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
+                            Text("会话列表有变化", Modifier.weight(1f), style = MaterialTheme.typography.bodySmall)
+                            TextButton(onClick = { host.refresh() }, enabled = !state.loading) { Text("刷新列表") }
+                        }
+                    }
+                }
                 items(state.threads, key = { "thread:${it.string("id")}" }) { thread ->
                     val id = thread.string("id")
                     Surface(color = if (state.threadId == id) MaterialTheme.colorScheme.secondaryContainer else MaterialTheme.colorScheme.surfaceContainerLow, shape = RoundedCornerShape(14.dp)) {
                         Column(Modifier.fillMaxWidth().padding(12.dp)) {
                             TextButton(onClick = { host.openThread(id) }, enabled = editable) { Text(thread.string("name").ifBlank { thread.string("preview").ifBlank { "新对话" } }.take(100), Modifier.fillMaxWidth(), maxLines = 2) }
-                            Text(OriginalSessionActions.threadStatus(state.threadStatuses[id]), style = MaterialTheme.typography.labelSmall)
+                            Text(OriginalSessionActions.threadStatus(state.threadStatuses[id]) + " · " + OriginalThreadUpdates.readLabel(state.threadUpdates.threads[id]), style = MaterialTheme.typography.labelSmall)
                             TextButton(onClick = { host.archive(id, !state.archived) }, enabled = editable) { Text(if (state.archived) "恢复会话" else "归档") }
                         }
                     }
                 }
                 if (state.nextCursor != null) item { TextButton(onClick = { host.refresh(more = true) }, enabled = !state.loading) { Text("加载更多会话") } }
+                if (state.threadId != null) item { OriginalThreadSyncPanel(host, onAttachments = { sessionInitialTab = "资料"; sessionManager = true }, onHistory = { host.openThread(state.threadId!!) }) }
                 if (state.threadId != null) item {
                     HorizontalDivider()
                     Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                        TextButton(onClick = { sessionManager = true }, enabled = !state.loading) { Text("目标与会话管理") }
+                        TextButton(onClick = { sessionInitialTab = "目标"; sessionManager = true }, enabled = !state.loading) { Text("目标与会话管理") }
                         TextButton(onClick = { host.fork() }, enabled = editable) { Text("分叉") }
                         TextButton(onClick = { renamed = "" }, enabled = editable) { Text("重命名") }
                         TextButton(onClick = { host.compact() }, enabled = editable) { Text("压缩上下文") }
@@ -209,7 +219,10 @@ import kotlinx.serialization.json.*
                     }
                 }
                 state.turnProgress.entries.toList().takeLast(3).forEach { (turnId, progress) ->
-                    item(key = "progress:$turnId") { ExpandableCard("运行进展 · ${turnId.takeLast(8)}", OriginalLiveUpdates.describe(progress), Icons.Outlined.Info) }
+                    item(key = "progress:$turnId") {
+                        val details = remember(progress) { OriginalLiveUpdates.describe(progress) }
+                        ExpandableCard("运行进展 · ${turnId.takeLast(8)}", details, Icons.Outlined.Info)
+                    }
                 }
                 if (state.report.isNotBlank()) item { ExpandableCard("核心返回详情", state.report, Icons.Outlined.Info) }
             }
@@ -220,7 +233,7 @@ import kotlinx.serialization.json.*
                 OutlinedTextField(draft, { draft = it }, label = { Text(if (active) "追加本次任务的指令" else "交给 Codex 的任务") }, modifier = Modifier.fillMaxWidth(), maxLines = 6, shape = RoundedCornerShape(18.dp))
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
                     if (active) TextButton(onClick = { host.stop() }) { Text("停止任务") }
-                    Button(onClick = { if (active) host.steer(draft) else host.send(draft); draft = "" }, enabled = draft.isNotBlank() && !state.loading && !extensionState.mutating && !mcpState.mutating && !settingsState.mutating && !filesState.mutating && !commandState.running && !fullTerminalState.running && !networkGit.running && !managedBusy && (!active || state.turnId != null)) { Text(if (active) "追加指令" else "发送") }
+                    Button(onClick = { if (active) host.steer(draft) else host.send(draft); draft = "" }, enabled = draft.isNotBlank() && !state.loading && !extensionState.mutating && !mcpState.mutating && !settingsState.mutating && !filesState.mutating && !commandState.running && !fullTerminalState.running && !networkGit.running && !managedBusy && host.selectedThreadUsable() && (!active || state.turnId != null)) { Text(if (active) "追加指令" else "发送") }
                 }
             }
         }

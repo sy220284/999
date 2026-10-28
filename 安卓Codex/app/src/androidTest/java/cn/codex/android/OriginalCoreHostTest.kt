@@ -298,4 +298,44 @@ class OriginalCoreHostTest {
         } finally { withContext(Dispatchers.Main) { host.close() }; session.dispose(); scope.cancel() }
     }
 
+    @Test fun deletedActiveThreadEndsWaitingBeforeAcknowledgementWithoutClosingOtherCoreWork() = runBlocking {
+        val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
+        lateinit var session: FakeSession
+        val held = CompletableDeferred<JsonObject>()
+        val host = host(scope, OriginalEngineFactory { launch -> FakeSession(launch.scope).also {
+            session = it; it.turn = { server, request -> server.started("A"); held.complete(request) }
+        } })
+        try {
+            withContext(Dispatchers.Main) { host.connect() }; ready(host)
+            withContext(Dispatchers.Main) { host.send("test") }; held.await()
+            session.notify("thread/deleted", obj("threadId" to "thread"))
+            withTimeout(5000) { host.state.first { !it.working && it.error?.contains("会话") == true } }
+            assertTrue(host.state.value.connected); assertNull(host.state.value.turnId)
+            assertFalse(host.selectedThreadUsable())
+            session.reply(held.await(), buildJsonObject { put("turn", obj("id" to "A", "status" to "inProgress")) })
+            session.started("A"); session.notify("warning", obj("message" to "late-start-barrier"))
+            withTimeout(5000) { host.state.first { it.status == "late-start-barrier" } }
+            assertNull(host.state.value.turnId); assertEquals(0, session.closed.get())
+        } finally { withContext(Dispatchers.Main) { host.close() }; session.dispose(); scope.cancel() }
+    }
+    @Test fun backgroundLifecycleDoesNotSwitchSelectionAndRevertBlocksSendUntilReload() = runBlocking {
+        val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
+        lateinit var session: FakeSession
+        val host = host(scope, OriginalEngineFactory { launch -> FakeSession(launch.scope).also { session = it } })
+        try {
+            withContext(Dispatchers.Main) { host.connect() }; ready(host)
+            withContext(Dispatchers.Main) { host.openThread("thread") }
+            withTimeout(5000) { host.state.first { !it.loading && it.threadId == "thread" } }
+            session.notify("thread/started", buildJsonObject { put("thread", obj("id" to "background", "name" to "后台会话")) })
+            session.notify("thread/closed", obj("threadId" to "background"))
+            session.notify("thread/reverted", obj("threadId" to "thread"))
+            withTimeout(5000) { host.state.first { it.threadUpdates.threads["thread"]?.historyVersion != null } }
+            assertEquals("thread", host.state.value.threadId); assertFalse(host.selectedThreadUsable())
+            withContext(Dispatchers.Main) { host.send("must not start") }
+            assertEquals(0, session.turnStarts.get())
+            withContext(Dispatchers.Main) { host.openThread("thread") }
+            withTimeout(5000) { host.state.first { !it.loading && host.selectedThreadUsable() } }
+        } finally { withContext(Dispatchers.Main) { host.close() }; session.dispose(); scope.cancel() }
+    }
+
 }

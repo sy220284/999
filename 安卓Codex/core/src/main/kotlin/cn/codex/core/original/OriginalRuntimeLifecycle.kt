@@ -15,6 +15,7 @@ sealed interface OriginalLifecycleEvent {
     data class TurnCompleted(val threadId: String, val turnId: String) : OriginalLifecycleEvent
     data class StopRequested(val threadId: String, val turnId: String) : OriginalLifecycleEvent
     data class InterruptAccepted(val threadId: String, val turnId: String) : OriginalLifecycleEvent
+    data class ThreadUnavailable(val threadId: String) : OriginalLifecycleEvent
     data object ThreadCleared : OriginalLifecycleEvent
     data object Disconnected : OriginalLifecycleEvent
 }
@@ -33,6 +34,9 @@ class OriginalRuntimeLifecycle {
         if (!isCurrent(epoch)) return state
         val old = state
         state = when (event) {
+            is OriginalLifecycleEvent.ThreadUnavailable -> if (old.threadId == event.threadId)
+                old.copy(turnId = null, pendingStartRequestId = null, stoppingTurnId = null,
+                    completedTurnIds = (old.completedTurnIds + listOfNotNull(old.turnId)).toList().takeLast(128).toSet()) else old
             OriginalLifecycleEvent.ThreadCleared -> {
                 check(old.turnId == null && old.pendingStartRequestId == null) { "活动任务尚未结束" }
                 old.copy(threadId = null, turnId = null, pendingStartRequestId = null, stoppingTurnId = null, completedTurnIds = emptySet())

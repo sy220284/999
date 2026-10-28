@@ -16,7 +16,7 @@ import cn.codex.core.string
 import cn.codex.core.original.*
 import kotlinx.serialization.json.*
 
-@Composable fun OriginalSessionScreen(host: OriginalCoreHost, onBack: () -> Unit) {
+@Composable fun OriginalSessionScreen(host: OriginalCoreHost, initialTab: String = "目标", onBack: () -> Unit) {
     val state by host.state.collectAsState()
     val extensions by host.extensions.state.collectAsState()
     val mcp by host.mcp.state.collectAsState()
@@ -28,7 +28,7 @@ import kotlinx.serialization.json.*
     val libraryStatus by host.library.operations.state.collectAsState()
     val servicesStatus by host.services.operations.state.collectAsState()
     val migrationStatus by host.migration.operations.state.collectAsState()
-    var tab by remember { mutableStateOf("目标") }
+    var tab by remember(initialTab) { mutableStateOf(initialTab) }
     var goalEdit by remember { mutableStateOf(false) }
     var sectionEdit by remember { mutableStateOf<Pair<String?, String>?>(null) }
     var attachmentEdit by remember { mutableStateOf(false) }
@@ -36,7 +36,7 @@ import kotlinx.serialization.json.*
     var ownerTypeInput by remember(state.ownerType) { mutableStateOf(state.ownerType) }
     var ownerKeyInput by remember(state.ownerKey) { mutableStateOf(state.ownerKey) }
     var before by remember(state.threadId) { mutableStateOf("") }
-    val editable = state.connected && !state.loading && !state.working && state.turnId == null && !extensions.mutating && !mcp.mutating && !settings.mutating && !files.mutating && !commands.running && !fullTerminal.running && !networkGit.running && !libraryStatus.mutating && !servicesStatus.mutating && !migrationStatus.mutating
+    val editable = state.connected && !state.loading && !state.working && state.turnId == null && !extensions.mutating && !mcp.mutating && !settings.mutating && !files.mutating && !commands.running && !fullTerminal.running && !networkGit.running && !libraryStatus.mutating && !servicesStatus.mutating && !migrationStatus.mutating && host.selectedThreadUsable()
     BackHandler(onBack = onBack)
     LaunchedEffect(state.connectionEpoch, state.threadId) { confirm = null; goalEdit = false; sectionEdit = null; attachmentEdit = false }
     LaunchedEffect(tab, state.threadId) {
@@ -53,6 +53,7 @@ import kotlinx.serialization.json.*
         if (state.loading) LinearProgressIndicator(Modifier.fillMaxWidth())
         LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(20.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
             item { Text(state.threadId?.let { "当前会话：$it" } ?: "请先返回选择会话，或管理全局分区。", style = MaterialTheme.typography.bodySmall); Text(state.status, color = MaterialTheme.colorScheme.primary) }
+            if (state.threadId != null) item { OriginalThreadSyncPanel(host, onAttachments = { tab = "资料"; host.loadAttachments() }, onHistory = { host.openThread(state.threadId!!) }) }
             state.error?.let { message -> item { Text(message, color = MaterialTheme.colorScheme.error); TextButton(onClick = host::dismissError) { Text("知道了") } } }
             if (tab == "高级操作" && state.threadId != null) item { OriginalThreadAdvanced(host, editable, onBack) }
             if (tab == "代码审查" && state.threadId != null) item {

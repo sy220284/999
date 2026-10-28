@@ -6,6 +6,7 @@ import cn.codex.core.*
 import cn.codex.core.original.*
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.*
+import kotlinx.coroutines.selects.select
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.serialization.json.*
@@ -31,6 +32,7 @@ data class OriginalState(
     val threadStatuses: Map<String, JsonObject> = emptyMap(),
     val guardianReviews: List<JsonObject> = emptyList(),
     val turnProgress: Map<String, OriginalTurnProgress> = emptyMap(),
+    val threadUpdates: OriginalThreadUpdatesState = OriginalThreadUpdatesState(), val threadListVersion: Long = 0,
     val sections: List<JsonObject> = emptyList(), val sectionCursor: String? = null,
     val turns: List<JsonObject> = emptyList(), val turnCursor: String? = null,
     val models: List<String> = emptyList(), val model: String = "", val report: String = ""
@@ -55,9 +57,11 @@ class OriginalCoreHost(
     private var listener: Job? = null
     private var closingJob: Job? = null
     private var operationJob: Job? = null
+    private class ThreadUnavailable(message: String) : IllegalStateException(message)
+    fun selectedThreadUsable() = OriginalThreadUpdates.canUse(state.value.threadUpdates.threads[state.value.threadId])
     private data class Outcome(val status: String, val error: String?)
     private data class TurnWaiter(val epoch: Long, val threadId: String, val requestId: String,
-        val finished: CompletableDeferred<Unit> = CompletableDeferred(), val observedStart: CompletableDeferred<String> = CompletableDeferred(), var turnId: String? = null,
+        val invalidated: CompletableDeferred<JsonElement> = CompletableDeferred(), val finished: CompletableDeferred<Unit> = CompletableDeferred(), val observedStart: CompletableDeferred<String> = CompletableDeferred(), var turnId: String? = null,
         val outcomes: LinkedHashMap<String, Outcome> = linkedMapOf())
     private var turnWaiter: TurnWaiter? = null
     private var reservedTask: OriginalTurnTask? = null
@@ -160,9 +164,11 @@ class OriginalCoreHost(
     fun refresh(archived: Boolean = state.value.archived, more: Boolean = false) = operation { api -> refreshThreads(api, archived, more) }
     private suspend fun refreshThreads(api: OriginalCodexClient, archived: Boolean, more: Boolean = false) {
         val cursor = if (more) state.value.nextCursor ?: return else null
+        val before = state.value.threadUpdates.version
         val response = api.threads(cursor, archived).jsonObject
+        ensureCurrent(lifecycle.state.connectionEpoch, api.connection)
         val entries = (response["data"] as? JsonArray).orEmpty().mapNotNull { it as? JsonObject }
-        mutable.update { it.copy(threads = (if (more) it.threads + entries else entries).distinctBy { row -> row.string("id") }, nextCursor = response.string("nextCursor").ifBlank { null }, archived = archived) }
+        mutable.update { it.copy(threads = OriginalThreadUpdates.overlay((if (more) it.threads + entries else entries).distinctBy { row -> row.string("id") }, it.threadUpdates, archived, before), threadListVersion = before, nextCursor = response.string("nextCursor").ifBlank { null }, archived = archived) }
     }
     fun selectModel(model: String) { mutable.update { it.copy(model = model) } }
     fun loadModels() = operation { api ->
@@ -182,17 +188,18 @@ class OriginalCoreHost(
     }
     fun openThread(id: String) = operation { api ->
         check(!state.value.working && state.value.turnId == null)
+        val before = state.value.threadUpdates.version
         val response = api.resume(id).jsonObject
-        selectThread(response.getValue("thread").jsonObject)
+        selectThread(response.getValue("thread").jsonObject, before)
         mutable.update { it.copy(historyCursor = response.string("itemsBackwardsCursor").ifBlank { null }) }
     }
-    private fun selectThread(thread: JsonObject) {
+    private fun selectThread(thread: JsonObject, throughVersion: Long = state.value.threadUpdates.version) {
         val turns = (thread["turns"] as? JsonArray).orEmpty().mapNotNull { it as? JsonObject }
         val active = turns.lastOrNull { it.string("status") == "inProgress" }?.string("id")
         val items = OriginalThreadView.history(thread)
         lifecycle.accept(lifecycle.state.connectionEpoch, OriginalLifecycleEvent.ThreadSelected(thread.string("id"), active))
         syncLifecycle()
-        mutable.update { it.copy(items = items, turnProgress = emptyMap(), threadGitInfo = thread["gitInfo"] as? JsonObject, attachmentOwners = OriginalSessionPage(), ownerType = "", ownerKey = "", goal = null, attachments = emptyList(), attachmentCursor = null, turns = emptyList(), turnCursor = null, historyCursor = null, model = thread.string("model", it.model), status = if (lifecycle.state.turnId == null) "会话已恢复" else "已恢复正在运行的回合") }
+        mutable.update { it.copy(items = items, turnProgress = emptyMap(), threadUpdates = OriginalThreadUpdates.acknowledgeHistory(it.threadUpdates, thread.string("id"), throughVersion), threadGitInfo = thread["gitInfo"] as? JsonObject, attachmentOwners = OriginalSessionPage(), ownerType = "", ownerKey = "", goal = null, attachments = emptyList(), attachmentCursor = null, turns = emptyList(), turnCursor = null, historyCursor = null, model = thread.string("model", it.model), status = if (lifecycle.state.turnId == null) "会话已恢复" else "已恢复正在运行的回合") }
     }
     fun loadHistory() = operation { api ->
         val snapshot = state.value
@@ -255,6 +262,7 @@ class OriginalCoreHost(
     private fun objects(page: JsonObject) = (page["data"] as? JsonArray).orEmpty().mapNotNull { it as? JsonObject }
     private fun idleThread(): String {
         check(!state.value.working && state.value.turnId == null && !otherTaskRunning()) { "请先停止任务" }
+        check(selectedThreadUsable()) { "会话状态已变化，请先重新打开或恢复会话" }
         return requireNotNull(state.value.threadId) { "请先选择会话" }
     }
     fun loadGoal() = operation { api -> val thread = requireNotNull(state.value.threadId); val goal = api.goal(thread).jsonObject["goal"] as? JsonObject; if (state.value.threadId == thread) mutable.update { it.copy(goal = goal) } }
@@ -265,9 +273,10 @@ class OriginalCoreHost(
     }
     fun clearGoal() = operation { api -> api.clearGoal(idleThread()); mutable.update { it.copy(goal = null, status = "目标已清除") } }
     fun loadAttachments(more: Boolean = false) = operation { api ->
+        val before = state.value.threadUpdates.version
         val thread = requireNotNull(state.value.threadId); val cursor = if (more) state.value.attachmentCursor ?: return@operation else null
         val page = api.attachments(thread, cursor).jsonObject
-        if (state.value.threadId == thread) mutable.update { it.copy(attachments = ((if (more) it.attachments else emptyList()) + objects(page)).distinctBy { row -> row.string("id") }, attachmentCursor = page.string("nextCursor").ifBlank { null }) }
+        if (state.value.threadId == thread) mutable.update { it.copy(threadUpdates = if (more) it.threadUpdates else OriginalThreadUpdates.acknowledgeAttachments(it.threadUpdates, thread, before), attachments = ((if (more) it.attachments else emptyList()) + objects(page)).distinctBy { row -> row.string("id") }, attachmentCursor = page.string("nextCursor").ifBlank { null }) }
     }
     fun addAttachment(type: String, key: String, payload: JsonElement) = operation { api ->
         val thread = idleThread(); require(type.isNotBlank() && key.isNotBlank()) { "请填写资料类型与标识" }
@@ -380,6 +389,7 @@ class OriginalCoreHost(
     }
     private fun reserve(task: OriginalTurnTask, label: String) {
         if (state.value.loading || state.value.working || configurationChanging || !state.value.connected) return
+        if (!selectedThreadUsable()) { error(IllegalStateException("会话状态已变化，请先重新打开或恢复会话")); return }
         if (state.value.turnId != null) { error(IllegalStateException("已恢复的回合仍在运行，请先停止或追加指令")); return }
         if (otherTaskRunning()) { error(IllegalStateException("另一个任务正在运行")); return }
         reservedTask = task
@@ -404,13 +414,22 @@ class OriginalCoreHost(
             val request = UUID.randomUUID().toString()
             lifecycle.accept(epoch, OriginalLifecycleEvent.StartRequested(request))
             val waiting = TurnWaiter(epoch, thread, request).also { waiter = it; turnWaiter = it }
-            val response = when (task) {
-                is OriginalTurnTask.Prompt -> api.turn(thread, task.text, configLoader().reasoning)
-                is OriginalTurnTask.Review -> { check(thread == task.threadId) { "审查所属会话已变化" }; api.review(thread, task.target) }
-                is OriginalTurnTask.Shell -> { check(thread == task.threadId); api.threadShell(thread, task.command, task.timeoutMs) }
+            val response = coroutineScope {
+                val requestResponse = async {
+                    when (task) {
+                        is OriginalTurnTask.Prompt -> api.turn(thread, task.text, configLoader().reasoning)
+                        is OriginalTurnTask.Review -> { check(thread == task.threadId) { "审查所属会话已变化" }; api.review(thread, task.target) }
+                        is OriginalTurnTask.Shell -> { check(thread == task.threadId); api.threadShell(thread, task.command, task.timeoutMs) }
+                    }
+                }
+                select<JsonElement> {
+                    requestResponse.onAwait { it }
+                    waiting.invalidated.onAwait { it }
+                }
             }.jsonObject
             if (task is OriginalTurnTask.Review) require(response.string("reviewThreadId") == thread) { "核心返回的审查会话与当前会话不同" }
             ensureCurrent(epoch, api.connection)
+            if (state.value.threadUpdates.threads[thread]?.availability in setOf("closed", "deleted")) throw ThreadUnavailable("会话已关闭、删除或变更，请重新打开后核对任务结果")
             val turnId = if (task is OriginalTurnTask.Shell) withTimeout(60_000) { waiting.observedStart.await() } else (response["turn"] as? JsonObject)?.string("id").orEmpty()
             require(turnId.isNotBlank()) { "原版任务启动响应缺少回合标识，不能确认任务状态" }
             waiting.turnId = turnId
@@ -427,7 +446,8 @@ class OriginalCoreHost(
             if (cancelled !is TimeoutCancellationException) throw cancelled
         } catch (failure: Exception) {
             if (current(epoch, api.connection)) {
-                if (turnFinished) error(IllegalStateException("任务已结束，但刷新会话失败：${failure.message.orEmpty()}"))
+                if (failure is ThreadUnavailable) error(failure)
+                else if (turnFinished) error(IllegalStateException("任务已结束，但刷新会话失败：${failure.message.orEmpty()}"))
                 else { close(); error(IllegalStateException("任务状态无法确认，核心已关闭。请恢复会话检查修改。${failure.message.orEmpty()}")) }
             }
         } finally {
@@ -489,6 +509,30 @@ class OriginalCoreHost(
     }
     private suspend fun notification(epoch: Long, rpc: AppServerConnection, method: String, params: JsonObject) {
         if (!current(epoch, rpc)) return
+        if (method in setOf("thread/started", "thread/readState/changed", "thread/archived", "thread/deleted", "thread/unarchived", "thread/closed", "thread/reverted", "thread/name/updated", "thread/attachment/updated", "thread/prediction/updated", "thread/queue/changed", "project/changed", "thread/project/updated", "thread/environment/connected", "thread/environment/disconnected", "thread/settings/updated")) {
+            val updated = OriginalThreadUpdates.reduce(state.value.threadUpdates, method, params)
+            val id = if (method == "thread/started") (params["thread"] as? JsonObject)?.string("id").orEmpty() else params.string("threadId")
+            val started = updated.started
+            mutable.update { old ->
+                val rows = if (method == "thread/started" && !old.archived && started != null)
+                    (listOf(started) + old.threads).distinctBy { it.string("id") } else old.threads
+                old.copy(threadUpdates = updated, threads = OriginalThreadUpdates.overlay(rows, updated, old.archived, old.threadListVersion),
+                    model = if (id == old.threadId && method == "thread/settings/updated") updated.threads[id]?.settings?.string("model", old.model) ?: old.model else old.model,
+                    loadedThreads = if (method in setOf("thread/closed", "thread/deleted")) old.loadedThreads.copy(entries = old.loadedThreads.entries.filterNot { it == id }) else old.loadedThreads)
+            }
+            if (id == state.value.threadId && method in setOf("thread/closed", "thread/deleted")) {
+                // 原版仅在该线程运行实例被卸载/删除后发终态；保留已显示正文，不把后台线程终态当当前回合完成。
+                val failure = ThreadUnavailable(if (method == "thread/deleted") "会话已删除，已停止等待该会话的任务" else "会话已卸载，请重新打开后继续")
+                turnWaiter?.takeIf { it.threadId == id }?.let { it.invalidated.completeExceptionally(failure); it.observedStart.completeExceptionally(failure); it.finished.completeExceptionally(failure) }
+                reservedTask = null
+                lifecycle.accept(epoch, OriginalLifecycleEvent.ThreadUnavailable(id)); syncLifecycle()
+                mutable.update { it.copy(working = if (turnWaiter == null) false else it.working, status = failure.message.orEmpty(), requests = it.requests.filterNot { request ->
+                    val p = request.params as? JsonObject
+                    p?.string("threadId") == id || p?.string("conversationId") == id
+                }) }
+            }
+            return
+        }
         if (method == "command/exec/outputDelta") { commands.output(params); return }
         if (method == "thread/goal/updated") {
             if (params.string("threadId") == state.value.threadId) mutable.update { it.copy(goal = params["goal"] as? JsonObject) }
@@ -539,6 +583,7 @@ class OriginalCoreHost(
         }
         if (method == "serverRequest/resolved") { mutable.update { it.copy(requests = it.requests.filterNot { r -> r.id == params["requestId"] }) }; return }
         if (params.string("threadId").isNotBlank() && params.string("threadId") != state.value.threadId) return
+        if (state.value.threadUpdates.threads[state.value.threadId]?.availability in setOf("closed", "deleted") && (method.startsWith("turn/") || method.startsWith("item/"))) return
         when (method) {
             "turn/plan/updated", "thread/tokenUsage/updated", "item/mcpToolCall/progress", "item/commandExecution/terminalInteraction", "item/fileChange/outputDelta" -> {
                 // 非当前会话/未知会话的通知不得进入正在查看的对话。

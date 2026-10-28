@@ -962,9 +962,9 @@
   {
     "kind": "服务端通知",
     "method": "thread/started",
-    "status": "待接入",
-    "entry": "",
-    "phase": "P3",
+    "status": "通知分支已接入，未运行验证",
+    "entry": "app/src/main/java/cn/codex/android/OriginalCoreHost.kt",
+    "phase": "待验证/继续语义审阅",
     "validation": "未运行验证"
   },
   {
@@ -978,49 +978,49 @@
   {
     "kind": "服务端通知",
     "method": "thread/readState/changed",
-    "status": "待接入",
-    "entry": "",
-    "phase": "P3",
+    "status": "通知分支已接入，未运行验证",
+    "entry": "app/src/main/java/cn/codex/android/OriginalCoreHost.kt",
+    "phase": "待验证/继续语义审阅",
     "validation": "未运行验证"
   },
   {
     "kind": "服务端通知",
     "method": "thread/archived",
-    "status": "待接入",
-    "entry": "",
-    "phase": "P3",
+    "status": "通知分支已接入，未运行验证",
+    "entry": "app/src/main/java/cn/codex/android/OriginalCoreHost.kt",
+    "phase": "待验证/继续语义审阅",
     "validation": "未运行验证"
   },
   {
     "kind": "服务端通知",
     "method": "thread/deleted",
-    "status": "待接入",
-    "entry": "",
-    "phase": "P3",
+    "status": "通知分支已接入，未运行验证",
+    "entry": "app/src/main/java/cn/codex/android/OriginalCoreHost.kt",
+    "phase": "待验证/继续语义审阅",
     "validation": "未运行验证"
   },
   {
     "kind": "服务端通知",
     "method": "thread/unarchived",
-    "status": "待接入",
-    "entry": "",
-    "phase": "P3",
+    "status": "通知分支已接入，未运行验证",
+    "entry": "app/src/main/java/cn/codex/android/OriginalCoreHost.kt",
+    "phase": "待验证/继续语义审阅",
     "validation": "未运行验证"
   },
   {
     "kind": "服务端通知",
     "method": "thread/closed",
-    "status": "待接入",
-    "entry": "",
-    "phase": "P3",
+    "status": "通知分支已接入，未运行验证",
+    "entry": "app/src/main/java/cn/codex/android/OriginalCoreHost.kt",
+    "phase": "待验证/继续语义审阅",
     "validation": "未运行验证"
   },
   {
     "kind": "服务端通知",
     "method": "thread/reverted",
-    "status": "待接入",
-    "entry": "",
-    "phase": "P3",
+    "status": "通知分支已接入，未运行验证",
+    "entry": "app/src/main/java/cn/codex/android/OriginalCoreHost.kt",
+    "phase": "待验证/继续语义审阅",
     "validation": "未运行验证"
   },
   {
@@ -1034,17 +1034,17 @@
   {
     "kind": "服务端通知",
     "method": "thread/name/updated",
-    "status": "待接入",
-    "entry": "",
-    "phase": "P3",
+    "status": "通知分支已接入，未运行验证",
+    "entry": "app/src/main/java/cn/codex/android/OriginalCoreHost.kt",
+    "phase": "待验证/继续语义审阅",
     "validation": "未运行验证"
   },
   {
     "kind": "服务端通知",
     "method": "thread/attachment/updated",
-    "status": "待接入",
-    "entry": "",
-    "phase": "P3",
+    "status": "通知分支已接入，未运行验证",
+    "entry": "app/src/main/java/cn/codex/android/OriginalCoreHost.kt",
+    "phase": "待验证/继续语义审阅",
     "validation": "未运行验证"
   },
   {
@@ -1058,9 +1058,9 @@
   {
     "kind": "服务端通知",
     "method": "thread/prediction/updated",
-    "status": "待接入",
-    "entry": "",
-    "phase": "P3",
+    "status": "通知分支已接入，未运行验证",
+    "entry": "app/src/main/java/cn/codex/android/OriginalCoreHost.kt",
+    "phase": "待验证/继续语义审阅",
     "validation": "未运行验证"
   },
   {
@@ -1074,49 +1074,49 @@
   {
     "kind": "服务端通知",
     "method": "thread/queue/changed",
-    "status": "待接入",
-    "entry": "",
-    "phase": "P3",
+    "status": "通知分支已接入，未运行验证",
+    "entry": "app/src/main/java/cn/codex/android/OriginalCoreHost.kt",
+    "phase": "待验证/继续语义审阅",
     "validation": "未运行验证"
   },
   {
     "kind": "服务端通知",
     "method": "project/changed",
-    "status": "待接入",
-    "entry": "",
-    "phase": "P4",
+    "status": "通知分支已接入，未运行验证",
+    "entry": "app/src/main/java/cn/codex/android/OriginalCoreHost.kt",
+    "phase": "待验证/继续语义审阅",
     "validation": "未运行验证"
   },
   {
     "kind": "服务端通知",
     "method": "thread/project/updated",
-    "status": "待接入",
-    "entry": "",
-    "phase": "P3",
+    "status": "通知分支已接入，未运行验证",
+    "entry": "app/src/main/java/cn/codex/android/OriginalCoreHost.kt",
+    "phase": "待验证/继续语义审阅",
     "validation": "未运行验证"
   },
   {
     "kind": "服务端通知",
     "method": "thread/environment/connected",
-    "status": "待接入",
-    "entry": "",
-    "phase": "P3",
+    "status": "通知分支已接入，未运行验证",
+    "entry": "app/src/main/java/cn/codex/android/OriginalCoreHost.kt",
+    "phase": "待验证/继续语义审阅",
     "validation": "未运行验证"
   },
   {
     "kind": "服务端通知",
     "method": "thread/environment/disconnected",
-    "status": "待接入",
-    "entry": "",
-    "phase": "P3",
+    "status": "通知分支已接入，未运行验证",
+    "entry": "app/src/main/java/cn/codex/android/OriginalCoreHost.kt",
+    "phase": "待验证/继续语义审阅",
     "validation": "未运行验证"
   },
   {
     "kind": "服务端通知",
     "method": "thread/settings/updated",
-    "status": "待接入",
-    "entry": "",
-    "phase": "P3",
+    "status": "通知分支已接入，未运行验证",
+    "entry": "app/src/main/java/cn/codex/android/OriginalCoreHost.kt",
+    "phase": "待验证/继续语义审阅",
     "validation": "未运行验证"
   },
   {
