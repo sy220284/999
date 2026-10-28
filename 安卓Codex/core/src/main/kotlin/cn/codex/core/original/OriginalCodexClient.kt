@@ -165,6 +165,12 @@ class OriginalCodexClient(val connection: AppServerConnection) {
     suspend fun appendRealtimeText(thread: String, text: String) = call("thread/realtime/appendText", buildJsonObject { put("threadId",thread);put("text",text);put("role","user") })
     suspend fun appendRealtimeAudio(thread: String, bytes: ByteArray, sampleRate: Int, channels: Int) = call("thread/realtime/appendAudio", buildJsonObject { put("threadId",thread);put("audio",buildJsonObject { put("data",java.util.Base64.getEncoder().encodeToString(bytes));put("sampleRate",sampleRate);put("numChannels",channels);put("samplesPerChannel",bytes.size/(channels*2));put("itemId",JsonNull) }) },10_000)
     suspend fun stopRealtime(thread: String) = call("thread/realtime/stop", buildJsonObject { put("threadId",thread) })
+    suspend fun addQueue(thread:String,input:JsonArray,clientMessageId:String)=call("thread/queue/add",buildJsonObject{put("threadId",thread);put("input",input);put("clientUserMessageId",clientMessageId)})
+    suspend fun listQueue(thread:String,cursor:String?=null)=call("thread/queue/list",buildJsonObject{put("threadId",thread);put("limit",50);cursor?.let{put("cursor",it)}})
+    suspend fun updateQueue(thread:String,id:String,input:JsonArray)=call("thread/queue/update",buildJsonObject{put("threadId",thread);put("queuedSubmissionId",id);put("input",input)})
+    suspend fun deleteQueue(thread:String,id:String)=call("thread/queue/delete",buildJsonObject{put("threadId",thread);put("queuedSubmissionId",id)})
+    suspend fun reorderQueue(thread:String,ids:List<String>)=call("thread/queue/reorder",buildJsonObject{put("threadId",thread);put("queuedSubmissionIds",JsonArray(ids.map(::JsonPrimitive)))})
+    suspend fun startQueue(thread:String,id:String?)=call("thread/queue/start",buildJsonObject{put("threadId",thread);id?.let{put("queuedSubmissionId",it)}})
     private fun id(threadId: String) = buildJsonObject { put("threadId", threadId) }
     companion object {
         fun textInput(text: String) = buildJsonArray { add(buildJsonObject { put("type", "text"); put("text", text); put("text_elements", buildJsonArray {}) }) }

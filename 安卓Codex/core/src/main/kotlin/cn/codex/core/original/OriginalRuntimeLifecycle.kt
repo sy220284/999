@@ -8,7 +8,9 @@ data class OriginalLifecycleState(
     val completedTurnIds: Set<String> = emptySet()
 )
 sealed interface OriginalLifecycleEvent {
+    data class QueueSnapshot(val threadId:String,val activeTurnId:String?,val completedIds:List<String>):OriginalLifecycleEvent
     data class ThreadSelected(val threadId: String, val activeTurnId: String?) : OriginalLifecycleEvent
+    data class StartRejected(val requestId:String):OriginalLifecycleEvent
     data class StartRequested(val requestId: String) : OriginalLifecycleEvent
     data class StartResponded(val requestId: String, val threadId: String, val turnId: String) : OriginalLifecycleEvent
     data class TurnStarted(val threadId: String, val turnId: String) : OriginalLifecycleEvent
@@ -34,6 +36,9 @@ class OriginalRuntimeLifecycle {
         if (!isCurrent(epoch)) return state
         val old = state
         state = when (event) {
+            is OriginalLifecycleEvent.QueueSnapshot -> if(event.threadId!=old.threadId)old else old.copy(
+                turnId=event.activeTurnId,completedTurnIds=(old.completedTurnIds+event.completedIds).toList().takeLast(128).toSet(),
+                pendingStartRequestId=null,stoppingTurnId=old.stoppingTurnId?.takeIf{it==event.activeTurnId})
             is OriginalLifecycleEvent.ThreadUnavailable -> if (old.threadId == event.threadId)
                 old.copy(turnId = null, pendingStartRequestId = null, stoppingTurnId = null,
                     completedTurnIds = (old.completedTurnIds + listOfNotNull(old.turnId)).toList().takeLast(128).toSet()) else old
@@ -47,6 +52,7 @@ class OriginalRuntimeLifecycle {
                 if (old.threadId == event.threadId && (old.turnId != null || old.pendingStartRequestId != null)) old
                 else old.copy(threadId = event.threadId, turnId = event.activeTurnId?.takeIf { it.isNotBlank() }?.takeUnless { old.threadId == event.threadId && it in old.completedTurnIds }, pendingStartRequestId = null, stoppingTurnId = null, completedTurnIds = if (old.threadId == event.threadId) old.completedTurnIds else emptySet())
             }
+            is OriginalLifecycleEvent.StartRejected -> if(event.requestId==old.pendingStartRequestId)old.copy(pendingStartRequestId=null)else old
             is OriginalLifecycleEvent.StartRequested -> {
                 require(event.requestId.isNotBlank())
                 check(old.threadId != null && old.turnId == null && old.pendingStartRequestId == null) { "已有活动任务或正在等待启动确认" }

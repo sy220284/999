@@ -33,6 +33,7 @@ data class OriginalState(
     val guardianReviews: List<JsonObject> = emptyList(),
     val turnProgress: Map<String, OriginalTurnProgress> = emptyMap(),
     val threadUpdates: OriginalThreadUpdatesState = OriginalThreadUpdatesState(), val threadListVersion: Long = 0,
+    val turnNotificationVersion:Long=0,val queueMonitoring:Boolean=false,
     val events: OriginalEventState = OriginalEventState(), val toolBusy: Boolean = false,
     val sections: List<JsonObject> = emptyList(), val sectionCursor: String? = null,
     val turns: List<JsonObject> = emptyList(), val turnCursor: String? = null,
@@ -93,11 +94,12 @@ class OriginalCoreHost(
         { state.value.working || state.value.turnId != null || state.value.loading || state.value.closing || otherTaskRunning() || configurationChanging }, configurationJournal.lifecycle("账号授权与反馈"), CreditResetRequestStore(context))
     val migration: OriginalMigrationController = OriginalMigrationController(scope, workspace.absolutePath,
         { state.value.working || state.value.turnId != null || state.value.loading || state.value.closing || otherTaskRunning() || configurationChanging }, configurationJournal.lifecycle("配置与迁移"))
+    val queue=OriginalQueueController(scope,{state.value.loading || state.value.closing || otherTaskRunning() || configurationChanging},configurationJournal.lifecycle("待办队列变更"))
     val search=OriginalSearchController(scope,workspace.absolutePath)
     val realtime=OriginalRealtimeController(scope,{state.value.working || state.value.turnId!=null || state.value.loading || state.value.closing || otherTaskRunning() || configurationChanging},configurationJournal.lifecycle("实时会话"))
     val microphone=OriginalRealtimeMicrophone(context,scope){bytes -> realtime.sendAudio(bytes)}
     fun commandWorkspace() = workspace.absolutePath
-    val managedChanging get() = realtime.state.value.running || library.operations.state.value.mutating || services.operations.state.value.mutating || migration.operations.state.value.mutating
+    val managedChanging get() = queue.operations.state.value.mutating || realtime.state.value.running || library.operations.state.value.mutating || services.operations.state.value.mutating || migration.operations.state.value.mutating
     val configurationChanging get() = state.value.toolBusy || (context.applicationContext as CodexApplication).gitOperations.state.value.running || (context.applicationContext as CodexApplication).fullTerminal.state.value.running || commands.state.value.running || extensions.state.value.mutating || mcp.state.value.mutating || settings.state.value.mutating || files.state.value.mutating || managedChanging
     fun mcpImports() = McpTools(context).connections().map { it.name to it.url }
     private fun error(error: Throwable) { mutable.update { it.copy(error = error.message ?: "原版核心操作失败") } }
@@ -147,7 +149,7 @@ class OriginalCoreHost(
         ensureCurrent(epoch, rpc)
         if (config.apiKey.isNotBlank() && config.endpoint.trimEnd('/') == "https://api.openai.com/v1" && api.account().jsonObject["account"] == JsonNull) api.loginApiKey(config.apiKey)
         ensureCurrent(epoch, rpc)
-        client = api; search.bind(api);realtime.bind(api);extensions.bind(api); mcp.bind(api); commands.bind(api); settings.bind(api); files.bind(api); library.bind(api); services.bind(api); migration.bind(api)
+        client = api;queue.bind(api); search.bind(api);realtime.bind(api);extensions.bind(api); mcp.bind(api); commands.bind(api); settings.bind(api); files.bind(api); library.bind(api); services.bind(api); migration.bind(api)
         mutable.update { it.copy(connected = true, status = "原版核心已连接 · 凭证由手机 Keystore 加密保存", model = config.model) }
         refreshThreads(api, false); readAccount(api, epoch)
     }
@@ -155,7 +157,7 @@ class OriginalCoreHost(
     private fun closeSession(cancelStartup: Boolean) {
         if (state.value.closing) return
         lifecycle.disconnect(lifecycle.state.connectionEpoch)
-        microphone.stop();realtimeAudio.stop();search.bind(null);realtime.bind(null);remainingEvents.reset();toolJobs.values.toList().forEach { it.cancel() };toolJobs.clear()
+        microphone.stop();realtimeAudio.stop();queue.bind(null);search.bind(null);realtime.bind(null);remainingEvents.reset();toolJobs.values.toList().forEach { it.cancel() };toolJobs.clear()
         if (cancelStartup) startupJob?.cancel()
         operationJob?.cancel(); operationJob = null
         reservedTask = null
@@ -203,7 +205,7 @@ class OriginalCoreHost(
         mutable.update { it.copy(historyCursor = response.string("itemsBackwardsCursor").ifBlank { null }) }
     }
     private fun selectThread(thread: JsonObject, throughVersion: Long = state.value.threadUpdates.version) {
-        microphone.stop();realtimeAudio.stop()
+        microphone.stop();realtimeAudio.stop();queue.selectThread(thread.string("id"))
         val turns = (thread["turns"] as? JsonArray).orEmpty().mapNotNull { it as? JsonObject }
         val active = turns.lastOrNull { it.string("status") == "inProgress" }?.string("id")
         val items = OriginalThreadView.history(thread)
@@ -333,7 +335,7 @@ class OriginalCoreHost(
     fun removeThread(delete: Boolean) = operation { api ->
         val thread = idleThread()
         if (delete) api.deleteThread(thread) else api.unsubscribe(thread)
-        lifecycle.accept(lifecycle.state.connectionEpoch, OriginalLifecycleEvent.ThreadCleared); syncLifecycle()
+        lifecycle.accept(lifecycle.state.connectionEpoch, OriginalLifecycleEvent.ThreadCleared); syncLifecycle();queue.selectThread(null)
         mutable.update { it.copy(items = emptyList(), turnProgress = emptyMap(), goal = null, attachments = emptyList(), turns = emptyList(), historyCursor = null, attachmentCursor = null, turnCursor = null, status = if (delete) "会话已删除" else "已关闭当前会话视图") }
         refreshThreads(api, state.value.archived)
     }
@@ -398,13 +400,58 @@ class OriginalCoreHost(
         } catch (failure: Exception) { error(failure) }
     }
     private fun reserve(task: OriginalTurnTask, label: String) {
+        if(queue.operations.state.value.busy && task !is OriginalTurnTask.QueueStart){error(IllegalStateException("队列正在读取或确认，请稍后开始其他任务"));return}
         if (state.value.loading || state.value.working || configurationChanging || !state.value.connected) return
         if (!selectedThreadUsable()) { error(IllegalStateException("会话状态已变化，请先重新打开或恢复会话")); return }
-        if (state.value.turnId != null) { error(IllegalStateException("已恢复的回合仍在运行，请先停止或追加指令")); return }
+        if (state.value.turnId != null && task !is OriginalTurnTask.QueueAdd) { error(IllegalStateException("已恢复的回合仍在运行，请先停止或追加指令")); return }
         if (otherTaskRunning()) { error(IllegalStateException("另一个任务正在运行")); return }
         reservedTask = task
         mutable.update { it.copy(working = true, error = null) }
         try { startTask(label) } catch (failure: Exception) { reservedTask = null; mutable.update { it.copy(working = false) }; error(failure) }
+    }
+    fun canAddQueue()=!queue.operations.state.value.busy && state.value.connected && state.value.threadId!=null && selectedThreadUsable() && !state.value.loading && !configurationChanging && (!state.value.working || state.value.turnId!=null || state.value.queueMonitoring)
+    fun addQueued(text:String){
+        if(!canAddQueue() || text.isBlank())return
+        if(state.value.working)queue.add(text)
+        else reserve(OriginalTurnTask.QueueAdd(requireNotNull(state.value.threadId),text,UUID.randomUUID().toString()),"加入并托管待办队列")
+    }
+    fun startQueued(approved:JsonObject){
+        val thread=state.value.threadId ?: return
+        queue.prepareStart(approved){if(state.value.threadId==thread)reserve(OriginalTurnTask.QueueStart(thread,approved.string("id")),"执行待办队列")}
+    }
+    private suspend fun awaitQueueDrained(api:OriginalCodexClient,thread:String,epoch:Long,required:Boolean){
+        mutable.update{it.copy(queueMonitoring=true)}
+        var stableIdle=false
+        try{
+            while(current(epoch,api.connection)){
+                val version=state.value.turnNotificationVersion;val revision=queue.state.value.revision
+                val rows=try{queue.all(api,thread)}catch(failure:RpcException){
+                    if(!required && (failure.code == -32601 || failure.message.orEmpty().contains("user message queue is unavailable")))return
+                    throw failure
+                }
+                val snapshot=api.read(thread).jsonObject.getValue("thread").jsonObject
+                ensureCurrent(epoch,api.connection)
+                if(version!=state.value.turnNotificationVersion || revision!=queue.state.value.revision || queue.operations.state.value.mutating){stableIdle=false;delay(100);continue}
+                val turns=(snapshot["turns"] as? JsonArray).orEmpty().mapNotNull{it as? JsonObject}
+                val active=turns.lastOrNull{it.string("status")=="inProgress"}?.string("id")
+                val status=(snapshot["status"] as? JsonObject)?.string("type").orEmpty()
+                if(status !in setOf("idle","active"))throw ThreadUnavailable("会话已卸载或状态未知，请重新打开核查队列")
+                lifecycle.accept(epoch,OriginalLifecycleEvent.QueueSnapshot(thread,active,turns.filter{it.string("status")!="inProgress"}.map{it.string("id")}));syncLifecycle()
+                val idle=status=="idle" && active==null
+                val interrupted=turns.lastOrNull()?.string("status")=="interrupted"
+                if(idle && (rows.isEmpty() || interrupted)){
+                    if(stableIdle){
+                        if(rows.isNotEmpty())mutable.update{it.copy(status="当前任务已停止，剩余待办保留，可稍后执行")}
+                        else mutable.update{it.copy(status=if(it.error!=null)it.status else "任务与待办队列已处理结束")}
+                        return
+                    }
+                    stableIdle=true
+                }else stableIdle=false
+                // 事件唤醒优先；一秒兜底读取实际运行状态，避免依赖通知数量或ACK推断完成。
+                withTimeoutOrNull(if(stableIdle)200L else 1000L){state.first{it.turnNotificationVersion!=version || queue.state.value.revision!=revision || !it.connected}}
+            }
+        }catch(failure:Exception){if(failure !is CancellationException && current(epoch,api.connection))api.connection.close();throw failure}
+        finally{if(current(epoch,api.connection))mutable.update{it.copy(queueMonitoring=false)}}
     }
     @Suppress("UNUSED_PARAMETER")
     suspend fun runReserved(text: String) {
@@ -421,12 +468,20 @@ class OriginalCoreHost(
                 ensureCurrent(epoch, api.connection); selectThread(thread)
             }
             val thread = requireNotNull(lifecycle.state.threadId)
+            if(task is OriginalTurnTask.QueueAdd){
+                check(task.threadId==thread)
+                val result=api.addQueue(thread,OriginalCodexClient.textInput(task.text),task.clientMessageId).jsonObject["queuedSubmission"] as? JsonObject ?: error("加入结果缺少待办条目")
+                require(result.string("id").isNotBlank() && result.string("clientUserMessageId")==task.clientMessageId){"加入结果标识不匹配，请刷新核查"}
+                awaitQueueDrained(api,thread,epoch,true);turnFinished=true;return
+            }
             val request = UUID.randomUUID().toString()
             lifecycle.accept(epoch, OriginalLifecycleEvent.StartRequested(request))
             val waiting = TurnWaiter(epoch, thread, request).also { waiter = it; turnWaiter = it }
             val response = coroutineScope {
                 val requestResponse = async {
                     when (task) {
+                        is OriginalTurnTask.QueueAdd -> error("加入队列由独立托管分支处理")
+                        is OriginalTurnTask.QueueStart -> {check(thread==task.threadId);api.startQueue(thread,task.id)}
                         is OriginalTurnTask.Prompt -> api.turn(thread, task.text, configLoader().reasoning)
                         is OriginalTurnTask.Review -> { check(thread == task.threadId) { "审查所属会话已变化" }; api.review(thread, task.target) }
                         is OriginalTurnTask.Shell -> { check(thread == task.threadId); api.threadShell(thread, task.command, task.timeoutMs) }
@@ -447,6 +502,7 @@ class OriginalCoreHost(
             waiting.outcomes[turnId]?.let { outcome -> applyOutcome(outcome); waiting.finished.complete(Unit) }
             if (!waiting.finished.isCompleted) mutable.update { it.copy(status = "正在处理") }
             waiting.finished.await(); turnFinished = true
+            awaitQueueDrained(api,thread,epoch,task is OriginalTurnTask.QueueStart)
             if (current(epoch, api.connection)) refreshThreads(api, false)
         } catch (cancelled: CancellationException) {
             if (current(epoch, api.connection)) {
@@ -456,7 +512,10 @@ class OriginalCoreHost(
             if (cancelled !is TimeoutCancellationException) throw cancelled
         } catch (failure: Exception) {
             if (current(epoch, api.connection)) {
-                if (failure is ThreadUnavailable) error(failure)
+                if(failure is RpcException && (task is OriginalTurnTask.QueueAdd || task is OriginalTurnTask.QueueStart) && failure.code in setOf(-32601,-32602)){
+                    turnWaiter?.let{lifecycle.accept(epoch,OriginalLifecycleEvent.StartRejected(it.requestId))};syncLifecycle()
+                    error(OriginalQueueData.label(failure))
+                } else if (failure is ThreadUnavailable) error(failure)
                 else if (turnFinished) error(IllegalStateException("任务已结束，但刷新会话失败：${failure.message.orEmpty()}"))
                 else { close(); error(IllegalStateException("任务状态无法确认，核心已关闭。请恢复会话检查修改。${failure.message.orEmpty()}")) }
             }
@@ -563,6 +622,7 @@ class OriginalCoreHost(
             }
             return
         }
+        if(method=="thread/queue/changed")queue.changed(params.string("threadId"))
         if (method in setOf("thread/started", "thread/readState/changed", "thread/archived", "thread/deleted", "thread/unarchived", "thread/closed", "thread/reverted", "thread/name/updated", "thread/attachment/updated", "thread/prediction/updated", "thread/queue/changed", "project/changed", "thread/project/updated", "thread/environment/connected", "thread/environment/disconnected", "thread/settings/updated")) {
             val updated = OriginalThreadUpdates.reduce(state.value.threadUpdates, method, params)
             val id = if (method == "thread/started") (params["thread"] as? JsonObject)?.string("id").orEmpty() else params.string("threadId")
@@ -646,12 +706,14 @@ class OriginalCoreHost(
                 mutable.update { it.copy(turnProgress = OriginalLiveUpdates.reduce(it.turnProgress, method, params)) }
             }
             "turn/started" -> {
+                mutable.update{it.copy(turnNotificationVersion=it.turnNotificationVersion+1)}
                 val id = (params["turn"] as? JsonObject)?.string("id").orEmpty()
                 if (id.isNotBlank() && id !in lifecycle.state.completedTurnIds) turnWaiter?.takeIf { it.epoch == epoch && it.threadId == params.string("threadId") }?.observedStart?.complete(id)
                 lifecycle.accept(epoch, OriginalLifecycleEvent.TurnStarted(params.string("threadId"), id)); syncLifecycle()
                 if (lifecycle.state.turnId == id && id.isNotBlank()) mutable.update { it.copy(status = "正在处理") }
             }
             "turn/completed" -> {
+                mutable.update{it.copy(turnNotificationVersion=it.turnNotificationVersion+1)}
                 val turn = params["turn"] as? JsonObject ?: return
                 val id = turn.string("id"); if (id.isBlank()) return
                 val wasActive = lifecycle.state.turnId == id

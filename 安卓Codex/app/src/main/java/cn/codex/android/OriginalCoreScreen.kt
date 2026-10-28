@@ -29,9 +29,10 @@ import kotlinx.serialization.json.*
     val libraryStatus by host.library.operations.state.collectAsState()
     val servicesStatus by host.services.operations.state.collectAsState()
     val migrationStatus by host.migration.operations.state.collectAsState()
+    val queueStatus by host.queue.operations.state.collectAsState()
     val searchStatus by host.search.state.collectAsState()
     val realtimeStatus by host.realtime.state.collectAsState()
-    val managedBusy = realtimeStatus.running || libraryStatus.mutating || servicesStatus.mutating || migrationStatus.mutating
+    val managedBusy = queueStatus.busy || realtimeStatus.running || libraryStatus.mutating || servicesStatus.mutating || migrationStatus.mutating
     val configurationRecords by host.configurationJournal.records.collectAsState()
     val configurationReadError by host.configurationJournal.readError.collectAsState()
     val activeConfiguration by host.configurationJournal.active.collectAsState()
@@ -122,6 +123,11 @@ import kotlinx.serialization.json.*
             if (!state.connected) item {
                 Text("此入口使用随应用安装的原版核心，连接原版会话与账号。缺少运行核心时会提示具体原因。", style = MaterialTheme.typography.bodyMedium)
                 Button(onClick = { consent = true }, enabled = !state.loading && !state.closing) { Text(if (state.loading) "正在启动" else "启动原版核心") }
+            }
+            if(queueStatus.error!=null) item {
+                Surface(shape=RoundedCornerShape(14.dp),color=MaterialTheme.colorScheme.errorContainer){Column(Modifier.fillMaxWidth().padding(14.dp)){
+                    Text(queueStatus.error.orEmpty());TextButton(onClick={sessionInitialTab="待办";sessionManager=true}){Text("查看待办并核查结果")}
+                }}
             }
             if(searchStatus.error!=null) item {
                 Surface(shape=RoundedCornerShape(14.dp),color=MaterialTheme.colorScheme.errorContainer){Column(Modifier.fillMaxWidth().padding(14.dp)){
@@ -217,6 +223,7 @@ import kotlinx.serialization.json.*
                 if (state.threadId != null) item {
                     HorizontalDivider()
                     Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                        TextButton(onClick={sessionInitialTab="待办";sessionManager=true},enabled=!state.loading){Text("待办队列")}
                         TextButton(onClick = { sessionInitialTab = "目标"; sessionManager = true }, enabled = !state.loading) { Text("目标与会话管理") }
                         TextButton(onClick = { host.fork() }, enabled = editable) { Text("分叉") }
                         TextButton(onClick = { renamed = "" }, enabled = editable) { Text("重命名") }

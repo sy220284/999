@@ -38,7 +38,7 @@ import kotlinx.serialization.json.*
             listOf("全部", "待完成", "代码已接入", "平台受限").forEach { value -> FilterChip(filter == value, { filter = value }, label = { Text(value) }, modifier = Modifier.padding(end = 8.dp)) }
         } }
         items(rows.filter { row -> (kind == "全部类型" || row.string("kind") == kind) && when (filter) {
-            "待完成" -> listOf("待接入","未接","未完成","缺少","有限").any { row.string("status").contains(it) }
+            "待完成" -> listOf("待接入","未接","未完成","未实现","缺少","有限").any { row.string("status").contains(it) }
             "代码已接入" -> row.string("status").contains("已接入")
             "平台受限" -> row.string("status").contains("平台受限")
             else -> true

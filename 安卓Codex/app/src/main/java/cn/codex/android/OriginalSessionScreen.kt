@@ -27,6 +27,7 @@ import kotlinx.serialization.json.*
     val commands by host.commands.state.collectAsState()
     val libraryStatus by host.library.operations.state.collectAsState()
     val servicesStatus by host.services.operations.state.collectAsState()
+    val queueStatus by host.queue.operations.state.collectAsState()
     val realtimeStatus by host.realtime.state.collectAsState()
     val migrationStatus by host.migration.operations.state.collectAsState()
     var tab by remember(initialTab) { mutableStateOf(initialTab) }
@@ -37,7 +38,7 @@ import kotlinx.serialization.json.*
     var ownerTypeInput by remember(state.ownerType) { mutableStateOf(state.ownerType) }
     var ownerKeyInput by remember(state.ownerKey) { mutableStateOf(state.ownerKey) }
     var before by remember(state.threadId) { mutableStateOf("") }
-    val editable = state.connected && !state.loading && !state.working && state.turnId == null && !extensions.mutating && !mcp.mutating && !settings.mutating && !files.mutating && !commands.running && !fullTerminal.running && !networkGit.running && !libraryStatus.mutating && !servicesStatus.mutating && !migrationStatus.mutating && !realtimeStatus.running && host.selectedThreadUsable()
+    val editable = state.connected && !state.loading && !state.working && state.turnId == null && !extensions.mutating && !mcp.mutating && !settings.mutating && !files.mutating && !commands.running && !fullTerminal.running && !networkGit.running && !libraryStatus.mutating && !servicesStatus.mutating && !migrationStatus.mutating && !realtimeStatus.running && !queueStatus.busy && host.selectedThreadUsable()
     BackHandler(onBack = onBack)
     LaunchedEffect(state.connectionEpoch, state.threadId) { confirm = null; goalEdit = false; sectionEdit = null; attachmentEdit = false }
     LaunchedEffect(tab, state.threadId) {
@@ -49,13 +50,14 @@ import kotlinx.serialization.json.*
             Text("会话管理", style = MaterialTheme.typography.titleLarge, modifier = Modifier.padding(top = 12.dp))
         }
         Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).padding(horizontal = 20.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            listOf("目标", "资料", "分区", "历史", "代码审查", "Git 资料", "内存会话", "资料所属", "高级操作").forEach { title -> FilterChip(tab == title, { tab = title }, enabled = !state.loading, label = { Text(title) }) }
+            listOf("目标", "待办", "资料", "分区", "历史", "代码审查", "Git 资料", "内存会话", "资料所属", "高级操作").forEach { title -> FilterChip(tab == title, { tab = title }, enabled = !state.loading, label = { Text(title) }) }
         }
         if (state.loading) LinearProgressIndicator(Modifier.fillMaxWidth())
         LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(20.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
             item { Text(state.threadId?.let { "当前会话：$it" } ?: "请先返回选择会话，或管理全局分区。", style = MaterialTheme.typography.bodySmall); Text(state.status, color = MaterialTheme.colorScheme.primary) }
             if (state.threadId != null) item { OriginalThreadSyncPanel(host, onAttachments = { tab = "资料"; host.loadAttachments() }, onHistory = { host.openThread(state.threadId!!) }) }
             state.error?.let { message -> item { Text(message, color = MaterialTheme.colorScheme.error); TextButton(onClick = host::dismissError) { Text("知道了") } } }
+            if(tab=="待办" && state.threadId!=null)item{OriginalQueuePanel(host,onBack)}
             if (tab == "高级操作" && state.threadId != null) item { OriginalThreadAdvanced(host, editable, onBack) }
             if (tab == "代码审查" && state.threadId != null) item {
                 OriginalReviewForm(editable) { type, value, title -> host.startReview(type, value, title); if (host.state.value.working) onBack() }

@@ -32,6 +32,10 @@ class OriginalCoreHostTest {
         var holdResume = false
         var turn: suspend (FakeSession, JsonObject) -> Unit = { _, _ -> }
         var review: suspend (FakeSession, JsonObject) -> Unit = { _, _ -> }
+        var queueImplemented=false
+        val queueRows=mutableListOf<JsonObject>()
+        @Volatile var runtimeTurn:String?=null
+        var queueStart:suspend(FakeSession,JsonObject)->Unit={_,_->}
         var shell: suspend (FakeSession, JsonObject) -> Unit = { _, _ -> }
         override val connection = AppServerConnection(incoming, clientOutput, scope, { serverOutput.close() })
         private val loop = scope.launch(Dispatchers.IO) {
@@ -47,6 +51,9 @@ class OriginalCoreHostTest {
                         "account/read" -> reply(request, buildJsonObject { put("account", JsonNull) })
                         "thread/list" -> reply(request, buildJsonObject { put("data", buildJsonArray {}) })
                         "thread/start", "thread/resume" -> if (!holdResume || request.string("method") == "thread/start") reply(request, thread(resumedTurn))
+                        "thread/queue/list" -> if(queueImplemented)reply(request,buildJsonObject{put("data",JsonArray(queueRows.toList()));put("nextCursor",JsonNull)}) else emit(buildJsonObject{put("id",request.getValue("id"));put("error",buildJsonObject{put("code",-32601);put("message","queue unsupported in fake")})})
+                        "thread/queue/start" -> queueStart(this@FakeSession,request)
+                        "thread/read" -> reply(request,buildJsonObject{put("thread",JsonObject(thread(runtimeTurn).getValue("thread").jsonObject + ("status" to buildJsonObject{put("type",if(runtimeTurn==null)"idle"else "active");put("activeFlags",buildJsonArray{})})))})
                         "turn/start" -> { turnStarts.incrementAndGet(); turn(this@FakeSession, request) }
                         "review/start" -> review(this@FakeSession, request)
                         "thread/shellCommand" -> shell(this@FakeSession, request)
@@ -59,8 +66,8 @@ class OriginalCoreHostTest {
         @Synchronized fun emit(frame: JsonObject) { serverOutput.write((frame.toString() + "\n").toByteArray()); serverOutput.flush() }
         fun reply(request: JsonObject, value: JsonObject) = emit(buildJsonObject { put("id", request.getValue("id")); put("result", value) })
         fun notify(method: String, params: JsonObject) = emit(buildJsonObject { put("method", method); put("params", params) })
-        fun started(id: String) = notify("turn/started", buildJsonObject { put("threadId", "thread"); put("turn", obj("id" to id, "status" to "inProgress")) })
-        fun completed(id: String) = notify("turn/completed", buildJsonObject { put("threadId", "thread"); put("turn", obj("id" to id, "status" to "completed")) })
+        fun started(id:String){runtimeTurn=id;notify("turn/started", buildJsonObject { put("threadId", "thread"); put("turn", obj("id" to id, "status" to "inProgress")) })}
+        fun completed(id:String){if(runtimeTurn==id)runtimeTurn=null;notify("turn/completed", buildJsonObject { put("threadId", "thread"); put("turn", obj("id" to id, "status" to "completed")) })}
         suspend fun next(method: String): JsonObject = withTimeout(5000) { while (true) { val frame = received.receive(); if (frame.string("method") == method) return@withTimeout frame }; error("unreachable") }
         override fun close() { closed.incrementAndGet(); if (!deferClose) dispose(); if (failClose) throw IOException("test close failure") }
         fun dispose() { if (disposed.compareAndSet(false, true)) { connection.close(); loop.cancel(); runCatching { reader.close() } } }
@@ -388,6 +395,26 @@ class OriginalCoreHostTest {
             }
             val seconds=response.getValue("result").jsonObject.getValue("currentTimeAt").jsonPrimitive.long
             assertTrue(seconds in before..(System.currentTimeMillis()/1000L));assertTrue(host.state.value.requests.isEmpty())
+        }finally{withContext(Dispatchers.Main){host.close()};session.dispose();scope.cancel()}
+    }
+
+    @Test fun queuedStartWaitsForAutomaticFollowupTurnAndDoesNotSubmitANormalPrompt()=runBlocking {
+        val scope=CoroutineScope(SupervisorJob()+Dispatchers.Main.immediate)
+        lateinit var session:FakeSession
+        val item=buildJsonObject{put("id","q");put("input",OriginalCodexClient.textInput("queued"));put("clientUserMessageId","c")}
+        val host=host(scope,OriginalEngineFactory{launch->FakeSession(launch.scope).also{
+            session=it;it.queueImplemented=true;it.queueRows+=item
+            it.queueStart={server,request->server.queueRows.clear();server.started("Q");server.completed("Q");server.started("follow");server.reply(request,buildJsonObject{put("turn",obj("id" to "Q","status" to "inProgress"))})}
+        }})
+        try{
+            withContext(Dispatchers.Main){host.connect()};ready(host)
+            withContext(Dispatchers.Main){host.openThread("thread")};withTimeout(5000){host.state.first{!it.loading && it.threadId=="thread"}}
+            withContext(Dispatchers.Main){host.startQueued(item)}
+            withTimeout(5000){host.state.first{it.queueMonitoring && it.turnId=="follow"}}
+            assertTrue(host.state.value.working);assertEquals(0,session.turnStarts.get())
+            session.completed("follow")
+            withTimeout(5000){host.state.first{!it.working}}
+            assertTrue(host.state.value.connected);assertNull(host.state.value.turnId)
         }finally{withContext(Dispatchers.Main){host.close()};session.dispose();scope.cancel()}
     }
 
