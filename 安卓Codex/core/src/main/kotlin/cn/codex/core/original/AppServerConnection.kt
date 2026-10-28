@@ -80,7 +80,7 @@ class AppServerConnection(
         try { awaitCancellation() } finally { shutdown(IOException("连接所属任务已结束")) }
     }
 
-    suspend fun request(method: String, params: JsonElement? = null, timeoutMs: Long = 60_000): JsonElement {
+    suspend fun request(method: String, params: JsonElement? = null, timeoutMs: Long = 60_000, onRequestId: (JsonElement) -> Unit = {}): JsonElement {
         check(closed.get() == null) { "原版核心未连接" }
         val id = JsonPrimitive(ids.incrementAndGet())
         val waiter = CompletableDeferred<JsonElement>()
@@ -94,6 +94,7 @@ class AppServerConnection(
             return withTimeout(timeoutMs) {
                 withContext(Dispatchers.IO) { send(buildJsonObject { put("id", id); put("method", method); if (params != null) put("params", params) }) }
                 writing.set(false)
+                onRequestId(id)
                 waiter.await()
             }
         } finally {

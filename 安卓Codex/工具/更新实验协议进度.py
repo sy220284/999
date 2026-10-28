@@ -29,6 +29,32 @@ controllers={
  'thread/realtime/':'core/src/main/kotlin/cn/codex/core/original/OriginalRealtimeController.kt'}
 ui={'thread/queue/':'app/src/main/java/cn/codex/android/OriginalQueuePanel.kt','process/':'app/src/main/java/cn/codex/android/OriginalCommandScreen.kt','fuzzyFileSearch/session':'app/src/main/java/cn/codex/android/OriginalExperimentalScreens.kt','thread/realtime/':'app/src/main/java/cn/codex/android/OriginalExperimentalScreens.kt'}
 client=(r/client_path).read_text()
+completion_groups={
+ 'project/':('OriginalProjectsController.kt','OriginalCompletionScreens.kt'),
+ 'thread/search':('OriginalHistoryController.kt','OriginalCompletionScreens.kt'),
+ 'thread/readState/update':('OriginalHistoryController.kt','OriginalCompletionScreens.kt'),
+ 'thread/items/read':('OriginalHistoryController.kt','OriginalCompletionScreens.kt'),
+ 'thread/timeline/list':('OriginalHistoryController.kt','OriginalCompletionScreens.kt'),
+ 'thread/backgroundTerminals/':('OriginalHistoryController.kt','OriginalCompletionScreens.kt'),
+ 'thread/settings/update':('OriginalAdvancedController.kt','OriginalCompletionScreens.kt'),
+ 'turn/settings/update':('OriginalAdvancedController.kt','OriginalCompletionScreens.kt'),
+ 'thread/memory':('OriginalAdvancedController.kt','OriginalCompletionScreens.kt'),
+ 'memory/':('OriginalAdvancedController.kt','OriginalCompletionScreens.kt'),
+ 'rollout/':('OriginalAdvancedController.kt','OriginalCompletionScreens.kt'),
+ 'thread/sample':('OriginalAdvancedController.kt','OriginalCompletionScreens.kt'),
+ 'thread/increment_elicitation':('OriginalAdvancedController.kt','OriginalCompletionScreens.kt'),
+ 'thread/decrement_elicitation':('OriginalAdvancedController.kt','OriginalCompletionScreens.kt'),
+ 'plugin/search':('OriginalAdvancedController.kt','OriginalCompletionScreens.kt'),
+ 'collaborationMode/list':('OriginalAdvancedController.kt','OriginalCompletionScreens.kt'),
+ 'server/diagnostics':('OriginalAdvancedController.kt','OriginalCompletionScreens.kt'),
+ 'remoteControl/':('OriginalConnectionsController.kt','OriginalCompletionScreens.kt'),
+ 'environment/':('OriginalConnectionsController.kt','OriginalCompletionScreens.kt'),
+ 'mcpServer/event/':('OriginalConnectionsController.kt','OriginalCompletionScreens.kt'),
+ 'account/bedrock/':('OriginalConnectionsController.kt','OriginalCompletionScreens.kt'),
+ 'userVerification/':('OriginalConnectionsController.kt','OriginalCompletionScreens.kt')}
+for prefix,(controller,screen)in completion_groups.items():
+    controllers[prefix]='core/src/main/kotlin/cn/codex/core/original/'+controller
+    ui[prefix]='app/src/main/java/cn/codex/android/'+screen
 rows=[]
 for kind,entries,stable in [('客户端请求',clients,known('ClientRequest.ts')),('服务端请求',servers,known('ServerRequest.ts'))]:
     for variant,method,body in entries:
@@ -46,15 +72,17 @@ for kind,entries,stable in [('客户端请求',clients,known('ClientRequest.ts')
         elif kind=='服务端请求' and method=='currentTime/read':
             entry='app/src/main/java/cn/codex/android/OriginalCoreHost.kt';assert 'message.method == "currentTime/read"'in(r/entry).read_text()
             status,phase='本机秒级时间回调代码已接入，未运行验证','运行验收'
-        elif f'call("{method}"'in client:
+        elif f'call("{method}"'in client or f'connection.request("{method}"'in client:
             group=next(k for k in controllers if method.startswith(k))
             entry=client_path+';'+controllers[group]+';'+ui[group]
             if method.startswith('thread/queue/'):
                 entry+=';app/src/main/java/cn/codex/android/OriginalCoreHost.kt'
             status,phase='实验调用/通知/中文操作代码已接入，未运行验证','运行验收'
+            if method.startswith('userVerification/'):
+                status,phase='能力核查与交互代码已接，Android本机验证提供者待实现','提供者缺口'
         rows.append(dict(kind=kind,method=method,status=status,entry=entry,phase=phase,validation='未运行验证',scope='Rust实验/默认TS省略',params=params,response=response))
 with(r/'文档/实验协议执行清单.csv').open('w',newline='')as f:
     writer=csv.DictWriter(f,fieldnames=list(rows[0]),lineterminator='\n');writer.writeheader();writer.writerows(rows)
 (r/'app/src/main/assets/实验协议进度.json').write_text(json.dumps(rows,ensure_ascii=False,indent=2)+'\n')
 print(f'Rust客户端{len(clients)}、服务端{len(servers)}、通知{len(notifs)}；默认清单外{len(rows)}项，合计{len(clients)+len(servers)+len(notifs)}项。')
-print('实验已接入',sum('已接入'in x['status']for x in rows),'待接入',sum('待接入'in x['status']for x in rows),'开发专用',sum('开发专用'==x['phase']for x in rows),'原版未实现',sum(x['phase']=='原版缺口'for x in rows))
+print('实验已接入',sum('已接入'in x['status']for x in rows),'待接入',sum('待接入'in x['status']for x in rows),'开发专用',sum('开发专用'==x['phase']for x in rows),'原版未实现',sum(x['phase']=='原版缺口'for x in rows),'提供者缺口',sum(x['phase']=='提供者缺口'for x in rows))

@@ -30,9 +30,13 @@ import kotlinx.serialization.json.*
     val servicesStatus by host.services.operations.state.collectAsState()
     val migrationStatus by host.migration.operations.state.collectAsState()
     val queueStatus by host.queue.operations.state.collectAsState()
+    val projectsStatus by host.projects.operations.state.collectAsState()
+    val historyStatus by host.history.operations.state.collectAsState()
+    val advancedStatus by host.advanced.operations.state.collectAsState()
+    val connectionsStatus by host.connections.operations.state.collectAsState()
     val searchStatus by host.search.state.collectAsState()
     val realtimeStatus by host.realtime.state.collectAsState()
-    val managedBusy = queueStatus.busy || realtimeStatus.running || libraryStatus.mutating || servicesStatus.mutating || migrationStatus.mutating
+    val managedBusy = projectsStatus.mutating || historyStatus.mutating || advancedStatus.mutating || connectionsStatus.mutating || queueStatus.busy || realtimeStatus.running || libraryStatus.mutating || servicesStatus.mutating || migrationStatus.mutating
     val configurationRecords by host.configurationJournal.records.collectAsState()
     val configurationReadError by host.configurationJournal.readError.collectAsState()
     val activeConfiguration by host.configurationJournal.active.collectAsState()
@@ -74,6 +78,10 @@ import kotlinx.serialization.json.*
     advancedManager?.let { page ->
         val allow = !state.working && state.turnId == null && !state.loading && !extensionState.mutating && !mcpState.mutating && !settingsState.mutating && !filesState.mutating && !fullTerminalState.running && !networkGit.running && !commandState.running && !managedBusy
         when (page) {
+            "项目管理" -> OriginalProjectsScreen(host) { advancedManager = null }
+            "搜索与会话记录" -> OriginalHistoryScreen(host,onOpen={id->host.openThread(id);advancedManager=null}) { advancedManager = null }
+            "会话设置与记忆" -> OriginalAdvancedScreen(host) { advancedManager = null }
+            "连接、订阅与认证" -> OriginalConnectionsScreen(host) { advancedManager = null }
             "市场、分享与应用" -> OriginalLibraryScreen(host.library, allow, host::close) { advancedManager = null }
             "授权、额度与反馈" -> OriginalServicesScreen(host.services, host.commandWorkspace(), allow, host::close) { advancedManager = null }
             "迁移、配置与工具" -> OriginalMigrationScreen(host.migration, host.commandWorkspace(), state.threadId, allow, host::close) { advancedManager = null }
@@ -160,7 +168,7 @@ import kotlinx.serialization.json.*
                     OutlinedButton(onClick = { skillsManager = true; host.extensions.refreshSkills() }, enabled = !state.loading) { Text("原版技能管理") }
                     TextButton(onClick = { eventsManager = true }) { Text("运行动态与能力") }
                     Row { TextButton(onClick={realtimeManager=true}){Text("实时文字与语音")};TextButton(onClick={searchManager=true}){Text("持续搜索项目")} }
-                    listOf("市场、分享与应用", "授权、额度与反馈", "迁移、配置与工具").forEach { title -> OutlinedButton(onClick = { advancedManager = title }, enabled = !state.loading) { Text(title) } }
+                    listOf("项目管理", "搜索与会话记录", "会话设置与记忆", "连接、订阅与认证", "市场、分享与应用", "授权、额度与反馈", "迁移、配置与工具").forEach { title -> OutlinedButton(onClick = { advancedManager = title }, enabled = !state.loading) { Text(title) } }
                     Text(state.account, style = MaterialTheme.typography.titleSmall)
                     Text("账号与 MCP 凭证由 Android Keystore 加密保存在手机，退出核心后仍可恢复。", style = MaterialTheme.typography.bodySmall)
                     Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {

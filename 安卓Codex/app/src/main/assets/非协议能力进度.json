@@ -1,0 +1,72 @@
+[
+  {
+    "id": "native-core",
+    "title": "原版核心与工具产物",
+    "status": "待构建与实机验证",
+    "detail": "核心、代码模式、rg和Git已有来源及脚本；尚无本轮构建产物。",
+    "acceptance": "恢复构建授权后核对双ABI、16KB页、动态依赖和实际执行。"
+  },
+  {
+    "id": "language",
+    "title": "手机语言运行环境",
+    "status": "待实现",
+    "detail": "尚未内置Node、Python、npm；填写MCP命令不会自动安装环境。",
+    "acceptance": "固定可信来源，完成Android构建、标准库与扩展目录、命令查找和能力检测。"
+  },
+  {
+    "id": "git-network",
+    "title": "Git命令网络与SSH",
+    "status": "待实现",
+    "detail": "JGit页面已有HTTPS代码；原生Git命令目前是本地能力。",
+    "acceptance": "补可信TLS/SSH依赖、证书与主机密钥校验、加密凭证及失败恢复。"
+  },
+  {
+    "id": "webrtc",
+    "title": "WebRTC语音",
+    "status": "待实现",
+    "detail": "WebSocket文字/PCM代码已有；收到SDP不代表媒体连接可用。",
+    "acceptance": "固定媒体依赖，完成SDP/ICE、声路、焦点、后台和断连回收。"
+  },
+  {
+    "id": "auth-provider",
+    "title": "外部刷新与设备证明",
+    "status": "缺外部提供者",
+    "detail": "当前没有服务认可的令牌刷新/证明提供者；不使用随机token冒充。",
+    "acceptance": "按受认可服务合同接入，分别满足10秒与100毫秒预算；无提供者继续返回明确错误。"
+  },
+  {
+    "id": "user-verification",
+    "title": "Android本机用户验证",
+    "status": "待实现",
+    "detail": "五项能力检查/交互已接；固定原版仅macOS提供实际本机验证。",
+    "acceptance": "补账号命名空间隔离、系统生物认证、受保护P256密钥、签名和取消桥接。"
+  },
+  {
+    "id": "schema",
+    "title": "完整复杂表单",
+    "status": "有限实现",
+    "detail": "已支持嵌套/组合/条件和本地引用等；外部引用、递归等仍有限。",
+    "acceptance": "完善受支持词汇与资源预算，未知规则保持拒绝；不得绕过验证自动接受。"
+  },
+  {
+    "id": "supply",
+    "title": "V8可信供应链",
+    "status": "缺可信工具锁及产物",
+    "detail": "GN/Ninja独立可信哈希未提供；不从下载结果自行生成信任。",
+    "acceptance": "取得可追溯的工具锁与实际归档/绑定，再核查链接和Android行为。"
+  },
+  {
+    "id": "ui",
+    "title": "中文交互、动效与无障碍",
+    "status": "待真机验收",
+    "detail": "已有中文侧栏、原生控件和动效代码；没有截图、帧率或功耗验收。",
+    "acceptance": "在Android17目标手机检查返回/键盘/横屏/大字/TalkBack、流畅度和后台策略。"
+  },
+  {
+    "id": "acceptance",
+    "title": "测试与真实服务验收",
+    "status": "未执行",
+    "detail": "当前授权不构建，测试方法只有源码；未调用模型、OAuth或实际录音。",
+    "acceptance": "按执行方案恢复编译、故障注入、真机和有授权的服务验收，保留真实日志。"
+  }
+]

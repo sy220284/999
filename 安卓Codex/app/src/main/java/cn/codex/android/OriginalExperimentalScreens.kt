@@ -75,6 +75,8 @@ import kotlinx.serialization.json.*
             TextButton(onClick=::back){Text("返回工作区")};Text("实时文字与语音",style=MaterialTheme.typography.headlineSmall)
             Text(state.status,color=MaterialTheme.colorScheme.primary)
             Text("通过WebSocket连接原版实时服务。文字、录音会发送给服务提供方并可能产生用量；结束前保留前台运行提示，进入后台会请求结束。",style=MaterialTheme.typography.bodySmall)
+            TextButton(onClick={host.realtime.voices()},enabled=core.connected && !state.voicesBusy){Text("读取可用声音")}
+            state.voices?.let{SelectionContainer{Text(it.toString().take(8192),style=MaterialTheme.typography.bodySmall)}}
             if(core.threadId==null)Text("请先返回工作区创建或选择会话。")
             Row{Checkbox(audioOutput,{audioOutput=it},enabled=!state.running);Text("请求音频回复",Modifier.padding(top=12.dp))}
             Row{Checkbox(consent,{consent=it},enabled=!state.running);Text("我确认开始实时会话并使用服务额度",Modifier.padding(top=12.dp))}
@@ -82,6 +84,7 @@ import kotlinx.serialization.json.*
             if(state.running){
                 OutlinedTextField(text,{text=it},label={Text("实时文字输入")},modifier=Modifier.fillMaxWidth())
                 Row{TextButton(onClick={host.realtime.send(text);text=""},enabled=state.ready && !state.controlBusy && text.isNotBlank()){Text("发送文字")}
+                    TextButton(onClick={host.realtime.speech(text);text=""},enabled=state.ready && !state.controlBusy && text.isNotBlank()){Text("将文字发送为语音")}
                     TextButton(onClick={if(mic.running)host.microphone.stop()else permission.launch(Manifest.permission.RECORD_AUDIO)},enabled=mic.running || state.ready && !state.controlBusy && rt?.sdpReceived!=true){Text(if(mic.running)"停止录音" else "开始录音")}}
                 Text(mic.message,style=MaterialTheme.typography.bodySmall)
                 if(permissionDenied)Text("未授予麦克风权限，可继续发送文字。",color=MaterialTheme.colorScheme.error)

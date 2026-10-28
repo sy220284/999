@@ -95,11 +95,16 @@ class OriginalCoreHost(
     val migration: OriginalMigrationController = OriginalMigrationController(scope, workspace.absolutePath,
         { state.value.working || state.value.turnId != null || state.value.loading || state.value.closing || otherTaskRunning() || configurationChanging }, configurationJournal.lifecycle("配置与迁移"))
     val queue=OriginalQueueController(scope,{state.value.loading || state.value.closing || otherTaskRunning() || configurationChanging},configurationJournal.lifecycle("待办队列变更"))
+    private fun completionBusy()=state.value.working || state.value.turnId!=null || state.value.loading || state.value.closing || otherTaskRunning() || configurationChanging
+    val projects=OriginalProjectsController(scope,{completionBusy()},configurationJournal.lifecycle("项目管理"),ProjectCreationRequestStore(context))
+    val history=OriginalHistoryController(scope,{state.value.threadId},{completionBusy()},configurationJournal.lifecycle("会话记录与后台终端"))
+    val advanced=OriginalAdvancedController(scope,{state.value.threadId},workspace.absolutePath,{completionBusy()},configurationJournal.lifecycle("会话设置、记忆与采样"))
+    val connections=OriginalConnectionsController(scope,{state.value.threadId},{completionBusy()},configurationJournal.lifecycle("环境、远控与服务认证"))
     val search=OriginalSearchController(scope,workspace.absolutePath)
     val realtime=OriginalRealtimeController(scope,{state.value.working || state.value.turnId!=null || state.value.loading || state.value.closing || otherTaskRunning() || configurationChanging},configurationJournal.lifecycle("实时会话"))
     val microphone=OriginalRealtimeMicrophone(context,scope){bytes -> realtime.sendAudio(bytes)}
     fun commandWorkspace() = workspace.absolutePath
-    val managedChanging get() = queue.operations.state.value.mutating || realtime.state.value.running || library.operations.state.value.mutating || services.operations.state.value.mutating || migration.operations.state.value.mutating
+    val managedChanging get() = projects.operations.state.value.mutating || history.operations.state.value.mutating || advanced.operations.state.value.mutating || connections.operations.state.value.mutating || queue.operations.state.value.mutating || realtime.state.value.running || library.operations.state.value.mutating || services.operations.state.value.mutating || migration.operations.state.value.mutating
     val configurationChanging get() = state.value.toolBusy || (context.applicationContext as CodexApplication).gitOperations.state.value.running || (context.applicationContext as CodexApplication).fullTerminal.state.value.running || commands.state.value.running || extensions.state.value.mutating || mcp.state.value.mutating || settings.state.value.mutating || files.state.value.mutating || managedChanging
     fun mcpImports() = McpTools(context).connections().map { it.name to it.url }
     private fun error(error: Throwable) { mutable.update { it.copy(error = error.message ?: "原版核心操作失败") } }
@@ -149,7 +154,7 @@ class OriginalCoreHost(
         ensureCurrent(epoch, rpc)
         if (config.apiKey.isNotBlank() && config.endpoint.trimEnd('/') == "https://api.openai.com/v1" && api.account().jsonObject["account"] == JsonNull) api.loginApiKey(config.apiKey)
         ensureCurrent(epoch, rpc)
-        client = api;queue.bind(api); search.bind(api);realtime.bind(api);extensions.bind(api); mcp.bind(api); commands.bind(api); settings.bind(api); files.bind(api); library.bind(api); services.bind(api); migration.bind(api)
+        client = api;projects.bind(api);history.bind(api);advanced.bind(api);connections.bind(api);queue.bind(api); search.bind(api);realtime.bind(api);extensions.bind(api); mcp.bind(api); commands.bind(api); settings.bind(api); files.bind(api); library.bind(api); services.bind(api); migration.bind(api)
         mutable.update { it.copy(connected = true, status = "原版核心已连接 · 凭证由手机 Keystore 加密保存", model = config.model) }
         refreshThreads(api, false); readAccount(api, epoch)
     }
@@ -157,7 +162,7 @@ class OriginalCoreHost(
     private fun closeSession(cancelStartup: Boolean) {
         if (state.value.closing) return
         lifecycle.disconnect(lifecycle.state.connectionEpoch)
-        microphone.stop();realtimeAudio.stop();queue.bind(null);search.bind(null);realtime.bind(null);remainingEvents.reset();toolJobs.values.toList().forEach { it.cancel() };toolJobs.clear()
+        microphone.stop();realtimeAudio.stop();projects.bind(null);history.bind(null);advanced.bind(null);connections.bind(null);queue.bind(null);search.bind(null);realtime.bind(null);remainingEvents.reset();toolJobs.values.toList().forEach { it.cancel() };toolJobs.clear()
         if (cancelStartup) startupJob?.cancel()
         operationJob?.cancel(); operationJob = null
         reservedTask = null
@@ -604,6 +609,9 @@ class OriginalCoreHost(
     }
     private suspend fun notification(epoch: Long, rpc: AppServerConnection, method: String, params: JsonObject) {
         if (!current(epoch, rpc)) return
+        if(method=="project/changed")projects.changed()
+        if(method=="remoteControl/status/changed")connections.remoteChanged(params)
+        if(method=="mcpServer/event/stream/notification")connections.streamEvent(params)
         if (method in OriginalRemainingEvents.methods) {
             try {
                 if(method=="process/outputDelta")commands.processOutput(params)

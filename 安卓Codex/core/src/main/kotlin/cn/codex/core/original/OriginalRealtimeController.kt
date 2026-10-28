@@ -7,7 +7,7 @@ import kotlinx.coroutines.selects.select
 import kotlinx.serialization.json.*
 
 data class OriginalRealtimeState(val connected:Boolean=false,val running:Boolean=false,val ready:Boolean=false,val controlBusy:Boolean=false,
-    val threadId:String?=null,val sessionId:String?=null,val status:String="实时会话尚未开始",val error:String?=null)
+    val threadId:String?=null,val sessionId:String?=null,val status:String="实时会话尚未开始",val error:String?=null,val voices:JsonObject?=null,val voicesBusy:Boolean=false)
 /** 前台操作记录持有到真实closed；启动/停止ACK均不能代替会话终态。 */
 class OriginalRealtimeController(private val scope:CoroutineScope,private val busyElsewhere:()->Boolean,
     private val lifecycle:OriginalMutationLifecycle=OriginalMutationLifecycle.None) {
@@ -17,13 +17,14 @@ class OriginalRealtimeController(private val scope:CoroutineScope,private val bu
     private var generation=0L
     private var job:Job?=null
     private var control:Job?=null
+    private var voicesJob:Job?=null
     private var controlSerial=0L
     private var stopRequested=false
     private var finished:CompletableDeferred<Unit>?=null
     private var started:CompletableDeferred<Unit>?=null
     private var acknowledged:CompletableDeferred<Unit>?=null
     fun bind(client:OriginalCodexClient?) {
-        generation++;controlSerial++;stopRequested=false;job?.cancel();control?.cancel();finished?.cancel();started?.cancel();acknowledged?.cancel()
+        generation++;voicesJob?.cancel();controlSerial++;stopRequested=false;job?.cancel();control?.cancel();finished?.cancel();started?.cancel();acknowledged?.cancel()
         finished=null;started=null;acknowledged=null;api=client;mutable.value=if(client==null)state.value.copy(connected=false,running=false,ready=false,controlBusy=false,status="连接已结束，请核查最后会话结果") else OriginalRealtimeState(connected=true)
     }
     fun start(thread:String,audioOutput:Boolean) {
@@ -73,6 +74,15 @@ class OriginalRealtimeController(private val scope:CoroutineScope,private val bu
                 if(stamp==generation && finished===end && serial==controlSerial){mutable.update{it.copy(error=failure.message ?: "操作结果未确认，不会自动重发")};if(failure is TimeoutCancellationException)client.connection.close()}}
             finally{if(stamp==generation && finished===end && serial==controlSerial)mutable.update{it.copy(controlBusy=false)}}
         }
+    }
+    fun voices() {
+        val client=api ?: return;if(state.value.voicesBusy)return
+        val stamp=generation;mutable.update{it.copy(voicesBusy=true,error=null)}
+        voicesJob=scope.launch{try{val result=client.realtimeVoices().jsonObject;if(stamp==generation)mutable.update{it.copy(voices=result)}}catch(failure:Exception){if(failure is CancellationException)throw failure;if(stamp==generation)mutable.update{it.copy(error=failure.message ?: "声音列表读取失败")}}finally{if(stamp==generation)mutable.update{it.copy(voicesBusy=false)}}}
+    }
+    fun speech(text:String) {
+        if(!state.value.ready || text.isBlank())return
+        control{client,thread,_ -> client.appendRealtimeSpeech(thread,text)}
     }
     fun send(text:String) {
         if(!state.value.ready || text.isBlank())return
