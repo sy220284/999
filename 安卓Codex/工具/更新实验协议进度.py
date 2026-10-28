@@ -79,7 +79,9 @@ for kind,entries,stable in [('客户端请求',clients,known('ClientRequest.ts')
                 entry+=';app/src/main/java/cn/codex/android/OriginalCoreHost.kt'
             status,phase='实验调用/通知/中文操作代码已接入，未运行验证','运行验收'
             if method.startswith('userVerification/'):
-                status,phase='能力核查与交互代码已接，Android本机验证提供者待实现','提供者缺口'
+                entry+=';app/src/main/java/cn/codex/android/OriginalAndroidVerification.kt;app/src/main/java/cn/codex/android/OriginalVerificationServer.kt;运行核心/补充源码/android_user_verification.rs;运行核心/安卓用户验证.patch'
+                assert all((r/path).is_file()for path in entry.split(';'))
+                status,phase='Android本机提供者/调用/中文交互代码已接入，未构建或运行验证','本机验证运行验收'
         rows.append(dict(kind=kind,method=method,status=status,entry=entry,phase=phase,validation='未运行验证',scope='Rust实验/默认TS省略',params=params,response=response))
 with(r/'文档/实验协议执行清单.csv').open('w',newline='')as f:
     writer=csv.DictWriter(f,fieldnames=list(rows[0]),lineterminator='\n');writer.writeheader();writer.writerows(rows)

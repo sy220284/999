@@ -27,7 +27,7 @@ import java.io.File
         state.error?.let { Text(it, color = MaterialTheme.colorScheme.error, modifier = Modifier.padding(horizontal = 16.dp)) }
         if (state.session == null) Column(Modifier.weight(1f).padding(20.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
             Text("支持颜色、光标、滚动、选择、粘贴与交互程序。离开页面后由前台通知保持会话。")
-            Text("只提供 Android 系统 shell 和已随应用安装的程序；Node、Python、npm 等运行环境尚未内置。命令以本应用身份运行，没有项目级沙箱。", style = MaterialTheme.typography.bodySmall)
+            Text("只提供 Android 系统 shell 和已随应用安装的程序；Node、Python、npm 需要随包提供解释器和运行库，实际安装情况见能力页。命令以本应用身份运行，没有项目级沙箱。", style = MaterialTheme.typography.bodySmall)
         } else AndroidView(factory = { ctx -> TerminalView(ctx, null).apply { setTerminalViewClient(controller.callbacks); setTextSize((14 * resources.displayMetrics.scaledDensity).toInt()); setTypeface(android.graphics.Typeface.MONOSPACE); binding[0] = this; controller.attach(this); requestFocus() } }, update = { binding[0] = it; controller.attach(it) }, modifier = Modifier.fillMaxWidth().weight(1f).background(Color.Black))
         if (state.running) Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).padding(horizontal = 8.dp), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
             FilterChip(state.ctrl, controller::ctrl, label = { Text("Ctrl") }); FilterChip(state.alt, controller::alt, label = { Text("Alt") })

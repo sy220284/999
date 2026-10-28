@@ -32,6 +32,7 @@ class OriginalCoreHostTest {
         var holdResume = false
         var turn: suspend (FakeSession, JsonObject) -> Unit = { _, _ -> }
         var review: suspend (FakeSession, JsonObject) -> Unit = { _, _ -> }
+        var verify:suspend(FakeSession,JsonObject)->Unit={_,_->}
         var queueImplemented=false
         val queueRows=mutableListOf<JsonObject>()
         @Volatile var runtimeTurn:String?=null
@@ -52,6 +53,8 @@ class OriginalCoreHostTest {
                         "thread/list" -> reply(request, buildJsonObject { put("data", buildJsonArray {}) })
                         "thread/start", "thread/resume" -> if (!holdResume || request.string("method") == "thread/start") reply(request, thread(resumedTurn))
                         "thread/queue/list" -> if(queueImplemented)reply(request,buildJsonObject{put("data",JsonArray(queueRows.toList()));put("nextCursor",JsonNull)}) else emit(buildJsonObject{put("id",request.getValue("id"));put("error",buildJsonObject{put("code",-32601);put("message","queue unsupported in fake")})})
+                        "userVerification/verify" -> verify(this@FakeSession,request)
+                        "userVerification/cancel" -> reply(request,buildJsonObject{})
                         "thread/queue/start" -> queueStart(this@FakeSession,request)
                         "thread/read" -> reply(request,buildJsonObject{put("thread",JsonObject(thread(runtimeTurn).getValue("thread").jsonObject + ("status" to buildJsonObject{put("type",if(runtimeTurn==null)"idle"else "active");put("activeFlags",buildJsonArray{})})))})
                         "turn/start" -> { turnStarts.incrementAndGet(); turn(this@FakeSession, request) }
@@ -415,6 +418,38 @@ class OriginalCoreHostTest {
             session.completed("follow")
             withTimeout(5000){host.state.first{!it.working}}
             assertTrue(host.state.value.connected);assertNull(host.state.value.turnId)
+        }finally{withContext(Dispatchers.Main){host.close()};session.dispose();scope.cancel()}
+    }
+
+    @Test fun nativeApprovalReturnsOnlyTheProofForItsPendingRequest()=runBlocking {
+        val scope=CoroutineScope(SupervisorJob()+Dispatchers.Main.immediate);lateinit var session:FakeSession
+        val proof=obj("credentialId" to "local-key","signature" to "signed-challenge")
+        val host=host(scope,OriginalEngineFactory{launch->FakeSession(launch.scope).also{session=it;it.verify={server,request->server.reply(request,buildJsonObject{put("proof",proof)})}}})
+        try{
+            withContext(Dispatchers.Main){host.connect()};ready(host)
+            session.emit(buildJsonObject{put("id","native");put("method","mcpServer/elicitation/request");put("params",obj("mode" to "openai/userVerification","challenge" to "AQ","title" to "允许一次操作","description" to "仅此挑战"))})
+            val request=withTimeout(5000){host.state.first{it.requests.isNotEmpty()}}.requests.single()
+            withContext(Dispatchers.Main){host.verifyElicitation(request)}
+            val response=withTimeout(5000){var frame=session.received.receive();while(frame["id"]!=JsonPrimitive("native"))frame=session.received.receive();frame}
+            assertEquals("accept",response.getValue("result").jsonObject.string("action"))
+            assertEquals(proof,response.getValue("result").jsonObject["content"])
+            withTimeout(5000){host.state.first{it.requests.isEmpty() && !it.toolBusy}}
+        }finally{withContext(Dispatchers.Main){host.close()};session.dispose();scope.cancel()}
+    }
+    @Test fun withdrawnNativeApprovalCancelsItsExactRpcAndClosesUnknownWork()=runBlocking {
+        val scope=CoroutineScope(SupervisorJob()+Dispatchers.Main.immediate);lateinit var session:FakeSession
+        val host=host(scope,OriginalEngineFactory{launch->FakeSession(launch.scope).also{session=it}})
+        try{
+            withContext(Dispatchers.Main){host.connect()};ready(host)
+            session.emit(buildJsonObject{put("id","native");put("method","mcpServer/elicitation/request");put("params",obj("mode" to "openai/userVerification","challenge" to "AQ","title" to "批准","description" to ""))})
+            val request=withTimeout(5000){host.state.first{it.requests.isNotEmpty()}}.requests.single()
+            withContext(Dispatchers.Main){host.verifyElicitation(request)}
+            val verify=session.next("userVerification/verify")
+            session.notify("serverRequest/resolved",buildJsonObject{put("requestId","native")})
+            val cancel=session.next("userVerification/cancel")
+            assertEquals(verify["id"],cancel.getValue("params").jsonObject["requestId"])
+            assertNotEquals(verify["id"],cancel["id"])
+            closed(host);assertEquals(0,session.clientResponses.get())
         }finally{withContext(Dispatchers.Main){host.close()};session.dispose();scope.cancel()}
     }
 

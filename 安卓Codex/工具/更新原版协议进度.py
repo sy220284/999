@@ -60,7 +60,7 @@ for kind, file in [("客户端请求", "ClientRequest.ts"), ("服务端请求", 
             if method in queued:
                 status, entry, phase = "中文交互已接入，未运行验证", host_path, "待验证"
                 if method == "mcpServer/elicitation/request":
-                    status, phase = "表单/URL 已接入；有限复杂 schema，未运行验证", "P2/待验证"
+                    status, phase = "表单/URL/本机签名已接入；有限复杂 schema，未运行验证", "P2/待验证"
             elif method in {"account/chatgptAuthTokens/refresh", "attestation/generate"}:
                 status, entry, phase = "缺少外部提供者，已有专用提示及协议拒绝", host_path, "外部依赖/待完成"
             else:
@@ -72,7 +72,8 @@ for kind, file in [("客户端请求", "ClientRequest.ts"), ("服务端请求", 
             if method.startswith("thread/realtime/"):
                 status, phase = "WebSocket发起/文字/录音/PCM输出代码已接入，未运行验证", "实时媒体运行验收"
                 if method == "thread/realtime/sdp":
-                    status, phase = "已标示WebRTC缺少媒体适配，未完成", "WebRTC依赖"
+                    status, phase = "WebRTC协商/媒体/静音控制代码已接入，未构建或运行验证", "WebRTC运行验收"
+                    entry += ";app/src/main/java/cn/codex/android/OriginalWebRtcAudio.kt"
             elif method in {"process/outputDelta", "process/exited", "fuzzyFileSearch/sessionUpdated", "fuzzyFileSearch/sessionCompleted"}:
                 status, phase = "实验发起/通知/操作代码已接入，未运行验证", "实验运行验收"
         elif method.startswith(("hook/", "mcpServer/")):

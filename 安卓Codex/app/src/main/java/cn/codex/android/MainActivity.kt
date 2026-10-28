@@ -15,6 +15,8 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 
 class MainActivity: ComponentActivity() {
     private val permission = registerForActivityResult(ActivityResultContracts.RequestPermission()) {}
+    override fun onResume(){super.onResume();OriginalBiometricPrompts.attach(this)}
+    override fun onPause(){OriginalBiometricPrompts.detach(this);super.onPause()}
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()

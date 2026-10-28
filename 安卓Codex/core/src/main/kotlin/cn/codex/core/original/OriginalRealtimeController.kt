@@ -7,7 +7,7 @@ import kotlinx.coroutines.selects.select
 import kotlinx.serialization.json.*
 
 data class OriginalRealtimeState(val connected:Boolean=false,val running:Boolean=false,val ready:Boolean=false,val controlBusy:Boolean=false,
-    val threadId:String?=null,val sessionId:String?=null,val status:String="实时会话尚未开始",val error:String?=null,val voices:JsonObject?=null,val voicesBusy:Boolean=false)
+    val threadId:String?=null,val sessionId:String?=null,val status:String="实时会话尚未开始",val error:String?=null,val voices:JsonObject?=null,val voicesBusy:Boolean=false,val webRtc:Boolean=false)
 /** 前台操作记录持有到真实closed；启动/停止ACK均不能代替会话终态。 */
 class OriginalRealtimeController(private val scope:CoroutineScope,private val busyElsewhere:()->Boolean,
     private val lifecycle:OriginalMutationLifecycle=OriginalMutationLifecycle.None) {
@@ -20,6 +20,7 @@ class OriginalRealtimeController(private val scope:CoroutineScope,private val bu
     private var voicesJob:Job?=null
     private var controlSerial=0L
     private var stopRequested=false
+    private var submitted=false
     private var finished:CompletableDeferred<Unit>?=null
     private var started:CompletableDeferred<Unit>?=null
     private var acknowledged:CompletableDeferred<Unit>?=null
@@ -27,7 +28,7 @@ class OriginalRealtimeController(private val scope:CoroutineScope,private val bu
         generation++;voicesJob?.cancel();controlSerial++;stopRequested=false;job?.cancel();control?.cancel();finished?.cancel();started?.cancel();acknowledged?.cancel()
         finished=null;started=null;acknowledged=null;api=client;mutable.value=if(client==null)state.value.copy(connected=false,running=false,ready=false,controlBusy=false,status="连接已结束，请核查最后会话结果") else OriginalRealtimeState(connected=true)
     }
-    fun start(thread:String,audioOutput:Boolean) {
+    fun start(thread:String,audioOutput:Boolean,webRtcOffer:(suspend ()->String)?=null) {
         if(state.value.running)return
         if(busyElsewhere()){mutable.update{it.copy(error="请先结束其他执行任务或配置变更")};return}
         val client=api ?: return
@@ -35,14 +36,16 @@ class OriginalRealtimeController(private val scope:CoroutineScope,private val bu
         val ticket=try{lifecycle.begin()}catch(failure:Exception){mutable.update{it.copy(error=failure.message)};return}
         val stamp=generation
         val end=CompletableDeferred<Unit>();val begin=CompletableDeferred<Unit>();val ack=CompletableDeferred<Unit>()
-        controlSerial++;control?.cancel();stopRequested=false
+        controlSerial++;control?.cancel();stopRequested=false;submitted=false
         finished=end;started=begin;acknowledged=ack
-        mutable.value=OriginalRealtimeState(connected=true,running=true,threadId=thread,status="正在建立实时会话")
+        mutable.value=OriginalRealtimeState(connected=true,running=true,threadId=thread,webRtc=webRtcOffer!=null,status="正在建立实时会话")
         job=scope.launch(start=CoroutineStart.UNDISPATCHED) {
             var confirmed=false
             try {
+                val offer=webRtcOffer?.invoke()
                 coroutineScope {
-                    val response=async{client.startRealtime(thread,audioOutput)}
+                    submitted=true
+                    val response=async{client.startRealtime(thread,audioOutput,offer)}
                     select<Unit> {
                         response.onAwait {
                             ack.complete(Unit)
@@ -61,7 +64,7 @@ class OriginalRealtimeController(private val scope:CoroutineScope,private val bu
                 if(stamp==generation){mutable.update{it.copy(error=failure.message ?: "实时会话失败")};if(failure !is RpcException || failure.code !in setOf(-32601,-32602))client.connection.close()}
             } finally {
                 try{lifecycle.finish(ticket,confirmed && stamp==generation)}catch(failure:Exception){if(stamp==generation)mutable.update{it.copy(error="实时会话记录保存失败，请核查结果")}}
-                finally{if(stamp==generation && finished===end)mutable.update{it.copy(running=false,ready=false,status=if(confirmed)it.status else "实时会话结果待核查")}}
+                finally{if(stamp==generation && finished===end)mutable.update{it.copy(running=false,ready=false,status=if(confirmed)it.status else if(!submitted)"媒体准备已结束，未发送服务启动请求" else "实时会话结果待核查")}}
             }
         }
     }
@@ -96,6 +99,7 @@ class OriginalRealtimeController(private val scope:CoroutineScope,private val bu
     fun stop() {
         if(!state.value.running || stopRequested)return
         stopRequested=true
+        if(!submitted){job?.cancel();return}
         if(state.value.controlBusy){controlSerial++;control?.cancel();mutable.update{it.copy(controlBusy=false)}}
         control{client,thread,end ->
             try {

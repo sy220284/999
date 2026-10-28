@@ -9,23 +9,23 @@
   {
     "id": "language",
     "title": "手机语言运行环境",
-    "status": "待实现",
-    "detail": "尚未内置Node、Python、npm；填写MCP命令不会自动安装环境。",
-    "acceptance": "固定可信来源，完成Android构建、标准库与扩展目录、命令查找和能力检测。"
+    "status": "有限运行环境源码已补，未构建",
+    "detail": "Node/Python/npm来源锁、原生启动器、受校验运行库解包和命令查找已有代码；当前没有目标产物。npm脚本、第三方原生扩展及完整Linux软件生态未等价实现。",
+    "acceptance": "验证官方包布局、许可、双ABI/16KB、stdio/TLS、Python扩展、npm脚本；不把工具源码当作已安装。"
   },
   {
     "id": "git-network",
     "title": "Git命令网络与SSH",
-    "status": "待实现",
-    "detail": "JGit页面已有HTTPS代码；原生Git命令目前是本地能力。",
-    "acceptance": "补可信TLS/SSH依赖、证书与主机密钥校验、加密凭证及失败恢复。"
+    "status": "网络/SSH源码已补，未构建",
+    "detail": "原生Git网络可选构建、OpenSSL/curl/OpenSSH来源锁、Android CA和SSH主机公钥确认已有代码；无实际TLS/SSH结果。",
+    "acceptance": "构建真实助手并验证证书、主机变更、口令PTY和clone/fetch/push失败恢复；Perl/WebDAV/SFTP等未承诺。"
   },
   {
     "id": "webrtc",
     "title": "WebRTC语音",
-    "status": "待实现",
-    "detail": "WebSocket文字/PCM代码已有；收到SDP不代表媒体连接可用。",
-    "acceptance": "固定媒体依赖，完成SDP/ICE、声路、焦点、后台和断连回收。"
+    "status": "媒体源码已接，未构建或设备验证",
+    "detail": "固定SDK版本，SDP/ICE与有序oai-events、手动静音控制、焦点和断连回收已有代码。",
+    "acceptance": "核对AAR/全部第三方许可/双ABI/16KB、对端协商、真实音路/权限、前后台和故障回收。"
   },
   {
     "id": "auth-provider",
@@ -37,23 +37,23 @@
   {
     "id": "user-verification",
     "title": "Android本机用户验证",
-    "status": "待实现",
-    "detail": "五项能力检查/交互已接；固定原版仅macOS提供实际本机验证。",
-    "acceptance": "补账号命名空间隔离、系统生物认证、受保护P256密钥、签名和取消桥接。"
+    "status": "Android提供者源码已补，未构建或设备验证",
+    "detail": "受保护P256、强生物认证、账号命名空间、独立PID/UID socket、Rust取消桥和批准请求已有代码。",
+    "acceptance": "验证硬件认证/失效/取消/换账号/旧连接；本机凭证创建不代表上游服务登记完成。"
   },
   {
     "id": "schema",
     "title": "完整复杂表单",
-    "status": "有限实现",
-    "detail": "已支持嵌套/组合/条件和本地引用等；外部引用、递归等仍有限。",
-    "acceptance": "完善受支持词汇与资源预算，未知规则保持拒绝；不得绕过验证自动接受。"
+    "status": "扩充有限实现，仍有规则缺口",
+    "detail": "组合/条件/有限递归、unevaluated标记、多选枚举和图片选项已有代码；RE2与大小/深度/求值预算。",
+    "acceptance": "外部资源、资源$id重定位、动态词汇及完整JSON Schema一致性未完成；未知规则继续拒绝。图片返回契约需服务联调。"
   },
   {
     "id": "supply",
     "title": "V8可信供应链",
-    "status": "缺可信工具锁及产物",
-    "detail": "GN/Ninja独立可信哈希未提供；不从下载结果自行生成信任。",
-    "acceptance": "取得可追溯的工具锁与实际归档/绑定，再核查链接和Android行为。"
+    "status": "固定源码自举路径已补，未执行",
+    "detail": "GN固定原版提交、Ninja官方固定源码自举；独立CIPD二进制锁仍可选，不用首次下载哈希建立信任。",
+    "acceptance": "验证官方Ninja1.12.1替代Chromium .4的兼容性、所有工具/子模块、V8归档与绑定/链接；无实际构建证明。"
   },
   {
     "id": "ui",
@@ -68,5 +68,26 @@
     "status": "未执行",
     "detail": "当前授权不构建，测试方法只有源码；未调用模型、OAuth或实际录音。",
     "acceptance": "按执行方案恢复编译、故障注入、真机和有授权的服务验收，保留真实日志。"
+  },
+  {
+    "id": "project-isolation",
+    "title": "Android项目级执行隔离",
+    "status": "无等价项目沙箱",
+    "detail": "现有命令共享本应用UID，项目路径检查不等于进程隔离。桌面Landlock/bubblewrap和Windows/macOS机制不能直接使用。",
+    "acceptance": "提出并验证实际可用Android隔离方案，或持续明确权限边界；不伪造沙箱保证。"
+  },
+  {
+    "id": "cloud-tasks",
+    "title": "独立CLI云任务",
+    "status": "未提供完整Android路径",
+    "detail": "固定cloud-tasks包含exec/status/list/apply/diff；不能把普通会话或环境接口视为这些功能已经实现。",
+    "acceptance": "对接固定原版命令或真实服务合同，补环境选择/分页/任务/差异预览/确认应用与失败恢复；需服务授权。"
+  },
+  {
+    "id": "standalone-cli",
+    "title": "独立CLI和服务工具",
+    "status": "尚未作为Android独立入口交付",
+    "detail": "固定源码还包含CLI/TUI、MCP服务端、守护进程管理和代理/隧道工具；安卓前端替代终端UI不等于逐个程序已经移植。",
+    "acceptance": "按CLI命令逐项核查是否需要产品入口或仅构建/开发用途，记录Android替代/缺口，验证真正需要的执行链。"
   }
 ]

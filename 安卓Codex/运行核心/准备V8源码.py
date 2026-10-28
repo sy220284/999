@@ -16,6 +16,8 @@ import tarfile
 import urllib.request
 
 REVISION = '2768994f664e8a6e3aba27503606c58339136e2a'
+GN_REVISION = '641ace93dd9560e75e7add0d08f77b446fbb3b78'
+NINJA_SOURCE_REVISION = '2daa09ba270b0a43e1929d29b073348aa985dfaa'  # 官方 v1.12.1，独立于 Chromium CIPD 打包修订
 EXTRA = {
     'third_party/android_platform': ('https://chromium.googlesource.com/chromium/src/third_party/android_platform.git', 'e3919359f2387399042d31401817db4a02d756ec'),
     'third_party/catapult': ('https://chromium.googlesource.com/catapult.git', '74513188f5cd39f9edb16236ea3a49ed5b3cb3c6'),
@@ -62,21 +64,21 @@ def archive(url, pin, cache, dest):
 
 def prepare(work, ndk, target):
     # CIPD 的版本标签来自固定 DEPS，但仅靠标签不足以证明二进制内容。
-    # 必须提供经独立核实的 SHA 锁，禁止首次下载时信任并自动回填哈希。
+    # 可用独立核实的二进制SHA锁；未提供时从固定官方源码自举，禁止首次下载即信任。
     if platform.system() != 'Linux' or platform.machine() != 'x86_64':
         raise ValueError('当前固定 GN/clang/NDK 入口仅支持 Linux x86_64 构建机')
     lock_file = os.environ.get('CODEX_ANDROID_V8_TOOL_LOCK')
-    if not lock_file:
-        raise ValueError('需要 CODEX_ANDROID_V8_TOOL_LOCK：包含 GN/Ninja 的独立 SHA-256 锁定记录')
-    lock = json.loads(Path(lock_file).read_text())
-    for key, expected in {'source_commit': REVISION, 'host': 'linux-x86_64',
-                          'gn_version': '641ace93dd9560e75e7add0d08f77b446fbb3b78',
-                          'ninja_version': '1.12.1.chromium.4'}.items():
-        if lock.get(key) != expected:
-            raise ValueError(f'V8 工具锁定记录 {key} 与固定源版本不匹配')
-    for name in ('gn_sha256', 'ninja_sha256'):
-        if not isinstance(lock.get(name), str) or not re.fullmatch('[0-9a-f]{64}', lock[name]):
-            raise ValueError(f'工具锁定记录缺少有效 {name}')
+    lock = None
+    if lock_file:
+        lock = json.loads(Path(lock_file).read_text())
+        for key, expected in {'source_commit': REVISION, 'host': 'linux-x86_64',
+                              'gn_version': '641ace93dd9560e75e7add0d08f77b446fbb3b78',
+                              'ninja_version': '1.12.1.chromium.4'}.items():
+            if lock.get(key) != expected:
+                raise ValueError(f'V8 工具锁定记录 {key} 与固定源版本不匹配')
+        for name in ('gn_sha256', 'ninja_sha256'):
+            if not isinstance(lock.get(name), str) or not re.fullmatch('[0-9a-f]{64}', lock[name]):
+                raise ValueError(f'工具锁定记录缺少有效 {name}')
     if not os.environ.get('LIBCLANG_PATH'):
         raise ValueError('请先设置构建机 LIBCLANG_PATH，供 bindgen 使用')
     source = work / 'rusty_v8'
@@ -104,16 +106,34 @@ def prepare(work, ndk, target):
     (source / 'third_party/rust-toolchain/.rusty_v8_version').write_text(RUST_URL)
     clang = work / 'clang'
     archive(CLANG_URL, CLANG_SHA, cache, clang)
-    # GN/Ninja 版本来自同一个 V8 DEPS：GN git 641ace93，Ninja 1.12.1.chromium.4。
     tools = work / 'gn-ninja'
-    if not (tools / 'gn/gn').exists() or not (tools / 'ninja/ninja').exists():
-        run('python3', source / 'tools/ninja_gn_binaries.py', '--dir', tools, cwd=source)
-    for name, relative in (('gn', 'gn/gn'), ('ninja', 'ninja/ninja')):
-        executable = tools / relative
-        with executable.open('rb') as stream:
-            digest = hashlib.file_digest(stream, 'sha256').hexdigest()
-        if digest != lock[name + '_sha256']:
-            raise ValueError(f'{name} 与独立锁定哈希不匹配；拒绝复用或执行 CIPD 下载的工具')
+    if lock is not None:
+        # 兼容已有的独立核实二进制锁；未校验前不执行下载所得工具。
+        if not (tools / 'gn/gn').exists() or not (tools / 'ninja/ninja').exists():
+            run('python3', source / 'tools/ninja_gn_binaries.py', '--dir', tools, cwd=source)
+        for name, relative in (('gn', 'gn/gn'), ('ninja', 'ninja/ninja')):
+            with (tools / relative).open('rb') as stream:
+                if hashlib.file_digest(stream, 'sha256').hexdigest() != lock[name + '_sha256']:
+                    raise ValueError(f'{name} 与独立锁定哈希不匹配，拒绝执行')
+        tool_source = {'mode': 'independently-locked-CIPD', 'lock_sha256': hashlib.sha256(Path(lock_file).read_bytes()).hexdigest()}
+    else:
+        # 从官方固定源码自举；不是先下载二进制、再把其哈希写成信任依据。
+        # Ninja 官方 1.12.1 与 DEPS 中 Chromium .4 包不是同一产物，兼容性待构建验证。
+        ninja_source = work / 'host-tool-sources/ninja'
+        gn_source = work / 'host-tool-sources/gn'
+        checkout('https://github.com/ninja-build/ninja.git', NINJA_SOURCE_REVISION, ninja_source)
+        checkout('https://gn.googlesource.com/gn', GN_REVISION, gn_source)
+        host_env = os.environ.copy()
+        host_env.update(CC=os.environ.get('CODEX_HOST_CC', '/usr/bin/cc'), CXX=os.environ.get('CODEX_HOST_CXX', '/usr/bin/c++'))
+        for key in ('CFLAGS','CXXFLAGS','CPPFLAGS','LDFLAGS','AR','RANLIB','LD'):
+            host_env.pop(key, None)
+        subprocess.run(['python3','configure.py','--bootstrap'],cwd=ninja_source,env=host_env,check=True)
+        subprocess.run(['python3','build/gen.py','--no-last-commit-position'],cwd=gn_source,env=host_env,check=True)
+        subprocess.run([str(ninja_source / 'ninja'),'-C','out','gn'],cwd=gn_source,env=host_env,check=True)
+        for name, built in (('gn',gn_source/'out/gn'),('ninja',ninja_source/'ninja')):
+            destination=tools/name/name;destination.parent.mkdir(parents=True,exist_ok=True)
+            shutil.copy2(built,destination)
+        tool_source = {'mode':'pinned-official-source-bootstrap','gn_commit':GN_REVISION,'ninja_commit':NINJA_SOURCE_REVISION,'ninja_version':'upstream-1.12.1 (not Chromium .4)','host_cc':host_env['CC'],'host_cxx':host_env['CXX']}
     libclang = os.environ.get('LIBCLANG_PATH')
     if not libclang:
         raise ValueError('请设置构建机 LIBCLANG_PATH，供 bindgen 使用；不能用 Android 目标库充当宿主 libclang')
@@ -131,7 +151,7 @@ def prepare(work, ndk, target):
         with path.open('rb') as stream:
             tool_digests[str(path)] = hashlib.file_digest(stream, 'sha256').hexdigest()
     modules = subprocess.check_output(['git', '-C', str(source), 'submodule', 'status', '--recursive']).decode()
-    (work / 'source-provenance.json').write_text(json.dumps({'rusty_v8': REVISION, 'extra': EXTRA, 'submodules': modules, 'rust_sha256': RUST_SHA, 'clang_sha256': CLANG_SHA, 'target': target, 'ndk': '28.2.13676358', 'gn': '641ace93dd9560e75e7add0d08f77b446fbb3b78', 'ninja': '1.12.1.chromium.4', 'tool_binary_sha256': tool_digests, 'tool_lock': str(Path(lock_file).resolve()), 'tool_lock_sha256': hashlib.sha256(Path(lock_file).read_bytes()).hexdigest()}, ensure_ascii=False, indent=2) + '\n')
+    (work / 'source-provenance.json').write_text(json.dumps({'rusty_v8': REVISION, 'extra': EXTRA, 'submodules': modules, 'rust_sha256': RUST_SHA, 'clang_sha256': CLANG_SHA, 'target': target, 'ndk': '28.2.13676358', 'gn': '641ace93dd9560e75e7add0d08f77b446fbb3b78', 'ninja': '1.12.1.chromium.4', 'tool_binary_sha256': tool_digests, 'tool_sources': tool_source}, ensure_ascii=False, indent=2) + '\n')
     print('已准备固定源码与工具；V8 尚须 Cargo/GN 编译和 Android 验证。')
 
 

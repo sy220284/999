@@ -84,7 +84,7 @@ class OriginalRemainingEvents {
             "thread/realtime/started" -> rt = OriginalRealtimeEvent(active = true,sessionId = p.string("realtimeSessionId"),status = "实时会话已连接")
             "thread/realtime/error" -> rt = rt.copy(status = "实时会话错误：${p.string("message")}")
             "thread/realtime/closed" -> rt = rt.copy(active = false,partials = emptyMap(), status = "实时会话已关闭：${p.string("reason")}")
-            "thread/realtime/sdp" -> rt = rt.copy(sdpReceived = true,status = "已收到WebRTC协商；当前包尚无WebRTC媒体适配，请使用文字和本机音频输出")
+            "thread/realtime/sdp" -> rt = rt.copy(sdpReceived = true,status = "已收到WebRTC协商；实际媒体连接状态请在实时语音页核查")
             "thread/realtime/outputAudio/delta" -> {
                 if(!rt.active)return
                 val audio = p["audio"] as? JsonObject ?: return

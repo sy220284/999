@@ -898,7 +898,7 @@
   {
     "kind": "服务端请求",
     "method": "mcpServer/elicitation/request",
-    "status": "表单/URL 已接入；有限复杂 schema，未运行验证",
+    "status": "表单/URL/本机签名已接入；有限复杂 schema，未运行验证",
     "entry": "app/src/main/java/cn/codex/android/OriginalCoreHost.kt",
     "phase": "P2/待验证",
     "validation": "未运行验证"
@@ -1602,9 +1602,9 @@
   {
     "kind": "服务端通知",
     "method": "thread/realtime/sdp",
-    "status": "已标示WebRTC缺少媒体适配，未完成",
-    "entry": "app/src/main/java/cn/codex/android/OriginalCoreHost.kt",
-    "phase": "WebRTC依赖",
+    "status": "WebRTC协商/媒体/静音控制代码已接入，未构建或运行验证",
+    "entry": "app/src/main/java/cn/codex/android/OriginalCoreHost.kt;app/src/main/java/cn/codex/android/OriginalWebRtcAudio.kt",
+    "phase": "WebRTC运行验收",
     "validation": "未运行验证"
   },
   {

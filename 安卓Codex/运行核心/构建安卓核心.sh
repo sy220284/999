@@ -61,6 +61,17 @@ if [[ -f "$source_root/codex-rs/keyring-store/src/android.rs" ]] && ! cmp -s "$s
   exit 2
 fi
 install -m 644 "$script_dir/补充源码/android_keyring.rs" "$source_root/codex-rs/keyring-store/src/android.rs"
+# Android验证提供者单独补丁；只改构建副本，绝不修改固定原始源码。
+if git -C "$source_root" apply --check "$script_dir/安卓用户验证.patch"; then
+  git -C "$source_root" apply "$script_dir/安卓用户验证.patch"
+else
+  git -C "$source_root" apply --reverse --check "$script_dir/安卓用户验证.patch"
+fi
+if [[ -f "$source_root/codex-rs/user-verification/src/platform_android.rs" ]] && ! cmp -s "$script_dir/补充源码/android_user_verification.rs" "$source_root/codex-rs/user-verification/src/platform_android.rs"; then
+  echo '构建副本的Android验证模块不同，请另选构建目录；不会覆盖修改。' >&2
+  exit 2
+fi
+install -m 644 "$script_dir/补充源码/android_user_verification.rs" "$source_root/codex-rs/user-verification/src/platform_android.rs"
 if [[ "$v8_mode" == source ]]; then
   # local patch 只改变 v8 来源；其他包版本和校验和沿用固定上游锁文件。
   python3 - "$source_root/codex-rs/Cargo.lock" <<'PYLOCK'

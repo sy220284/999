@@ -51,4 +51,4 @@ if a.parser_path:
     for name in ['OriginalAndroidTools.kt','OriginalRemainingEvents.kt','OriginalRemainingEventsTest.kt','OriginalRealtimeAudio.kt','OriginalEventsScreen.kt','OriginalCoreHost.kt','OriginalCoreHostTest.kt','OriginalCoreScreen.kt','OriginalCodexClient.kt']:
         path=next(r.rglob(name));assert not parser.parse(path.read_bytes()).root_node.has_error,path
     print('9份本批Kotlin语法通过。')
-print('33类通知、实际工具执行/页面/注册、固定Rust实验字段和206项清单核对通过；外部提供者和WebRTC继续列缺口，实验发起另表核对。')
+print('33类通知、实际工具执行/页面/注册、固定Rust实验字段和206项清单核对通过；外部提供者仍列缺口，WebRTC源码接线另由原生核查检查；运行均未验证。')

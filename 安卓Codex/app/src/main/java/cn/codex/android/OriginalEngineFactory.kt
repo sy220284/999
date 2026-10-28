@@ -12,8 +12,12 @@ import java.util.concurrent.atomic.AtomicBoolean
 
 /** 宿主只持有一个会话资源；测试可替换工厂，生产始终使用实际安装的原版程序。 */
 data class OriginalEngineLaunch(val context: Context, val config: ApiConfig, val workspace: File, val home: File, val scope: CoroutineScope)
-interface OriginalEngineSession : Closeable { val connection: AppServerConnection }
-fun interface OriginalEngineFactory { suspend fun open(launch: OriginalEngineLaunch): OriginalEngineSession }
+interface OriginalEngineSession : Closeable {
+    val connection: AppServerConnection
+}
+fun interface OriginalEngineFactory {
+    suspend fun open(launch: OriginalEngineLaunch): OriginalEngineSession
+}
 
 object NativeOriginalEngineFactory : OriginalEngineFactory {
     override suspend fun open(launch: OriginalEngineLaunch): OriginalEngineSession {
@@ -30,6 +34,7 @@ object NativeOriginalEngineFactory : OriginalEngineFactory {
         val (context, config, workspace, home, scope) = launch
         val binary = File(context.applicationInfo.nativeLibraryDir, "libcodex_engine.so")
         check(binary.isFile && binary.canExecute()) { "当前包未包含可执行的原版核心，请按运行核心目录的脚本生成对应 ABI 产物。" }
+        AndroidLanguageRuntime.prepare(context)
         val endpoint = URI(config.endpoint)
         require(endpoint.scheme == "https" || config.allowLoopbackHttp && endpoint.scheme == "http" && endpoint.host in setOf("localhost", "127.0.0.1", "[::1]", "::1")) { "原版核心仅接受 HTTPS 或已允许的本机 HTTP 地址" }
         require(!endpoint.host.isNullOrBlank() && endpoint.rawUserInfo == null && endpoint.rawQuery == null && endpoint.rawFragment == null) { "模型地址需要有效主机名，且不可包含凭证、查询或片段" }
@@ -41,13 +46,16 @@ object NativeOriginalEngineFactory : OriginalEngineFactory {
         File(home, "config.toml").createNewFile()
         val trust = AndroidTrustBundle.write(home)
         val vault = OriginalVaultServer(context, scope)
+        var verification:OriginalVerificationServer?=null
         var child: NativeCoreProcess? = null
         var rpc: AppServerConnection? = null
         return try {
+            val verifier=OriginalVerificationServer(context,scope).also{verification=it}
             val env = System.getenv().toMutableMap().apply {
                 put("PATH", (context.applicationContext as CodexApplication).toolPath)
                 putAll(AndroidToolPaths.environment(context))
                 put("CODEX_HOME", home.absolutePath); put("HOME", home.absolutePath)
+                put("CODEX_ANDROID_VERIFICATION_SOCKET",verifier.path)
                 put("CODEX_ANDROID_VAULT_SOCKET", vault.path); put("CODEX_ANDROID_VAULT_HOST_PID", android.os.Process.myPid().toString())
                 put("TMPDIR", context.cacheDir.absolutePath); put("SHELL", "/system/bin/sh")
                 put("CODEX_CA_CERTIFICATE", trust.absolutePath); put("SSL_CERT_FILE", trust.absolutePath)
@@ -59,7 +67,7 @@ object NativeOriginalEngineFactory : OriginalEngineFactory {
                 if (config.apiKey.isNotBlank()) env["CODEX_ANDROID_API_KEY"] = config.apiKey
             }
             val process = NativeCoreProcess(binary, args, env, workspace).also { child = it }
-            vault.authorize(process.pid)
+            vault.authorize(process.pid);verifier.authorize(process.pid)
             scope.launch(Dispatchers.IO) { runCatching { process.errors.use { stream -> val bytes = ByteArray(4096); while (stream.read(bytes) >= 0) { /* 不记录可能携带凭证的 stderr */ } } } }
             val rpcConnection = AppServerConnection(process.input, process.output, scope, process::close).also { rpc = it }
             object : OriginalEngineSession {
@@ -67,11 +75,11 @@ object NativeOriginalEngineFactory : OriginalEngineFactory {
                 private val closed = AtomicBoolean()
                 override fun close() {
                     if (!closed.compareAndSet(false, true)) return
-                    try { rpcConnection.close(); process.close() } finally { vault.close() }
+                    try { rpcConnection.close(); process.close() } finally { verifier.close();vault.close() }
                 }
             }
         } catch (failure: Throwable) {
-            runCatching { rpc?.close() }; runCatching { child?.close() }; runCatching { vault.close() }
+            runCatching { rpc?.close() }; runCatching { child?.close() }; runCatching { verification?.close() };runCatching { vault.close() }
             throw failure
         }
     }

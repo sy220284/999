@@ -212,6 +212,7 @@ class RuntimeController(private val context: Context) {
         }
     }
     fun reserveTask(): Boolean {
+        if(!AndroidLanguageRuntime.state.value.ready){fail(AndroidLanguageRuntime.state.value.error ?: "内置开发环境正在准备，请稍后重试");return false}
         val native = (context.applicationContext as CodexApplication).originalCore.state.value
         if ((context.applicationContext as CodexApplication).originalCore.configurationChanging) return false
         if (state.value.busy || native.working || native.closing || native.turnId != null) return false
@@ -254,9 +255,7 @@ class RuntimeController(private val context: Context) {
                 }
                 attachmentInputs.clear(); mutable.update { it.copy(attachments = emptyList()) }
             }
-        } catch (e: CancellationException) { mutable.update { it.copy(error = "任务已停止；已完成的文件修改仍保留，可在修改记录中查看") }; throw e }
-        catch (e: Exception) { fail(e.message ?: "执行失败") }
-        finally {
+        } catch (e: CancellationException) { mutable.update { it.copy(error = "任务已停止；已完成的文件修改仍保留，可在修改记录中查看") }; throw e } catch (e: Exception) { fail(e.message ?: "执行失败") } finally {
             runner.stop(); shell = null
             withContext(NonCancellable) { refresh() }
             active = null
@@ -265,6 +264,7 @@ class RuntimeController(private val context: Context) {
     }
     private val controlSequences = Regex("\u001B\\[[0-9;?]*[ -/]*[@-~]")
     fun startInteractiveTerminal() {
+        if(!AndroidLanguageRuntime.state.value.ready){fail(AndroidLanguageRuntime.state.value.error ?: "内置开发环境正在准备");return}
         if (state.value.busy || interactive != null) return
         val project = state.value.project
         scope.launch {

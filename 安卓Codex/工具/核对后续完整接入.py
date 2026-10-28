@@ -63,7 +63,9 @@ history=(r/files[2]).read_text()
 assert 'response["readState"]'in history and 'expectedRevision'in(r/files[0]).read_text()
 assert '"ready"'in(r/files[4]).read_text()
 assert 'cfg!(target_os = "macos")'in(source/'user-verification/src/lib.rs').read_text()
-assert sum(x['phase']=='提供者缺口'for x in rows)==5
+assert sum(x['phase']=='本机验证运行验收'for x in rows)==5
+assert (r/'运行核心/补充源码/android_user_verification.rs').is_file()
+assert 'CODEX_ANDROID_VERIFICATION_SOCKET'in(r/'app/src/main/java/cn/codex/android/OriginalEngineFactory.kt').read_text()
 assert not any('待接入'in x['status']for x in rows)
 assert len({(x['kind'],x['method'])for x in rows})==71
-print('51项固定Rust方法、直接字段、业务调用、中文页面、通知/连接绑定核对通过；5项用户验证仍是提供者缺口，不计完整实现。')
+print('51项固定Rust方法、直接字段、业务调用、中文页面、通知/连接绑定核对通过；5项用户验证已有Android原生接线，尚未构建/设备验证。')

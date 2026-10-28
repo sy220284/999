@@ -47,12 +47,13 @@ class FullTerminalController(private val context: Context) {
     fun detach(expected: TerminalView?) { expected?.setTerminalCursorBlinkerState(false, false); if (view.get() === expected) view.clear() }
     fun start(directory: File) {
         if (state.value.running) return
+        if(!AndroidLanguageRuntime.state.value.ready){mutable.update{it.copy(error=AndroidLanguageRuntime.state.value.error ?: "内置运行环境正在准备，请稍后再开启终端")};return}
         if (app.controller.state.value.busy || app.originalCore.state.value.working || app.originalCore.state.value.loading || app.originalCore.state.value.turnId != null || app.originalCore.configurationChanging) { mutable.update { it.copy(error = "请先结束当前任务或配置操作") }; return }
         try {
             require(directory.isDirectory) { "工作目录不存在" }
             val operation = lifecycle.begin(); ticket = operation; aborted = false
             val environment = System.getenv().toMutableMap().apply {
-                put("PATH", app.toolPath); put("TERM", "xterm-256color"); put("COLORTERM", "truecolor"); put("LANG", "C.UTF-8")
+                putAll(AndroidToolPaths.environment(context));put("PATH", app.toolPath); put("TERM", "xterm-256color"); put("COLORTERM", "truecolor"); put("LANG", "C.UTF-8")
                 put("HOME", File(context.filesDir, "终端主目录").apply { mkdirs() }.absolutePath); put("TMPDIR", context.cacheDir.absolutePath)
                 remove("OPENAI_API_KEY"); remove("CODEX_API_KEY"); remove("CODEX_ANDROID_API_KEY"); remove("CODEX_ANDROID_VAULT_SOCKET")
             }

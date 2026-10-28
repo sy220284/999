@@ -1,0 +1,11 @@
+{
+  "verified_on": "2026-10-28",
+  "sources": {
+    "node": {"version":"24.22.1","url":"https://nodejs.org/dist/v24.22.1/node-v24.22.1.tar.xz","sha256":"4f5379796280cdaeb0c2f358fd04b6a16cc4fb7dfa83b5a8c91a9d963b435231","evidence":"https://nodejs.org/en/blog/release/v24.22.1"},
+    "python-arm64-v8a": {"version":"3.14.10","url":"https://www.python.org/ftp/python/3.14.10/python-3.14.10-aarch64-linux-android.tar.gz","sha256":"423c80b957330cf0ebb92b9b20f2294c292144a441bdb0ceb8c69d14928e569b","evidence":"https://www.python.org/downloads/release/python-31410/"},
+    "python-x86_64": {"version":"3.14.10","url":"https://www.python.org/ftp/python/3.14.10/python-3.14.10-x86_64-linux-android.tar.gz","sha256":"6ebda1fc3f28efc5861cad397254e8ce5d81ba4f83a3cb6a0c124c3826a0e14c","evidence":"https://www.python.org/downloads/release/python-31410/"},
+    "openssl": {"version":"3.5.9","url":"https://github.com/openssl/openssl/releases/download/openssl-3.5.9/openssl-3.5.9.tar.gz","sha256":"603f5602e2eef00d77fbd429d34dcd5822bb301757a1bc9cdb24c670f1eb859a","evidence":"https://api.github.com/repos/openssl/openssl/releases/tags/openssl-3.5.9"},
+    "curl": {"version":"8.23.0","url":"https://github.com/curl/curl/releases/download/curl-8_23_0/curl-8.23.0.tar.xz","sha256":"8dadd7d2536a314f982ad05a651b713f426bf7d02cc2c76cffb9796f2218e6c5","evidence":"https://api.github.com/repos/curl/curl/releases/tags/curl-8_23_0"},
+    "openssh": {"version":"10.6p1","url":"https://cdn.openbsd.org/pub/OpenBSD/OpenSSH/portable/openssh-10.6p1.tar.gz","sha256":"a9dc9565dffe8640f64d863cd29a32bc4a3dbdec0566a7fc44c5d6ee767d5f39","evidence":"https://www.openssh.org/releasenotes.html"}
+  }
+}

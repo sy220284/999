@@ -50,7 +50,7 @@ class ElicitationFormTest {
         assertFailsWith<IllegalArgumentException> { form.content(mapOf("__form_json" to "{\"kind\":\"work\",\"hours\":1.2}")) }
     }
     @Test fun unknownValidationVocabularyIsNotSilentlyAccepted() {
-        assertFalse(schema("""{"type":"object","unevaluatedProperties":false}""").supported)
+        assertFalse(schema("""{"type":"object","futureKeyword":false}""").supported)
         assertFalse(schema("""{"type":"object","${'$'}ref":"#"}""").supported)
     }
 

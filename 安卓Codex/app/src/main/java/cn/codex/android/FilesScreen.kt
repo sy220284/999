@@ -127,7 +127,7 @@ fun formatSize(size: Long) = when { size < 1024 -> "$size B"; size < 1024 * 1024
                 TextButton(onClick = { controller.resizeInteractiveTerminal(40, 100) }) { Text("宽屏 100 列") }
             }
         }
-        Text("在当前项目目录执行命令。可用命令取决于手机系统；不自带 Python、Node 或完整 Linux 环境。", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        Text("在当前项目目录执行命令。可用命令取决于手机系统；Python/Node需要对应随包产物，完整桌面Linux软件不能直接运行。", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
         Surface(Modifier.weight(1f).fillMaxWidth(), color = MaterialTheme.colorScheme.surfaceContainerLow, shape = RoundedCornerShape(16.dp)) { SelectionContainer { Text(state.terminal.ifBlank { "命令输出会显示在这里。" }, Modifier.verticalScroll(rememberScrollState()).horizontalScroll(rememberScrollState()).padding(16.dp), fontFamily = FontFamily.Monospace, fontSize = 13.sp, lineHeight = 21.sp) } }
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) { listOf("pwd", "ls -la", "uname -a").forEach { text -> SuggestionChip(onClick = { command = text }, label = { Text(text, fontFamily = FontFamily.Monospace) }, enabled = !state.busy) } }
         OutlinedTextField(command, { command = it }, modifier = Modifier.fillMaxWidth(), label = { Text("输入命令") }, minLines = 2, maxLines = 5, shape = RoundedCornerShape(14.dp))

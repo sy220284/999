@@ -226,10 +226,10 @@ private val completionPadding=PaddingValues(20.dp)
             TextButton(onClick={c.requirements()},enabled=idle){Text("检查GovCloud要求")};CompletionValue("要求检查结果",state.requirements)
         }
         if(tab==4)item{
-            Text("固定原版只提供macOS本机验证器。Android生物识别与签名提供者尚未实现；不能使用随机证明或把普通凭证存储当成生物验证。",color=MaterialTheme.colorScheme.primary)
+            Text("Android验证桥使用硬件保护的P256密钥与系统强生物认证。实际可用性取决于手机和随包核心；本机创建凭证不代表已完成服务端登记。",color=MaterialTheme.colorScheme.primary)
             Button(onClick={c.verificationStatus()},enabled=idle){Text("核查验证能力")};CompletionValue("实际提供者状态",state.verification)
             val supported=state.verification!=null && (state.verification?.get("unavailableReason")==JsonNull || state.verification?.get("unavailableReason")==null || state.verification?.string("unavailableReason")=="credentialMissing")
-            TextButton(onClick={confirmation=CompletionConfirmation("登记本机验证凭证？","只有实际提供者可用时执行；可能弹出系统身份验证。"){c.verification(true)}},enabled=idle && supported){Text("登记凭证")}
+            TextButton(onClick={confirmation=CompletionConfirmation("创建本机验证凭证？","创建或复用此账号的本机密钥；服务端登记需要服务提供者另行完成。"){c.verification(true)}},enabled=idle && supported){Text("创建本机凭证")}
             CompletionField("无填充base64url挑战",challenge,{challenge=it},idle);CompletionField("系统验证标题",title,{title=it},idle);CompletionField("系统验证说明",description,{description=it},idle)
             TextButton(onClick={val ch=challenge;val t=title;val d=description;confirmation=CompletionConfirmation("为此挑战生成身份签名？","标题：$t\n说明：$d\n挑战：$ch"){c.verification(false,ch,t,d)}},enabled=idle && supported){Text("验证并签名")}
             TextButton(onClick={confirmation=CompletionConfirmation("删除验证凭证？","将删除此账号的本机验证密钥，可能需要重新登记。"){c.deleteVerification()}},enabled=idle && supported){Text("删除凭证")}
@@ -237,4 +237,36 @@ private val completionPadding=PaddingValues(20.dp)
         }
     }
     CompletionDialog(confirmation,{confirmation=null},idle)
+}
+
+@Composable fun OriginalSshScreen(controller:AndroidSshTrust,privateKeyPath:String,allowChanges:Boolean,onBack:()->Unit) {
+    val state by controller.state.collectAsState();var host by rememberSaveable{mutableStateOf("")};var key by rememberSaveable{mutableStateOf("")}
+    var confirmation by remember{mutableStateOf<CompletionConfirmation?>(null)};var formError by remember{mutableStateOf<String?>(null)}
+    val idle=!state.working
+    BackHandler(onBack=onBack)
+    LazyColumn(Modifier.fillMaxSize().imePadding(),contentPadding=completionPadding,verticalArrangement=Arrangement.spacedBy(12.dp)) {
+        item{TextButton(onClick=onBack){Text("返回工作区")};Text("SSH主机校验",style=MaterialTheme.typography.headlineSmall)
+            Text(state.message,color=MaterialTheme.colorScheme.primary);state.error?.let{Text(it,color=MaterialTheme.colorScheme.error)}
+            if(state.working)LinearProgressIndicator(Modifier.fillMaxWidth())
+            Text("Git命令默认严格检查主机公钥。请从服务商公布信息或可信渠道取得公钥，并核对指纹；应用不会自动扫描后接受，也不会自动替换旧密钥。",style=MaterialTheme.typography.bodySmall)
+            Button(onClick={controller.refresh()},enabled=idle){Text("读取已信任主机")}
+            CompletionField("主机名，非默认端口写作[主机]:端口",host,{host=it},idle)
+            CompletionField("主机公钥：类型和Base64内容",key,{key=it},idle)
+            formError?.let{Text(it,color=MaterialTheme.colorScheme.error)}
+            Button(onClick={runCatching{OriginalSshHostKey.parse(host,key)}.onSuccess{value->
+                val old=state.hosts.firstOrNull{it.host==value.host};formError=null
+                confirmation=CompletionConfirmation(if(old==null)"信任此主机密钥？"else"替换已信任主机密钥？","主机：${value.host}\n新指纹：${value.fingerprint}\n旧指纹：${old?.fingerprint ?: "没有记录"}\n请与可信来源独立核对，错误的信任可能将连接交给其他服务器。"){controller.save(value,old)}
+            }.onFailure{formError=it.message ?: "主机或公钥格式不正确"}},enabled=idle && state.loaded && allowChanges){Text("查看指纹并确认")}
+            HorizontalDivider();Text("私钥与口令",style=MaterialTheme.typography.titleMedium)
+            Text("私钥路径：$privateKeyPath\n可在交互终端使用ssh-keygen生成带口令的密钥；口令在PTY中输入，应用不代填或缓存。把公钥登记到远端属于另行授权操作。",style=MaterialTheme.typography.bodySmall)
+            Text("当前代码已提供构建与安装路径；包内缺少SSH产物时不会假装已连接。应用命令共享本应用权限，不能把此目录当成项目隔离边界。",style=MaterialTheme.typography.bodySmall)
+        }
+        items(state.hosts,key={it.host}){value->
+            Surface(shape=MaterialTheme.shapes.medium,color=MaterialTheme.colorScheme.surfaceContainerLow){Column(Modifier.fillMaxWidth().padding(16.dp)){
+                Text(value.host,style=MaterialTheme.typography.titleMedium);SelectionContainer{Text(value.fingerprint,style=MaterialTheme.typography.bodySmall)}
+                TextButton(onClick={confirmation=CompletionConfirmation("移除此主机信任？","${value.host}\n${value.fingerprint}\n后续Git连接会拒绝此主机，直至重新核对并登记。"){controller.remove(value)}},enabled=idle && allowChanges){Text("移除信任")}
+            }}
+        }
+    }
+    CompletionDialog(confirmation,{confirmation=null},idle && allowChanges)
 }

@@ -126,4 +126,34 @@ class OriginalExperimentalFlowsTest {
         } } finally {scope.cancel();dispatcher.close()}
     }
 
+    @Test fun stoppingDuringMediaPreparationNeverStartsOrStopsARemoteSession() = runBlocking {
+        val dispatcher=Executors.newSingleThreadExecutor().asCoroutineDispatcher();val scope=CoroutineScope(SupervisorJob()+dispatcher)
+        val outcomes=mutableListOf<Boolean>()
+        val lifecycle=object:OriginalMutationLifecycle{
+            override fun begin()="media"
+            override fun finish(ticket:String,confirmed:Boolean){outcomes+=confirmed}
+        }
+        try { Wire(scope).use { wire ->
+            val controller=OriginalRealtimeController(scope,{false},lifecycle)
+            val preparing=CompletableDeferred<Unit>()
+            withContext(dispatcher){controller.bind(OriginalCodexClient(wire.rpc));controller.start("t",false){preparing.complete(Unit);awaitCancellation()}}
+            preparing.await();withContext(dispatcher){controller.stop()}
+            withTimeout(3000){controller.state.first{!it.running}}
+            assertEquals(listOf(false),outcomes)
+            withContext(dispatcher){controller.start("next",false)}
+            val next=wire.read();assertEquals("thread/realtime/start",next.string("method"));assertEquals("next",next.getValue("params").jsonObject.string("threadId"))
+        } } finally {scope.cancel();dispatcher.close()}
+    }
+    @Test fun preparedOfferUsesWebRtcTransportAndKeepsTheExactSdp() = runBlocking {
+        val dispatcher=Executors.newSingleThreadExecutor().asCoroutineDispatcher();val scope=CoroutineScope(SupervisorJob()+dispatcher)
+        try { Wire(scope).use { wire ->
+            val controller=OriginalRealtimeController(scope,{false});val offer="v=0\r\nm=audio 9 UDP/TLS/RTP/SAVPF 111\r\n"
+            withContext(dispatcher){controller.bind(OriginalCodexClient(wire.rpc));controller.start("t",true){offer}}
+            val request=wire.read();val transport=request.getValue("params").jsonObject.getValue("transport").jsonObject
+            assertEquals("webrtc",transport.string("type"));assertEquals(offer,transport.string("sdp"))
+            withContext(dispatcher){controller.notification("thread/realtime/closed",buildJsonObject{put("threadId","t")})};wire.reply(request)
+            withTimeout(3000){controller.state.first{!it.running}}
+        } } finally {scope.cancel();dispatcher.close()}
+    }
+
 }

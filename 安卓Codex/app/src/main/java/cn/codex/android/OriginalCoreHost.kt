@@ -33,6 +33,7 @@ data class OriginalState(
     val guardianReviews: List<JsonObject> = emptyList(),
     val turnProgress: Map<String, OriginalTurnProgress> = emptyMap(),
     val threadUpdates: OriginalThreadUpdatesState = OriginalThreadUpdatesState(), val threadListVersion: Long = 0,
+    val verifyingElicitation:ServerMessage.Request?=null,val verificationError:String?=null,
     val turnNotificationVersion:Long=0,val queueMonitoring:Boolean=false,
     val events: OriginalEventState = OriginalEventState(), val toolBusy: Boolean = false,
     val sections: List<JsonObject> = emptyList(), val sectionCursor: String? = null,
@@ -72,7 +73,7 @@ class OriginalCoreHost(
     val realtimeAudio = OriginalRealtimeAudio(context,scope)
     private val workspace = File(context.filesDir, "工作区/原版项目").apply { mkdirs() }
     private val androidTools = OriginalAndroidTools(workspace)
-    private val toolJobs = mutableMapOf<ServerMessage.Request,Job>()
+    private val toolJobs = java.util.IdentityHashMap<ServerMessage.Request,Job>()
     private val engineHome = File(context.filesDir, "原版核心数据").apply { mkdirs() }
     val configurationJournal get() = (context.applicationContext as CodexApplication).configurationJournal
     val extensions: OriginalExtensionsController = OriginalExtensionsController(scope, workspace.absolutePath, configurationJournal.lifecycle("插件、技能与自动规则")) { state.value.working || state.value.turnId != null || state.value.loading || otherTaskRunning() || managedChanging || mcp.state.value.mutating || settings.state.value.mutating || files.state.value.mutating || commands.state.value.running || (context.applicationContext as CodexApplication).fullTerminal.state.value.running }
@@ -96,15 +97,18 @@ class OriginalCoreHost(
         { state.value.working || state.value.turnId != null || state.value.loading || state.value.closing || otherTaskRunning() || configurationChanging }, configurationJournal.lifecycle("配置与迁移"))
     val queue=OriginalQueueController(scope,{state.value.loading || state.value.closing || otherTaskRunning() || configurationChanging},configurationJournal.lifecycle("待办队列变更"))
     private fun completionBusy()=state.value.working || state.value.turnId!=null || state.value.loading || state.value.closing || otherTaskRunning() || configurationChanging
+    val sshTrust:AndroidSshTrust=AndroidSshTrust(context,scope,{completionBusy()},configurationJournal.lifecycle("SSH主机信任"))
     val projects=OriginalProjectsController(scope,{completionBusy()},configurationJournal.lifecycle("项目管理"),ProjectCreationRequestStore(context))
     val history=OriginalHistoryController(scope,{state.value.threadId},{completionBusy()},configurationJournal.lifecycle("会话记录与后台终端"))
     val advanced=OriginalAdvancedController(scope,{state.value.threadId},workspace.absolutePath,{completionBusy()},configurationJournal.lifecycle("会话设置、记忆与采样"))
     val connections=OriginalConnectionsController(scope,{state.value.threadId},{completionBusy()},configurationJournal.lifecycle("环境、远控与服务认证"))
     val search=OriginalSearchController(scope,workspace.absolutePath)
-    val realtime=OriginalRealtimeController(scope,{state.value.working || state.value.turnId!=null || state.value.loading || state.value.closing || otherTaskRunning() || configurationChanging},configurationJournal.lifecycle("实时会话"))
+    val webRtc:OriginalWebRtcAudio=OriginalWebRtcAudio(context,scope){realtime.stop()}
+    val realtime:OriginalRealtimeController=OriginalRealtimeController(scope,{state.value.working || state.value.turnId!=null || state.value.loading || state.value.closing || otherTaskRunning() || configurationChanging},configurationJournal.lifecycle("实时会话"))
     val microphone=OriginalRealtimeMicrophone(context,scope){bytes -> realtime.sendAudio(bytes)}
+    init {scope.launch{realtime.state.map{it.running}.distinctUntilChanged().collect{running->if(!running)webRtc.close()}}}
     fun commandWorkspace() = workspace.absolutePath
-    val managedChanging get() = projects.operations.state.value.mutating || history.operations.state.value.mutating || advanced.operations.state.value.mutating || connections.operations.state.value.mutating || queue.operations.state.value.mutating || realtime.state.value.running || library.operations.state.value.mutating || services.operations.state.value.mutating || migration.operations.state.value.mutating
+    val managedChanging get() = sshTrust.state.value.working || projects.operations.state.value.mutating || history.operations.state.value.mutating || advanced.operations.state.value.mutating || connections.operations.state.value.mutating || queue.operations.state.value.mutating || realtime.state.value.running || library.operations.state.value.mutating || services.operations.state.value.mutating || migration.operations.state.value.mutating
     val configurationChanging get() = state.value.toolBusy || (context.applicationContext as CodexApplication).gitOperations.state.value.running || (context.applicationContext as CodexApplication).fullTerminal.state.value.running || commands.state.value.running || extensions.state.value.mutating || mcp.state.value.mutating || settings.state.value.mutating || files.state.value.mutating || managedChanging
     fun mcpImports() = McpTools(context).connections().map { it.name to it.url }
     private fun error(error: Throwable) { mutable.update { it.copy(error = error.message ?: "原版核心操作失败") } }
@@ -162,7 +166,8 @@ class OriginalCoreHost(
     private fun closeSession(cancelStartup: Boolean) {
         if (state.value.closing) return
         lifecycle.disconnect(lifecycle.state.connectionEpoch)
-        microphone.stop();realtimeAudio.stop();projects.bind(null);history.bind(null);advanced.bind(null);connections.bind(null);queue.bind(null);search.bind(null);realtime.bind(null);remainingEvents.reset();toolJobs.values.toList().forEach { it.cancel() };toolJobs.clear()
+        mutable.update{it.copy(verifyingElicitation=null,verificationError=null)}
+        microphone.stop();realtimeAudio.stop();webRtc.close();projects.bind(null);history.bind(null);advanced.bind(null);connections.bind(null);queue.bind(null);search.bind(null);realtime.bind(null);remainingEvents.reset();toolJobs.values.toList().forEach { it.cancel() };toolJobs.clear()
         if (cancelStartup) startupJob?.cancel()
         operationJob?.cancel(); operationJob = null
         reservedTask = null
@@ -565,9 +570,39 @@ class OriginalCoreHost(
         // 请求 ID 可在重连后复用，必须核对当前队列中的同一个请求实例。
         if (state.value.requests.none { it === request }) return@launch
         try {
+            toolJobs.remove(request)?.cancel()
             rpc.respond(request.id, result)
             if (current(epoch, rpc)) mutable.update { it.copy(requests = it.requests.filterNot { pending -> pending === request }) }
         } catch (failure: Exception) { if (current(epoch, rpc)) error(failure) }
+    }
+    fun verifyElicitation(request:ServerMessage.Request) {
+        if(request.method!="mcpServer/elicitation/request" || state.value.requests.none{it===request} || request in toolJobs || state.value.verifyingElicitation!=null)return
+        val params=request.params as? JsonObject ?: return
+        if(params.string("mode")!="openai/userVerification")return
+        val api=client ?: return;val rpc=api.connection;val epoch=lifecycle.state.connectionEpoch
+        val job=scope.launch(start=CoroutineStart.LAZY){
+            var issued:JsonElement?=null;var completed=false
+            mutable.update{it.copy(verifyingElicitation=request,verificationError=null,toolBusy=true)}
+            try{
+                val input=OriginalCompletionData.verification(params.string("challenge"),params.string("title"),params.string("description"))
+                val result=api.verifyUser(input){issued=it}.jsonObject;completed=true
+                val proof=result.getValue("proof").jsonObject
+                require(proof.string("credentialId").isNotBlank() && proof.string("signature").isNotBlank())
+                if(current(epoch,rpc) && state.value.requests.any{it===request}){
+                    rpc.respond(request.id,buildJsonObject{put("action","accept");put("content",proof);put("_meta",JsonNull)})
+                    mutable.update{it.copy(requests=it.requests.filterNot{pending->pending===request})}
+                }
+            }catch(error:CancellationException){throw error}catch(_:Exception){if(current(epoch,rpc))mutable.update{it.copy(verificationError="本机验证未完成，可重试系统验证或拒绝此请求")}}
+            finally{
+                if(!completed && issued!=null)withContext(NonCancellable){
+                    try{runCatching{withTimeout(3000){api.cancelVerification(requireNotNull(issued))}}}
+                    finally{rpc.close()} // 取消ACK不代表本机签名已终止；只关闭本次捕获的连接。
+                }
+                toolJobs.remove(request)
+                if(current(epoch,rpc))mutable.update{it.copy(verifyingElicitation=if(it.verifyingElicitation===request)null else it.verifyingElicitation,toolBusy=toolJobs.isNotEmpty())}
+            }
+        }
+        toolJobs[request]=job;job.start()
     }
     fun dismissRuntimeNotice(key: String) { remainingEvents.dismiss(key);mutable.update { it.copy(events = remainingEvents.state) } }
     fun executeAndroidTool(request: ServerMessage.Request) {
@@ -609,6 +644,8 @@ class OriginalCoreHost(
     }
     private suspend fun notification(epoch: Long, rpc: AppServerConnection, method: String, params: JsonObject) {
         if (!current(epoch, rpc)) return
+        if(method=="thread/realtime/sdp" && realtime.state.value.webRtc)webRtc.answer(params.string("threadId"),params.string("sdp"))
+        if(method in setOf("thread/realtime/closed","thread/realtime/error") && params.string("threadId")==realtime.state.value.threadId){webRtc.close();if(method.endsWith("error") && realtime.state.value.webRtc)realtime.stop()}
         if(method=="project/changed")projects.changed()
         if(method=="remoteControl/status/changed")connections.remoteChanged(params)
         if(method=="mcpServer/event/stream/notification")connections.streamEvent(params)

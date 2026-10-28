@@ -30,13 +30,14 @@ import kotlinx.serialization.json.*
     val servicesStatus by host.services.operations.state.collectAsState()
     val migrationStatus by host.migration.operations.state.collectAsState()
     val queueStatus by host.queue.operations.state.collectAsState()
+    val sshStatus by host.sshTrust.state.collectAsState()
     val projectsStatus by host.projects.operations.state.collectAsState()
     val historyStatus by host.history.operations.state.collectAsState()
     val advancedStatus by host.advanced.operations.state.collectAsState()
     val connectionsStatus by host.connections.operations.state.collectAsState()
     val searchStatus by host.search.state.collectAsState()
     val realtimeStatus by host.realtime.state.collectAsState()
-    val managedBusy = projectsStatus.mutating || historyStatus.mutating || advancedStatus.mutating || connectionsStatus.mutating || queueStatus.busy || realtimeStatus.running || libraryStatus.mutating || servicesStatus.mutating || migrationStatus.mutating
+    val managedBusy = sshStatus.working || projectsStatus.mutating || historyStatus.mutating || advancedStatus.mutating || connectionsStatus.mutating || queueStatus.busy || realtimeStatus.running || libraryStatus.mutating || servicesStatus.mutating || migrationStatus.mutating
     val configurationRecords by host.configurationJournal.records.collectAsState()
     val configurationReadError by host.configurationJournal.readError.collectAsState()
     val activeConfiguration by host.configurationJournal.active.collectAsState()
@@ -60,7 +61,7 @@ import kotlinx.serialization.json.*
     var draft by remember { mutableStateOf("") }
     var renamed by remember { mutableStateOf<String?>(null) }
     val context = LocalContext.current
-    state.requests.firstOrNull()?.let { request -> key(state.connectionEpoch, request.id) { if(request.method == "item/tool/call") OriginalDynamicToolDialog(host,request) else OriginalRequestDialog(request, state.items, { host.answer(request, it) }) } }
+    state.requests.firstOrNull()?.let { request -> key(state.connectionEpoch, request.id) { if(request.method == "item/tool/call") OriginalDynamicToolDialog(host,request) else OriginalRequestDialog(request, state.items, { host.answer(request, it) },onVerify={host.verifyElicitation(request)},verifying=state.verifyingElicitation===request,verificationError=state.verificationError) } }
     OriginalSkillPreview(host.extensions)
     if (state.agent != null) {
         val agent = state.agent!!
@@ -78,6 +79,7 @@ import kotlinx.serialization.json.*
     advancedManager?.let { page ->
         val allow = !state.working && state.turnId == null && !state.loading && !extensionState.mutating && !mcpState.mutating && !settingsState.mutating && !filesState.mutating && !fullTerminalState.running && !networkGit.running && !commandState.running && !managedBusy
         when (page) {
+            "SSH主机校验" -> OriginalSshScreen(host.sshTrust,java.io.File(AndroidSshTrust.directory(LocalContext.current),"id_ed25519").absolutePath,allow) { advancedManager = null }
             "项目管理" -> OriginalProjectsScreen(host) { advancedManager = null }
             "搜索与会话记录" -> OriginalHistoryScreen(host,onOpen={id->host.openThread(id);advancedManager=null}) { advancedManager = null }
             "会话设置与记忆" -> OriginalAdvancedScreen(host) { advancedManager = null }
@@ -168,7 +170,7 @@ import kotlinx.serialization.json.*
                     OutlinedButton(onClick = { skillsManager = true; host.extensions.refreshSkills() }, enabled = !state.loading) { Text("原版技能管理") }
                     TextButton(onClick = { eventsManager = true }) { Text("运行动态与能力") }
                     Row { TextButton(onClick={realtimeManager=true}){Text("实时文字与语音")};TextButton(onClick={searchManager=true}){Text("持续搜索项目")} }
-                    listOf("项目管理", "搜索与会话记录", "会话设置与记忆", "连接、订阅与认证", "市场、分享与应用", "授权、额度与反馈", "迁移、配置与工具").forEach { title -> OutlinedButton(onClick = { advancedManager = title }, enabled = !state.loading) { Text(title) } }
+                    listOf("项目管理", "SSH主机校验", "搜索与会话记录", "会话设置与记忆", "连接、订阅与认证", "市场、分享与应用", "授权、额度与反馈", "迁移、配置与工具").forEach { title -> OutlinedButton(onClick = { advancedManager = title }, enabled = !state.loading) { Text(title) } }
                     Text(state.account, style = MaterialTheme.typography.titleSmall)
                     Text("账号与 MCP 凭证由 Android Keystore 加密保存在手机，退出核心后仍可恢复。", style = MaterialTheme.typography.bodySmall)
                     Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -291,17 +293,17 @@ internal fun openOriginalLogin(context: android.content.Context, url: String) {
     runCatching { context.startActivity(Intent(Intent.ACTION_VIEW, uri)) }.onFailure { android.widget.Toast.makeText(context, "无法打开浏览器，请检查浏览器是否可用", android.widget.Toast.LENGTH_LONG).show() }
 }
 
-@Composable private fun OriginalRequestDialog(request: ServerMessage.Request, items: List<OriginalItem>, respond: (JsonElement) -> Unit) {
+@Composable private fun OriginalRequestDialog(request: ServerMessage.Request, items: List<OriginalItem>, respond: (JsonElement) -> Unit,onVerify:()->Unit={},verifying:Boolean=false,verificationError:String?=null) {
     val params = request.params as? JsonObject ?: buildJsonObject {}
     if (request.method in setOf("execCommandApproval", "applyPatchApproval")) { OriginalLegacyApprovalDialog(request, respond); return }
     if (request.method == "item/permissions/requestApproval") { OriginalPermissionDialog(params, respond); return }
-    var answers by remember(request.id) { mutableStateOf(emptyMap<String, String>()) }
+    var answers by remember(request) { mutableStateOf(emptyMap<String, String>()) }
     val question = request.method == "item/tool/requestUserInput"
     val elicitation = request.method == "mcpServer/elicitation/request"
     val context = LocalContext.current
-    val form = remember(request.id) { (params["requestedSchema"] as? JsonObject)?.let(::ElicitationForm) }
-    LaunchedEffect(request.id, form) { if (elicitation && form != null) answers = form.initialValues }
-    var formError by remember(request.id) { mutableStateOf("") }
+    val form = remember(request) { runCatching{(params["requestedSchema"] as? JsonObject)?.let(::ElicitationForm)}.getOrNull() }
+    LaunchedEffect(request, form) { if (elicitation && form != null) answers = form.initialValues }
+    var formError by remember(request) { mutableStateOf("") }
     val reviewedItem = items.firstOrNull { it.id == params.string("itemId") }
     val canReview = if (request.method.contains("fileChange")) reviewedItem?.type == "fileChange" && (reviewedItem.data["changes"] as? JsonArray)?.isNotEmpty() == true && reviewedItem.text.length <= 100_000 else params.string("command").isNotBlank() || reviewedItem?.type == "commandExecution"
     val questions = (params["questions"] as? JsonArray).orEmpty().mapNotNull { it as? JsonObject }
@@ -319,7 +321,12 @@ internal fun openOriginalLogin(context: android.content.Context, url: String) {
                 if ((q["options"] as? JsonArray).isNullOrEmpty() || q["isOther"]?.jsonPrimitive?.booleanOrNull == true) OutlinedTextField(answers[id].orEmpty(), { answers = answers + (id to it) }, label = { Text(if (q["isSecret"]?.jsonPrimitive?.booleanOrNull == true) "保密回答" else "你的回答") }, visualTransformation = if (q["isSecret"]?.jsonPrimitive?.booleanOrNull == true) PasswordVisualTransformation() else VisualTransformation.None, modifier = Modifier.fillMaxWidth())
             } else if (elicitation) {
                 Text(params.string("message", "服务请求补充信息"))
-                if (params.string("mode") == "url") {
+                if(params.string("mode")=="openai/userVerification"){
+                    Text(params.string("title"),style=MaterialTheme.typography.titleMedium);Text(params.string("description"))
+                    Text("确认后由系统强生物认证签署此挑战，私钥保留在手机。",style=MaterialTheme.typography.bodySmall)
+                    if(verifying)LinearProgressIndicator(Modifier.fillMaxWidth())
+                    verificationError?.let{Text(it,color=MaterialTheme.colorScheme.error)}
+                } else if (params.string("mode") == "url") {
                     Text(params.string("url"), style = MaterialTheme.typography.bodySmall)
                     OutlinedButton(onClick = { openOriginalLogin(context, params.string("url")) }) { Text("打开授权页面") }
                     Text("完成服务页面的授权后，再确认返回工具。", style = MaterialTheme.typography.bodySmall)
@@ -328,7 +335,11 @@ internal fun openOriginalLogin(context: android.content.Context, url: String) {
                     else form.fields.forEach { field ->
                         Text(field.title + if (field.required) " *" else "")
                         if (field.description.isNotBlank()) Text(field.description, style = MaterialTheme.typography.bodySmall)
-                        if (field.options != null) field.options!!.forEachIndexed { index, option ->
+                        if(field.multiOptions!=null){
+                            val selected=runCatching{Json.parseToJsonElement(answers[field.name] ?: "[]").jsonArray}.getOrDefault(JsonArray(emptyList()))
+                            field.multiOptions!!.forEachIndexed{index,option->FilterChip(selected=option in selected,onClick={val next=if(option in selected)selected.filterNot{it==option}else selected+option;answers=answers+(field.name to JsonArray(next).toString())},label={Text(field.multiLabel(index))})}
+                        } else if (field.options != null) field.options!!.forEachIndexed { index, option ->
+                            field.imageOptions.getOrNull(index)?.let{OriginalImageChoicePreview(it)}
                             val value = option.jsonPrimitive.content
                             FilterChip(answers[field.name] == value, { answers = answers + (field.name to value) }, label = { Text(field.label(index)) })
                         } else if (field.type == "boolean") Row {
@@ -347,7 +358,8 @@ internal fun openOriginalLogin(context: android.content.Context, url: String) {
             }
         }
     }, confirmButton = {
-        if (elicitation && (params.string("mode") == "url" || form?.supported == true)) TextButton(onClick = {
+        if(elicitation && params.string("mode")=="openai/userVerification")TextButton(onClick=onVerify,enabled=!verifying){Text(if(verifying)"正在系统验证" else "验证并同意")}
+        else if (elicitation && (params.string("mode") == "url" || form?.supported == true)) TextButton(onClick = {
             runCatching { if (params.string("mode") == "url") JsonNull else requireNotNull(form).content(answers) }
                 .onSuccess { content -> respond(buildJsonObject { put("action", "accept"); put("content", content); put("_meta", JsonNull) }) }
                 .onFailure { formError = it.message ?: "请检查填写内容" }

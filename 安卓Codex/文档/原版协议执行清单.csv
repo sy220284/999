@@ -111,7 +111,7 @@
 服务端请求,item/commandExecution/requestApproval,中文交互已接入，未运行验证,app/src/main/java/cn/codex/android/OriginalCoreHost.kt,待验证,未运行验证
 服务端请求,item/fileChange/requestApproval,中文交互已接入，未运行验证,app/src/main/java/cn/codex/android/OriginalCoreHost.kt,待验证,未运行验证
 服务端请求,item/tool/requestUserInput,中文交互已接入，未运行验证,app/src/main/java/cn/codex/android/OriginalCoreHost.kt,待验证,未运行验证
-服务端请求,mcpServer/elicitation/request,表单/URL 已接入；有限复杂 schema，未运行验证,app/src/main/java/cn/codex/android/OriginalCoreHost.kt,P2/待验证,未运行验证
+服务端请求,mcpServer/elicitation/request,表单/URL/本机签名已接入；有限复杂 schema，未运行验证,app/src/main/java/cn/codex/android/OriginalCoreHost.kt,P2/待验证,未运行验证
 服务端请求,item/permissions/requestApproval,中文交互已接入，未运行验证,app/src/main/java/cn/codex/android/OriginalCoreHost.kt,待验证,未运行验证
 服务端请求,item/tool/call,中文交互已接入，未运行验证,app/src/main/java/cn/codex/android/OriginalCoreHost.kt,待验证,未运行验证
 服务端请求,account/chatgptAuthTokens/refresh,缺少外部提供者，已有专用提示及协议拒绝,app/src/main/java/cn/codex/android/OriginalCoreHost.kt,外部依赖/待完成,未运行验证
@@ -199,7 +199,7 @@
 服务端通知,thread/realtime/transcript/delta,WebSocket发起/文字/录音/PCM输出代码已接入，未运行验证,app/src/main/java/cn/codex/android/OriginalCoreHost.kt,实时媒体运行验收,未运行验证
 服务端通知,thread/realtime/transcript/done,WebSocket发起/文字/录音/PCM输出代码已接入，未运行验证,app/src/main/java/cn/codex/android/OriginalCoreHost.kt,实时媒体运行验收,未运行验证
 服务端通知,thread/realtime/outputAudio/delta,WebSocket发起/文字/录音/PCM输出代码已接入，未运行验证,app/src/main/java/cn/codex/android/OriginalCoreHost.kt,实时媒体运行验收,未运行验证
-服务端通知,thread/realtime/sdp,已标示WebRTC缺少媒体适配，未完成,app/src/main/java/cn/codex/android/OriginalCoreHost.kt,WebRTC依赖,未运行验证
+服务端通知,thread/realtime/sdp,WebRTC协商/媒体/静音控制代码已接入，未构建或运行验证,app/src/main/java/cn/codex/android/OriginalCoreHost.kt;app/src/main/java/cn/codex/android/OriginalWebRtcAudio.kt,WebRTC运行验收,未运行验证
 服务端通知,thread/realtime/error,WebSocket发起/文字/录音/PCM输出代码已接入，未运行验证,app/src/main/java/cn/codex/android/OriginalCoreHost.kt,实时媒体运行验收,未运行验证
 服务端通知,thread/realtime/closed,WebSocket发起/文字/录音/PCM输出代码已接入，未运行验证,app/src/main/java/cn/codex/android/OriginalCoreHost.kt,实时媒体运行验收,未运行验证
 服务端通知,windows/worldWritableWarning,Windows 专用，Android 平台受限,,平台限制,未运行验证

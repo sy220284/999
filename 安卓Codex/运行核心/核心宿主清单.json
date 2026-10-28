@@ -1,6 +1,6 @@
 {
   "upstream_commit": "970111f6cb62cc02fe36a82ea7d71b37a2889c97",
-  "evidence": "固定上游提交的 10 项条目、23 份唯一源码证据；Android 路径为静态接线记录，无构建/运行结果",
+  "evidence": "固定上游提交的 12 项条目、27 份唯一源码证据；仅静态接线记录，无构建/运行结果",
   "entries": [
     {
       "name": "app-server",
@@ -340,6 +340,48 @@
         "x86_64"
       ],
       "environment": "PATH/GIT_EXEC_PATH/GIT_TEMPLATE_DIR/GIT_PAGER；不注入网络凭证；core 继承策略使用显式无敏感位置字段"
+    },
+    {
+      "name": "android-user-verification",
+      "package": "codex-user-verification（Android补丁）",
+      "androidInstall": "宿主Keystore + 核心内Rust提供者",
+      "ipc": "独立私有socket/u32 JSON；确切PID/UID；断管取消",
+      "status": "源码接入，未构建/运行",
+      "abi": [
+        "arm64-v8a",
+        "x86_64"
+      ],
+      "refs": [
+        {
+          "path": "codex-rs/user-verification/src/lib.rs",
+          "sha256": "2f267cd270fc97e8ae252888f7d5ac8c9739b2c07079a9e899d13f2e2e8dbc99"
+        },
+        {
+          "path": "codex-rs/app-server-protocol/src/protocol/v2/user_verification.rs",
+          "sha256": "4c5543c279c490c29be9ed74e0426cd8d7849702213505988191fbbeecf5dfb7"
+        }
+      ]
+    },
+    {
+      "name": "android-webrtc",
+      "package": "Android媒体替代原版voice-host设备实现",
+      "androidInstall": "SDK JNI随包 + Android音频接口",
+      "ipc": "原版RPC承载SDP；ordered oai-events；媒体不通过stdio",
+      "status": "源码接入，未构建/运行",
+      "abi": [
+        "arm64-v8a",
+        "x86_64"
+      ],
+      "refs": [
+        {
+          "path": "codex-rs/voice-host/README.md",
+          "sha256": "f5f651151b63b0b16cbd9d67286a2c9c7f5f074315eae5ed60a60102ceac8766"
+        },
+        {
+          "path": "codex-rs/voice-host/src/transport.rs",
+          "sha256": "1ef0696b7c61083b37d6536c58df98e22bc00ba8918a815370698f7c987886a8"
+        }
+      ]
     }
   ]
 }

@@ -205,7 +205,7 @@ private data class McpConfirmation(val entry: OriginalMcpEntry, val snapshot: Or
                 OutlinedTextField(scopes, { scopes = it }, enabled = !busy, label = { Text("授权范围（每行一项，可选）") }, modifier = Modifier.fillMaxWidth())
                 Text("需要账号授权时，保存后点击服务卡片的“账号授权”。", style = MaterialTheme.typography.bodySmall)
             } else {
-                Text("程序需要已安装在手机可执行的位置。当前没有内置完整 Node、Python 或 npm，填写命令不会自动安装运行环境。", style = MaterialTheme.typography.bodySmall)
+                Text("程序需要已安装在手机可执行的位置。Node/Python/npm需要实际随包解释器与数据；填写命令不会自动安装，先在能力页核查。", style = MaterialTheme.typography.bodySmall)
                 OutlinedTextField(command, { command = it }, enabled = !busy, label = { Text("程序路径") }, singleLine = true, modifier = Modifier.fillMaxWidth())
                 OutlinedTextField(args, { args = it }, enabled = !busy, label = { Text("参数（每行一个，原样传入）") }, modifier = Modifier.fillMaxWidth())
                 OutlinedTextField(cwd, { cwd = it }, enabled = !busy, label = { Text("工作目录（可选）") }, singleLine = true, modifier = Modifier.fillMaxWidth())
