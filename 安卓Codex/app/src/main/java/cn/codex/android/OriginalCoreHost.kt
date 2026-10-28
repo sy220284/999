@@ -93,8 +93,11 @@ class OriginalCoreHost(
         { state.value.working || state.value.turnId != null || state.value.loading || state.value.closing || otherTaskRunning() || configurationChanging }, configurationJournal.lifecycle("账号授权与反馈"), CreditResetRequestStore(context))
     val migration: OriginalMigrationController = OriginalMigrationController(scope, workspace.absolutePath,
         { state.value.working || state.value.turnId != null || state.value.loading || state.value.closing || otherTaskRunning() || configurationChanging }, configurationJournal.lifecycle("配置与迁移"))
+    val search=OriginalSearchController(scope,workspace.absolutePath)
+    val realtime=OriginalRealtimeController(scope,{state.value.working || state.value.turnId!=null || state.value.loading || state.value.closing || otherTaskRunning() || configurationChanging},configurationJournal.lifecycle("实时会话"))
+    val microphone=OriginalRealtimeMicrophone(context,scope){bytes -> realtime.sendAudio(bytes)}
     fun commandWorkspace() = workspace.absolutePath
-    val managedChanging get() = library.operations.state.value.mutating || services.operations.state.value.mutating || migration.operations.state.value.mutating
+    val managedChanging get() = realtime.state.value.running || library.operations.state.value.mutating || services.operations.state.value.mutating || migration.operations.state.value.mutating
     val configurationChanging get() = state.value.toolBusy || (context.applicationContext as CodexApplication).gitOperations.state.value.running || (context.applicationContext as CodexApplication).fullTerminal.state.value.running || commands.state.value.running || extensions.state.value.mutating || mcp.state.value.mutating || settings.state.value.mutating || files.state.value.mutating || managedChanging
     fun mcpImports() = McpTools(context).connections().map { it.name to it.url }
     private fun error(error: Throwable) { mutable.update { it.copy(error = error.message ?: "原版核心操作失败") } }
@@ -144,7 +147,7 @@ class OriginalCoreHost(
         ensureCurrent(epoch, rpc)
         if (config.apiKey.isNotBlank() && config.endpoint.trimEnd('/') == "https://api.openai.com/v1" && api.account().jsonObject["account"] == JsonNull) api.loginApiKey(config.apiKey)
         ensureCurrent(epoch, rpc)
-        client = api; extensions.bind(api); mcp.bind(api); commands.bind(api); settings.bind(api); files.bind(api); library.bind(api); services.bind(api); migration.bind(api)
+        client = api; search.bind(api);realtime.bind(api);extensions.bind(api); mcp.bind(api); commands.bind(api); settings.bind(api); files.bind(api); library.bind(api); services.bind(api); migration.bind(api)
         mutable.update { it.copy(connected = true, status = "原版核心已连接 · 凭证由手机 Keystore 加密保存", model = config.model) }
         refreshThreads(api, false); readAccount(api, epoch)
     }
@@ -152,7 +155,7 @@ class OriginalCoreHost(
     private fun closeSession(cancelStartup: Boolean) {
         if (state.value.closing) return
         lifecycle.disconnect(lifecycle.state.connectionEpoch)
-        realtimeAudio.stop();remainingEvents.reset();toolJobs.values.toList().forEach { it.cancel() };toolJobs.clear()
+        microphone.stop();realtimeAudio.stop();search.bind(null);realtime.bind(null);remainingEvents.reset();toolJobs.values.toList().forEach { it.cancel() };toolJobs.clear()
         if (cancelStartup) startupJob?.cancel()
         operationJob?.cancel(); operationJob = null
         reservedTask = null
@@ -200,7 +203,7 @@ class OriginalCoreHost(
         mutable.update { it.copy(historyCursor = response.string("itemsBackwardsCursor").ifBlank { null }) }
     }
     private fun selectThread(thread: JsonObject, throughVersion: Long = state.value.threadUpdates.version) {
-        realtimeAudio.stop()
+        microphone.stop();realtimeAudio.stop()
         val turns = (thread["turns"] as? JsonArray).orEmpty().mapNotNull { it as? JsonObject }
         val active = turns.lastOrNull { it.string("status") == "inProgress" }?.string("id")
         val items = OriginalThreadView.history(thread)
@@ -528,6 +531,8 @@ class OriginalCoreHost(
                 if (message.method in setOf("item/commandExecution/requestApproval", "item/fileChange/requestApproval", "item/tool/requestUserInput", "mcpServer/elicitation/request", "item/permissions/requestApproval", "execCommandApproval", "applyPatchApproval", "item/tool/call")) {
                     if (state.value.requests.size >= 32) rpc.reject(message.id, -32000, "待处理交互数量达到上限")
                     else mutable.update { it.copy(requests = it.requests + message) }
+                } else if(message.method == "currentTime/read") {
+                    rpc.respond(message.id,buildJsonObject{put("currentTimeAt",System.currentTimeMillis()/1000L)})
                 } else if(message.method == "account/chatgptAuthTokens/refresh" || message.method == "attestation/generate") {
                     val reason = if(message.method == "attestation/generate") "当前Android包未接入受服务端认可的设备证明提供者；本连接未声明requestAttestation能力" else "当前使用原版核心管理的登录，未配置外部账号令牌刷新提供者；请在授权页重新登录"
                     rpc.reject(message.id,-32001,reason)
@@ -542,10 +547,15 @@ class OriginalCoreHost(
         if (!current(epoch, rpc)) return
         if (method in OriginalRemainingEvents.methods) {
             try {
+                if(method=="process/outputDelta")commands.processOutput(params)
+                if(method=="process/exited")commands.processExited(params)
+                if(method.startsWith("fuzzyFileSearch/session"))search.notification(method,params)
+                if(method.startsWith("thread/realtime/"))realtime.notification(method,params)
+                if(method=="thread/realtime/started" && !realtime.acceptsStarted(params.string("threadId")))return
                 remainingEvents.accept(method,params)
                 if(method == "thread/realtime/outputAudio/delta" && params.string("threadId") == state.value.threadId && remainingEvents.state.realtime[state.value.threadId]?.let { it.active && !it.sdpReceived } == true)
                     (params["audio"] as? JsonObject)?.let(realtimeAudio::offer)
-                if(method in setOf("thread/realtime/closed","thread/realtime/started","thread/realtime/sdp","thread/realtime/error") && params.string("threadId") == state.value.threadId) realtimeAudio.stop()
+                if(method in setOf("thread/realtime/closed","thread/realtime/started","thread/realtime/sdp","thread/realtime/error") && params.string("threadId") == state.value.threadId) {microphone.stop();realtimeAudio.stop()}
                 mutable.update { it.copy(events = remainingEvents.state) }
             } catch(failure: Exception) {
                 remainingEvents.notice("decode/$method","收到无法解析的运行信息", "$method：${failure.message.orEmpty().take(200)}")
@@ -566,6 +576,7 @@ class OriginalCoreHost(
             }
             if (id == state.value.threadId && method in setOf("thread/closed", "thread/deleted")) {
                 // 原版仅在该线程运行实例被卸载/删除后发终态；保留已显示正文，不把后台线程终态当当前回合完成。
+                realtime.notification("thread/realtime/closed",buildJsonObject{put("threadId",id);put("reason","会话已卸载或删除")});microphone.stop();realtimeAudio.stop()
                 val failure = ThreadUnavailable(if (method == "thread/deleted") "会话已删除，已停止等待该会话的任务" else "会话已卸载，请重新打开后继续")
                 turnWaiter?.takeIf { it.threadId == id }?.let { it.invalidated.completeExceptionally(failure); it.observedStart.completeExceptionally(failure); it.finished.completeExceptionally(failure) }
                 reservedTask = null

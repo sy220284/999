@@ -31,7 +31,7 @@ host = (r/'app/src/main/java/cn/codex/android/OriginalCoreHost.kt').read_text()
 client = (r/'core/src/main/kotlin/cn/codex/core/original/OriginalCodexClient.kt').read_text()
 ui = (r/'app/src/main/java/cn/codex/android/OriginalEventsScreen.kt').read_text()
 assert 'method in OriginalRemainingEvents.methods' in host
-assert 'OriginalEventsScreen(host)' in (r/'app/src/main/java/cn/codex/android/OriginalCoreScreen.kt').read_text()
+assert 'OriginalEventsScreen(host' in (r/'app/src/main/java/cn/codex/android/OriginalCoreScreen.kt').read_text()
 assert 'executeAndroidTool(request)' in ui and 'androidTools.execute(params)' in host
 assert 'put("dynamicTools", OriginalAndroidTools.definitions())' in client
 # 默认TS生成物剔除了experimental字段，此处直接核对固定Rust原声明。
@@ -51,4 +51,4 @@ if a.parser_path:
     for name in ['OriginalAndroidTools.kt','OriginalRemainingEvents.kt','OriginalRemainingEventsTest.kt','OriginalRealtimeAudio.kt','OriginalEventsScreen.kt','OriginalCoreHost.kt','OriginalCoreHostTest.kt','OriginalCoreScreen.kt','OriginalCodexClient.kt']:
         path=next(r.rglob(name));assert not parser.parse(path.read_bytes()).root_node.has_error,path
     print('9份本批Kotlin语法通过。')
-print('33类通知、实际工具执行/页面/注册、固定Rust实验字段和206项清单核对通过；外部提供者、实验发起和WebRTC继续列缺口。')
+print('33类通知、实际工具执行/页面/注册、固定Rust实验字段和206项清单核对通过；外部提供者和WebRTC继续列缺口，实验发起另表核对。')

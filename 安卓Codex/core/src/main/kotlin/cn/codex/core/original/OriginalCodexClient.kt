@@ -153,6 +153,18 @@ class OriginalCodexClient(val connection: AppServerConnection) {
     suspend fun remoteDiff(cwd: String) = call("gitDiffToRemote", buildJsonObject { put("cwd", cwd) })
     suspend fun authStatus(refresh: Boolean, includeToken: Boolean = false) = call("getAuthStatus", buildJsonObject { put("includeToken", includeToken); put("refreshToken", refresh) })
     suspend fun fuzzySearch(query: String, roots: List<String>, cancellationToken: String?) = call("fuzzyFileSearch", buildJsonObject { put("query", query); put("roots", buildJsonArray { roots.forEach { add(it) } }); put("cancellationToken", cancellationToken?.let(::JsonPrimitive) ?: JsonNull) })
+    // 固定Rust原声明中的实验方法；默认TS不含此组，单独记入实验清单。
+    suspend fun spawnProcess(handle: String, command: List<String>, cwd: String, tty: Boolean, timeoutMs: Long, rows: Int, cols: Int) = call("process/spawn", buildJsonObject { put("processHandle",handle);put("command",JsonArray(command.map(::JsonPrimitive)));put("cwd",cwd);put("tty",tty);put("streamStdin",true);put("streamStdoutStderr",true);put("outputBytesCap",1_048_576);put("timeoutMs",timeoutMs);if(tty)put("size",buildJsonObject { put("rows",rows);put("cols",cols) }) })
+    suspend fun writeProcess(handle: String, bytes: ByteArray, closeStdin: Boolean) = call("process/writeStdin", buildJsonObject { put("processHandle",handle);put("deltaBase64",java.util.Base64.getEncoder().encodeToString(bytes));put("closeStdin",closeStdin) })
+    suspend fun killProcess(handle: String) = call("process/kill", buildJsonObject { put("processHandle",handle) })
+    suspend fun resizeProcess(handle: String, rows: Int, cols: Int) = call("process/resizePty", buildJsonObject { put("processHandle",handle);put("size",buildJsonObject { put("rows",rows);put("cols",cols) }) })
+    suspend fun startSearchSession(session: String, roots: List<String>) = call("fuzzyFileSearch/sessionStart", buildJsonObject { put("sessionId",session);put("roots",JsonArray(roots.map(::JsonPrimitive))) })
+    suspend fun updateSearchSession(session: String, query: String) = call("fuzzyFileSearch/sessionUpdate", buildJsonObject { put("sessionId",session);put("query",query) })
+    suspend fun stopSearchSession(session: String) = call("fuzzyFileSearch/sessionStop", buildJsonObject { put("sessionId",session) })
+    suspend fun startRealtime(thread: String, audioOutput: Boolean) = call("thread/realtime/start", buildJsonObject { put("threadId",thread);put("outputModality",if(audioOutput) "audio" else "text");put("transport",buildJsonObject { put("type","websocket") });put("version","v2") })
+    suspend fun appendRealtimeText(thread: String, text: String) = call("thread/realtime/appendText", buildJsonObject { put("threadId",thread);put("text",text);put("role","user") })
+    suspend fun appendRealtimeAudio(thread: String, bytes: ByteArray, sampleRate: Int, channels: Int) = call("thread/realtime/appendAudio", buildJsonObject { put("threadId",thread);put("audio",buildJsonObject { put("data",java.util.Base64.getEncoder().encodeToString(bytes));put("sampleRate",sampleRate);put("numChannels",channels);put("samplesPerChannel",bytes.size/(channels*2));put("itemId",JsonNull) }) },10_000)
+    suspend fun stopRealtime(thread: String) = call("thread/realtime/stop", buildJsonObject { put("threadId",thread) })
     private fun id(threadId: String) = buildJsonObject { put("threadId", threadId) }
     companion object {
         fun textInput(text: String) = buildJsonArray { add(buildJsonObject { put("type", "text"); put("text", text); put("text_elements", buildJsonArray {}) }) }

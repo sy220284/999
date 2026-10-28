@@ -29,7 +29,9 @@ import kotlinx.serialization.json.*
     val libraryStatus by host.library.operations.state.collectAsState()
     val servicesStatus by host.services.operations.state.collectAsState()
     val migrationStatus by host.migration.operations.state.collectAsState()
-    val managedBusy = libraryStatus.mutating || servicesStatus.mutating || migrationStatus.mutating
+    val searchStatus by host.search.state.collectAsState()
+    val realtimeStatus by host.realtime.state.collectAsState()
+    val managedBusy = realtimeStatus.running || libraryStatus.mutating || servicesStatus.mutating || migrationStatus.mutating
     val configurationRecords by host.configurationJournal.records.collectAsState()
     val configurationReadError by host.configurationJournal.readError.collectAsState()
     val activeConfiguration by host.configurationJournal.active.collectAsState()
@@ -43,6 +45,8 @@ import kotlinx.serialization.json.*
     var filesManager by remember { mutableStateOf(false) }
     var skillsManager by remember { mutableStateOf(false) }
     var advancedManager by remember { mutableStateOf<String?>(null) }
+    var realtimeManager by remember { mutableStateOf(false) }
+    var searchManager by remember { mutableStateOf(false) }
     var eventsManager by remember { mutableStateOf(false) }
     var sessionManager by remember { mutableStateOf(false) }
     var sessionInitialTab by remember { mutableStateOf("目标") }
@@ -79,7 +83,9 @@ import kotlinx.serialization.json.*
     if (filesManager) { OriginalFilesScreen(host.files, allowChanges = !state.working && state.turnId == null && !state.loading && !extensionState.mutating && !mcpState.mutating && !settingsState.mutating && !filesState.mutating && !fullTerminalState.running && !networkGit.running && !managedBusy && !commandState.running) { filesManager = false }; return }
     if (settingsManager) { OriginalSettingsScreen(host.settings, allowChanges = !state.working && state.turnId == null && !state.loading && !extensionState.mutating && !mcpState.mutating && !settingsState.mutating && !filesState.mutating && !fullTerminalState.running && !networkGit.running && !managedBusy && !commandState.running) { settingsManager = false }; return }
     if (commandManager) { OriginalCommandScreen(host.commands, host.commandWorkspace()) { commandManager = false }; return }
-    if (eventsManager) { OriginalEventsScreen(host) { eventsManager = false }; return }
+    if (realtimeManager) { OriginalRealtimeScreen(host) { realtimeManager = false }; return }
+    if (searchManager) { OriginalSearchScreen(host,onOpen={path->host.files.read(path);searchManager=false;filesManager=true}) { searchManager = false }; return }
+    if (eventsManager) { OriginalEventsScreen(host,onRealtime={eventsManager=false;realtimeManager=true}) { eventsManager = false }; return }
     if (sessionManager) { OriginalSessionScreen(host, initialTab = sessionInitialTab) { sessionManager = false }; return }
     if (mcpManager) {
         OriginalMcpScreen(host.mcp, allowChanges = !state.working && state.turnId == null && !state.loading && !extensionState.mutating && !settingsState.mutating && !filesState.mutating && !fullTerminalState.running && !networkGit.running && !managedBusy,
@@ -117,6 +123,11 @@ import kotlinx.serialization.json.*
                 Text("此入口使用随应用安装的原版核心，连接原版会话与账号。缺少运行核心时会提示具体原因。", style = MaterialTheme.typography.bodyMedium)
                 Button(onClick = { consent = true }, enabled = !state.loading && !state.closing) { Text(if (state.loading) "正在启动" else "启动原版核心") }
             }
+            if(searchStatus.error!=null) item {
+                Surface(shape=RoundedCornerShape(14.dp),color=MaterialTheme.colorScheme.errorContainer){Column(Modifier.fillMaxWidth().padding(14.dp)){
+                    Text(searchStatus.error.orEmpty());TextButton(onClick={searchManager=true}){Text("查看搜索并核查停止状态")}
+                }}
+            }
             if (state.error != null) item {
                 Surface(color = MaterialTheme.colorScheme.errorContainer, shape = RoundedCornerShape(14.dp)) {
                     Column(Modifier.padding(14.dp)) { Text(state.error.orEmpty(), color = MaterialTheme.colorScheme.onErrorContainer); TextButton(onClick = host::dismissError) { Text("知道了") } }
@@ -142,6 +153,7 @@ import kotlinx.serialization.json.*
                     OutlinedButton(onClick = { filesManager = true; host.files.refresh() }, enabled = !state.loading) { Text("原版项目文件") }
                     OutlinedButton(onClick = { skillsManager = true; host.extensions.refreshSkills() }, enabled = !state.loading) { Text("原版技能管理") }
                     TextButton(onClick = { eventsManager = true }) { Text("运行动态与能力") }
+                    Row { TextButton(onClick={realtimeManager=true}){Text("实时文字与语音")};TextButton(onClick={searchManager=true}){Text("持续搜索项目")} }
                     listOf("市场、分享与应用", "授权、额度与反馈", "迁移、配置与工具").forEach { title -> OutlinedButton(onClick = { advancedManager = title }, enabled = !state.loading) { Text(title) } }
                     Text(state.account, style = MaterialTheme.typography.titleSmall)
                     Text("账号与 MCP 凭证由 Android Keystore 加密保存在手机，退出核心后仍可恢复。", style = MaterialTheme.typography.bodySmall)

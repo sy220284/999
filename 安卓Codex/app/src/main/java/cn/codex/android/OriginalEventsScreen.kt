@@ -17,7 +17,7 @@ import cn.codex.core.string
 import cn.codex.core.original.*
 import kotlinx.serialization.json.*
 
-@Composable fun OriginalEventsScreen(host: OriginalCoreHost, onBack: () -> Unit) {
+@Composable fun OriginalEventsScreen(host: OriginalCoreHost, onRealtime: () -> Unit, onBack: () -> Unit) {
     val state by host.state.collectAsState()
     val sound by host.realtimeAudio.state.collectAsState()
     val owner = LocalLifecycleOwner.current
@@ -30,7 +30,8 @@ import kotlinx.serialization.json.*
     LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(20.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
         item { TextButton(onClick = onBack) { Text("返回工作区") };Text("运行动态",style = MaterialTheme.typography.headlineSmall)
             Text("通知跟随本次核心连接。这里显示当前会话及全局动态，断开后清空。",style = MaterialTheme.typography.bodySmall) }
-        item { ExpandableCard("当前能力与待补部分","手机动态工具：逐次批准项目目录/文本读取。\n外部账号令牌刷新：未接外部提供者，请用原版核心登录。\n设备证明：未接受认可的证明提供者，连接不声明此能力。\n实时音频：支持接收PCM16后由你开启播放，离页或后台自动静音。\nWebRTC：当前包缺少媒体协商适配。\n固定公开请求清单没有process/spawn、实时会话/搜索会话的实验发起接口，本页先兼容接收这些通知，实验发起流程仍待补齐。",Icons.Outlined.Info) }
+        item { ExpandableCard("当前能力与待补部分","手机动态工具：逐次批准项目目录/文本读取。\n外部账号令牌刷新：未接外部提供者，请用原版核心登录。\n设备证明：未接受认可的证明提供者，连接不声明此能力。\n实时音频：支持接收PCM16后由你开启播放，离页或后台自动静音。\nWebRTC：当前包缺少媒体协商适配。\n实验发起入口已接：独立命令可选择process/spawn，持续搜索和实时文字/录音有专用页；WebSocket会话由前台托管至关闭，实验接口另列清单。",Icons.Outlined.Info) }
+        item { TextButton(onClick=onRealtime){Text("打开实时文字与语音") } }
         val events = state.events
         val rt = events.realtime[state.threadId]
         if(rt != null) item {

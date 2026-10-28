@@ -18,7 +18,7 @@ import kotlinx.serialization.json.*
     var rows by remember { mutableStateOf(emptyList<JsonObject>()) }
     var filter by remember { mutableStateOf("全部") }
     var kind by remember { mutableStateOf("全部类型") }
-    LaunchedEffect(Unit) { rows = withContext(Dispatchers.IO) { Json.parseToJsonElement(context.assets.open("原版协议进度.json").bufferedReader().use { it.readText() }).jsonArray.map { it.jsonObject } } }
+    LaunchedEffect(Unit) { rows = withContext(Dispatchers.IO) { listOf("原版协议进度.json","实验协议进度.json").flatMap { file -> Json.parseToJsonElement(context.assets.open(file).bufferedReader().use { it.readText() }).jsonArray.map { it.jsonObject } } } }
     LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(20.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
         item { Text("能力，要说清楚", style = MaterialTheme.typography.headlineMedium); Spacer(Modifier.height(12.dp)); Text("当前是开发版本，尚未完整复刻 Codex。文件、会话和工具执行在手机上完成；模型需要服务连接。此页逐项列出上传源码的客户端请求、服务端请求与通知；存在调用封装不代表语义和体验已全部完成。不能将“待移植”理解为“安卓无法实现”。", style = MaterialTheme.typography.bodyMedium) }
         item { NoteCard("手机端的实际边界", "可运行系统允许的 shell 命令，但没有桌面 Linux 沙箱；应用权限不能访问其他应用私有目录。\n\n没有内置 Python、Node、完整 Linux 软件仓库；桌面可执行程序不能直接运行。\n\n应用后台任务受系统和厂商省电策略约束，不保证永久守护。\n\nWindows/macOS 专属沙箱与凭证接口不适用于安卓。") }
@@ -30,15 +30,15 @@ import kotlinx.serialization.json.*
             }
             Text("Git 页面通过 JGit 连接 HTTPS；本地 Git 命令不包含 HTTP(S)/SSH 传输或 Perl 扩展。", style = MaterialTheme.typography.bodySmall)
         } }
-        item { Text("源码接口对照 · ${rows.size} 项", style = MaterialTheme.typography.titleMedium) }
+        item { Text("源码接口对照（含Rust实验接口）· ${rows.size} 项", style = MaterialTheme.typography.titleMedium) }
         item { Row(Modifier.horizontalScroll(androidx.compose.foundation.rememberScrollState())) {
             listOf("全部类型", "客户端请求", "服务端请求", "服务端通知").forEach { value -> FilterChip(kind == value, { kind = value }, label = { Text(value) }, modifier = Modifier.padding(end = 8.dp)) }
         } }
         item { Row(Modifier.horizontalScroll(androidx.compose.foundation.rememberScrollState())) {
-            listOf("全部", "待接入", "代码已接入", "平台受限").forEach { value -> FilterChip(filter == value, { filter = value }, label = { Text(value) }, modifier = Modifier.padding(end = 8.dp)) }
+            listOf("全部", "待完成", "代码已接入", "平台受限").forEach { value -> FilterChip(filter == value, { filter = value }, label = { Text(value) }, modifier = Modifier.padding(end = 8.dp)) }
         } }
         items(rows.filter { row -> (kind == "全部类型" || row.string("kind") == kind) && when (filter) {
-            "待接入" -> row.string("status").contains("待接入") || row.string("status").contains("未接入")
+            "待完成" -> listOf("待接入","未接","未完成","缺少","有限").any { row.string("status").contains(it) }
             "代码已接入" -> row.string("status").contains("已接入")
             "平台受限" -> row.string("status").contains("平台受限")
             else -> true

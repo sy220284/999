@@ -13,6 +13,7 @@ import cn.codex.core.original.OriginalCommandController
 @Composable fun OriginalCommandScreen(controller: OriginalCommandController, defaultCwd: String, onBack: () -> Unit) {
     val state by controller.state.collectAsState()
     var command by remember { mutableStateOf("") }; var cwd by remember { mutableStateOf(defaultCwd) }
+    var experimental by remember { mutableStateOf(false) }
     var tty by remember { mutableStateOf(false) }; var consent by remember { mutableStateOf(false) }
     var input by remember { mutableStateOf("") }; var timeout by remember { mutableStateOf("60000") }
     var rows by remember { mutableStateOf("24") }; var cols by remember { mutableStateOf("80") }
@@ -24,9 +25,10 @@ import cn.codex.core.original.OriginalCommandController
         OutlinedTextField(command, { command = it }, label = { Text("手机命令") }, enabled = !state.running, modifier = Modifier.fillMaxWidth())
         OutlinedTextField(cwd, { cwd = it }, label = { Text("工作目录") }, enabled = !state.running, modifier = Modifier.fillMaxWidth())
         OutlinedTextField(timeout, { timeout = it }, label = { Text("超时（毫秒）") }, enabled = !state.running, singleLine = true)
+        Row { Checkbox(experimental,{experimental=it},enabled=!state.running);Text("使用实验进程接口（process/spawn）",modifier=Modifier.padding(top=12.dp)) }
         Row { Checkbox(tty, { tty = it }, enabled = !state.running); Text("使用伪终端", modifier = Modifier.padding(top = 12.dp)) }
         Row { Checkbox(consent, { consent = it }, enabled = !state.running); Text("我确认这条命令及其访问范围", modifier = Modifier.padding(top = 12.dp)) }
-        Button(onClick = { controller.run(command, cwd, tty, requireNotNull(timeout.toLongOrNull())) }, enabled = state.connected && !state.running && consent && command.isNotBlank() && timeout.toLongOrNull()?.let { it > 0 && it <= Long.MAX_VALUE - 10_000 } == true) { Text("执行命令") }
+        Button(onClick = { controller.run(command, cwd, tty, requireNotNull(timeout.toLongOrNull()),experimental=experimental) }, enabled = state.connected && !state.running && consent && command.isNotBlank() && timeout.toLongOrNull()?.let { it > 0 && it <= Long.MAX_VALUE - 10_000 } == true) { Text("执行命令") }
         if (state.running) {
             OutlinedTextField(input, { input = it }, label = { Text("标准输入") }, enabled = !state.stdinClosed, modifier = Modifier.fillMaxWidth())
             Row(Modifier.horizontalScroll(rememberScrollState())) {

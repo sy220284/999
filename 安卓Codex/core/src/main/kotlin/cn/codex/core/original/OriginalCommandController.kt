@@ -3,6 +3,7 @@ package cn.codex.core.original
 import cn.codex.core.string
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.*
+import kotlinx.coroutines.selects.select
 import kotlinx.serialization.json.*
 import java.nio.ByteBuffer
 import java.nio.CharBuffer
@@ -25,7 +26,7 @@ class CommandUtf8Stream {
     }
 }
 data class OriginalCommandState(val connected: Boolean = false, val running: Boolean = false, val controlBusy: Boolean = false,
-    val processId: String? = null, val tty: Boolean = false, val stdinClosed: Boolean = false, val output: String = "", val error: String? = null, val status: String = "尚未运行命令")
+    val processId: String? = null, val experimental: Boolean = false, val tty: Boolean = false, val stdinClosed: Boolean = false, val output: String = "", val error: String? = null, val status: String = "尚未运行命令")
 class OriginalCommandController(private val scope: CoroutineScope, private val busyElsewhere: () -> Boolean, private val lifecycle: OriginalMutationLifecycle = OriginalMutationLifecycle.None) {
     private val mutable = MutableStateFlow(OriginalCommandState())
     val state = mutable.asStateFlow()
@@ -33,10 +34,11 @@ class OriginalCommandController(private val scope: CoroutineScope, private val b
     private var generation = 0L
     private var job: Job? = null
     private var control: Job? = null
+    private var exit: CompletableDeferred<JsonObject>? = null
     private var stdout = CommandUtf8Stream(); private var stderr = CommandUtf8Stream()
-    fun bind(api: OriginalCodexClient?) { generation++; job?.cancel(); control?.cancel(); client = api; mutable.value = if (api == null) state.value.copy(connected = false, running = false, controlBusy = false, status = "连接已结束，请核查最后命令结果") else OriginalCommandState(connected = true) }
+    fun bind(api: OriginalCodexClient?) { generation++; exit?.cancel();exit=null;job?.cancel(); control?.cancel(); client = api; mutable.value = if (api == null) state.value.copy(connected = false, running = false, controlBusy = false, status = "连接已结束，请核查最后命令结果") else OriginalCommandState(connected = true) }
     private fun append(text: String) { mutable.update { it.copy(output = (it.output + text).takeLast(1_048_576)) } }
-    fun run(command: String, cwd: String, tty: Boolean, timeoutMs: Long, rows: Int = 24, cols: Int = 80) {
+    fun run(command: String, cwd: String, tty: Boolean, timeoutMs: Long, rows: Int = 24, cols: Int = 80, experimental: Boolean = false) {
         if (state.value.running) return
         if (busyElsewhere()) { mutable.update { it.copy(error = "请先结束其他任务、终端或仓库操作") }; return }
         val api = client ?: return
@@ -45,11 +47,18 @@ class OriginalCommandController(private val scope: CoroutineScope, private val b
         val stamp = generation
         val process = UUID.randomUUID().toString()
         stdout = CommandUtf8Stream(); stderr = CommandUtf8Stream()
-        mutable.value = OriginalCommandState(connected = true, running = true, processId = process, tty = tty, status = "命令运行中")
-        job = scope.launch {
+        val finished = CompletableDeferred<JsonObject>();exit = finished
+        mutable.value = OriginalCommandState(connected = true, running = true, processId = process, experimental = experimental, tty = tty, status = "命令运行中")
+        job = scope.launch(start = CoroutineStart.UNDISPATCHED) {
             var confirmed = false
             try {
-                val result = api.exec(process, listOf("/system/bin/sh", "-c", command), cwd, tty, timeoutMs, rows, cols).jsonObject
+                val result = if(experimental) withTimeout(timeoutMs + 10_000) {
+                    coroutineScope {
+                        val ack=async{api.spawnProcess(process,listOf("/system/bin/sh","-c",command),cwd,tty,timeoutMs,rows,cols)}
+                        // 空ACK不结束托管；真实退出可早于ACK，结束后取消其本机等待。
+                        select<JsonObject>{ack.onAwait{finished.await()};finished.onAwait{ack.cancel();it}}
+                    }
+                } else api.exec(process, listOf("/system/bin/sh", "-c", command), cwd, tty, timeoutMs, rows, cols).jsonObject
                 if (stamp == generation) {
                     append(stdout.append(byteArrayOf(), true) + stderr.append(byteArrayOf(), true))
                     append(result.string("stdout") + result.string("stderr"))
@@ -58,7 +67,7 @@ class OriginalCommandController(private val scope: CoroutineScope, private val b
             } catch (cancelled: CancellationException) {
                 if (cancelled !is TimeoutCancellationException) throw cancelled
                 if (stamp == generation) mutable.update { it.copy(error = "命令响应超时，正在终止本次连接；结果仍需核查", status = "命令结果待核查") }
-                withContext(NonCancellable) { try { withTimeout(5000) { api.terminateCommand(process) } } finally { api.connection.close() } }
+                withContext(NonCancellable) { try { withTimeout(5000) { if(experimental)api.killProcess(process)else api.terminateCommand(process) } } finally { api.connection.close() } }
             } catch (failure: Exception) { if (stamp == generation) mutable.update { it.copy(error = failure.message, status = "命令结果待核查") } }
             finally {
                 try { lifecycle.finish(ticket, confirmed && stamp == generation) }
@@ -74,17 +83,24 @@ class OriginalCommandController(private val scope: CoroutineScope, private val b
         mutable.update { it.copy(controlBusy = true, error = null) }
         control = scope.launch {
             try { action(api, process) }
-            catch (failure: Exception) { if (failure is CancellationException && failure !is TimeoutCancellationException) throw failure; if (stamp == generation) mutable.update { it.copy(error = failure.message ?: "命令控制结果未确认，不会自动重发") } }
-            finally { if (stamp == generation) mutable.update { it.copy(controlBusy = false) } }
+            catch (failure: Exception) { if (failure is CancellationException && failure !is TimeoutCancellationException) throw failure; if (stamp == generation && state.value.processId == process) mutable.update { it.copy(error = failure.message ?: "命令控制结果未确认，不会自动重发") } }
+            finally { if (stamp == generation && state.value.processId == process) mutable.update { it.copy(controlBusy = false) } }
         }
     }
     fun send(text: String, closeStdin: Boolean = false) = control { api, id ->
         check(!state.value.stdinClosed) { "标准输入已关闭" }
-        api.writeCommand(id, text.toByteArray(Charsets.UTF_8), closeStdin)
-        if (state.value.processId == id && closeStdin) mutable.update { it.copy(stdinClosed = true) }
+        if(state.value.experimental) api.writeProcess(id,text.toByteArray(Charsets.UTF_8),closeStdin) else api.writeCommand(id, text.toByteArray(Charsets.UTF_8), closeStdin)
+        if (state.value.processId == id && state.value.running && closeStdin) mutable.update { it.copy(stdinClosed = true) }
     }
-    fun resize(rows: Int, cols: Int) = control { api, id -> require(state.value.tty && rows > 0 && cols > 0); api.resizeCommand(id, rows, cols) }
-    fun stop() = control { api, id -> api.terminateCommand(id); if (state.value.processId == id) mutable.update { it.copy(status = "已请求终止，等待命令结束") } }
+    fun resize(rows: Int, cols: Int) = control { api, id -> require(state.value.tty && rows > 0 && cols > 0); if(state.value.experimental)api.resizeProcess(id,rows,cols)else api.resizeCommand(id, rows, cols) }
+    fun stop() = control { api, id -> if(state.value.experimental)api.killProcess(id)else api.terminateCommand(id); if (state.value.processId == id && state.value.running) mutable.update { it.copy(status = "已请求终止，等待命令结束") } }
+    fun processOutput(params: JsonObject) {
+        if(!state.value.experimental || params.string("processHandle") != state.value.processId || exit?.isCompleted == true)return
+        output(JsonObject(params + ("processId" to JsonPrimitive(params.string("processHandle")))))
+    }
+    fun processExited(params: JsonObject) {
+        if(state.value.running && state.value.experimental && params.string("processHandle") == state.value.processId) exit?.complete(params)
+    }
     fun output(params: JsonObject) {
         if (!state.value.running || params.string("processId") != state.value.processId) return
         val bytes = Base64.getDecoder().decode(params.string("deltaBase64"))

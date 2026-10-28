@@ -1258,17 +1258,17 @@
   {
     "kind": "服务端通知",
     "method": "process/outputDelta",
-    "status": "兼容通知消费者已接，实验发起未接，未运行验证",
+    "status": "实验发起/通知/操作代码已接入，未运行验证",
     "entry": "app/src/main/java/cn/codex/android/OriginalCoreHost.kt",
-    "phase": "实验发起/待验证",
+    "phase": "实验运行验收",
     "validation": "未运行验证"
   },
   {
     "kind": "服务端通知",
     "method": "process/exited",
-    "status": "兼容通知消费者已接，实验发起未接，未运行验证",
+    "status": "实验发起/通知/操作代码已接入，未运行验证",
     "entry": "app/src/main/java/cn/codex/android/OriginalCoreHost.kt",
-    "phase": "实验发起/待验证",
+    "phase": "实验运行验收",
     "validation": "未运行验证"
   },
   {
@@ -1522,81 +1522,81 @@
   {
     "kind": "服务端通知",
     "method": "fuzzyFileSearch/sessionUpdated",
-    "status": "兼容通知消费者已接，实验发起未接，未运行验证",
+    "status": "实验发起/通知/操作代码已接入，未运行验证",
     "entry": "app/src/main/java/cn/codex/android/OriginalCoreHost.kt",
-    "phase": "实验发起/待验证",
+    "phase": "实验运行验收",
     "validation": "未运行验证"
   },
   {
     "kind": "服务端通知",
     "method": "fuzzyFileSearch/sessionCompleted",
-    "status": "兼容通知消费者已接，实验发起未接，未运行验证",
+    "status": "实验发起/通知/操作代码已接入，未运行验证",
     "entry": "app/src/main/java/cn/codex/android/OriginalCoreHost.kt",
-    "phase": "实验发起/待验证",
+    "phase": "实验运行验收",
     "validation": "未运行验证"
   },
   {
     "kind": "服务端通知",
     "method": "thread/realtime/started",
-    "status": "兼容接收/文字及PCM输出代码已接；实验发起未接，未运行验证",
+    "status": "WebSocket发起/文字/录音/PCM输出代码已接入，未运行验证",
     "entry": "app/src/main/java/cn/codex/android/OriginalCoreHost.kt",
-    "phase": "实时会话发起/媒体验收",
+    "phase": "实时媒体运行验收",
     "validation": "未运行验证"
   },
   {
     "kind": "服务端通知",
     "method": "thread/realtime/itemAdded",
-    "status": "兼容接收/文字及PCM输出代码已接；实验发起未接，未运行验证",
+    "status": "WebSocket发起/文字/录音/PCM输出代码已接入，未运行验证",
     "entry": "app/src/main/java/cn/codex/android/OriginalCoreHost.kt",
-    "phase": "实时会话发起/媒体验收",
+    "phase": "实时媒体运行验收",
     "validation": "未运行验证"
   },
   {
     "kind": "服务端通知",
     "method": "thread/realtime/item/started",
-    "status": "兼容接收/文字及PCM输出代码已接；实验发起未接，未运行验证",
+    "status": "WebSocket发起/文字/录音/PCM输出代码已接入，未运行验证",
     "entry": "app/src/main/java/cn/codex/android/OriginalCoreHost.kt",
-    "phase": "实时会话发起/媒体验收",
+    "phase": "实时媒体运行验收",
     "validation": "未运行验证"
   },
   {
     "kind": "服务端通知",
     "method": "thread/realtime/item/transcript/delta",
-    "status": "兼容接收/文字及PCM输出代码已接；实验发起未接，未运行验证",
+    "status": "WebSocket发起/文字/录音/PCM输出代码已接入，未运行验证",
     "entry": "app/src/main/java/cn/codex/android/OriginalCoreHost.kt",
-    "phase": "实时会话发起/媒体验收",
+    "phase": "实时媒体运行验收",
     "validation": "未运行验证"
   },
   {
     "kind": "服务端通知",
     "method": "thread/realtime/item/completed",
-    "status": "兼容接收/文字及PCM输出代码已接；实验发起未接，未运行验证",
+    "status": "WebSocket发起/文字/录音/PCM输出代码已接入，未运行验证",
     "entry": "app/src/main/java/cn/codex/android/OriginalCoreHost.kt",
-    "phase": "实时会话发起/媒体验收",
+    "phase": "实时媒体运行验收",
     "validation": "未运行验证"
   },
   {
     "kind": "服务端通知",
     "method": "thread/realtime/transcript/delta",
-    "status": "兼容接收/文字及PCM输出代码已接；实验发起未接，未运行验证",
+    "status": "WebSocket发起/文字/录音/PCM输出代码已接入，未运行验证",
     "entry": "app/src/main/java/cn/codex/android/OriginalCoreHost.kt",
-    "phase": "实时会话发起/媒体验收",
+    "phase": "实时媒体运行验收",
     "validation": "未运行验证"
   },
   {
     "kind": "服务端通知",
     "method": "thread/realtime/transcript/done",
-    "status": "兼容接收/文字及PCM输出代码已接；实验发起未接，未运行验证",
+    "status": "WebSocket发起/文字/录音/PCM输出代码已接入，未运行验证",
     "entry": "app/src/main/java/cn/codex/android/OriginalCoreHost.kt",
-    "phase": "实时会话发起/媒体验收",
+    "phase": "实时媒体运行验收",
     "validation": "未运行验证"
   },
   {
     "kind": "服务端通知",
     "method": "thread/realtime/outputAudio/delta",
-    "status": "兼容接收/文字及PCM输出代码已接；实验发起未接，未运行验证",
+    "status": "WebSocket发起/文字/录音/PCM输出代码已接入，未运行验证",
     "entry": "app/src/main/java/cn/codex/android/OriginalCoreHost.kt",
-    "phase": "实时会话发起/媒体验收",
+    "phase": "实时媒体运行验收",
     "validation": "未运行验证"
   },
   {
@@ -1610,17 +1610,17 @@
   {
     "kind": "服务端通知",
     "method": "thread/realtime/error",
-    "status": "兼容接收/文字及PCM输出代码已接；实验发起未接，未运行验证",
+    "status": "WebSocket发起/文字/录音/PCM输出代码已接入，未运行验证",
     "entry": "app/src/main/java/cn/codex/android/OriginalCoreHost.kt",
-    "phase": "实时会话发起/媒体验收",
+    "phase": "实时媒体运行验收",
     "validation": "未运行验证"
   },
   {
     "kind": "服务端通知",
     "method": "thread/realtime/closed",
-    "status": "兼容接收/文字及PCM输出代码已接；实验发起未接，未运行验证",
+    "status": "WebSocket发起/文字/录音/PCM输出代码已接入，未运行验证",
     "entry": "app/src/main/java/cn/codex/android/OriginalCoreHost.kt",
-    "phase": "实时会话发起/媒体验收",
+    "phase": "实时媒体运行验收",
     "validation": "未运行验证"
   },
   {

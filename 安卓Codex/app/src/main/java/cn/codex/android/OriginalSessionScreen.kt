@@ -27,6 +27,7 @@ import kotlinx.serialization.json.*
     val commands by host.commands.state.collectAsState()
     val libraryStatus by host.library.operations.state.collectAsState()
     val servicesStatus by host.services.operations.state.collectAsState()
+    val realtimeStatus by host.realtime.state.collectAsState()
     val migrationStatus by host.migration.operations.state.collectAsState()
     var tab by remember(initialTab) { mutableStateOf(initialTab) }
     var goalEdit by remember { mutableStateOf(false) }
@@ -36,7 +37,7 @@ import kotlinx.serialization.json.*
     var ownerTypeInput by remember(state.ownerType) { mutableStateOf(state.ownerType) }
     var ownerKeyInput by remember(state.ownerKey) { mutableStateOf(state.ownerKey) }
     var before by remember(state.threadId) { mutableStateOf("") }
-    val editable = state.connected && !state.loading && !state.working && state.turnId == null && !extensions.mutating && !mcp.mutating && !settings.mutating && !files.mutating && !commands.running && !fullTerminal.running && !networkGit.running && !libraryStatus.mutating && !servicesStatus.mutating && !migrationStatus.mutating && host.selectedThreadUsable()
+    val editable = state.connected && !state.loading && !state.working && state.turnId == null && !extensions.mutating && !mcp.mutating && !settings.mutating && !files.mutating && !commands.running && !fullTerminal.running && !networkGit.running && !libraryStatus.mutating && !servicesStatus.mutating && !migrationStatus.mutating && !realtimeStatus.running && host.selectedThreadUsable()
     BackHandler(onBack = onBack)
     LaunchedEffect(state.connectionEpoch, state.threadId) { confirm = null; goalEdit = false; sectionEdit = null; attachmentEdit = false }
     LaunchedEffect(tab, state.threadId) {

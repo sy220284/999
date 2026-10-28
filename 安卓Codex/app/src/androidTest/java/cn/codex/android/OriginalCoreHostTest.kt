@@ -373,4 +373,22 @@ class OriginalCoreHostTest {
         } finally { withContext(Dispatchers.Main) { host.close() };session.dispose();scope.cancel() }
     }
 
+    @Test fun experimentalClockCallbackReturnsWholeUnixSecondsWithoutOpeningADialog() = runBlocking {
+        val scope=CoroutineScope(SupervisorJob()+Dispatchers.Main.immediate)
+        lateinit var session:FakeSession
+        val host=host(scope,OriginalEngineFactory{launch->FakeSession(launch.scope).also{session=it}})
+        try{
+            withContext(Dispatchers.Main){host.connect()};ready(host)
+            val before=System.currentTimeMillis()/1000L
+            session.emit(buildJsonObject{put("id","clock");put("method","currentTime/read");put("params",obj("threadId" to "thread"))})
+            val response=withTimeout(5000){
+                var frame=session.received.receive()
+                while(frame["id"]!=JsonPrimitive("clock"))frame=session.received.receive()
+                frame
+            }
+            val seconds=response.getValue("result").jsonObject.getValue("currentTimeAt").jsonPrimitive.long
+            assertTrue(seconds in before..(System.currentTimeMillis()/1000L));assertTrue(host.state.value.requests.isEmpty())
+        }finally{withContext(Dispatchers.Main){host.close()};session.dispose();scope.cancel()}
+    }
+
 }
