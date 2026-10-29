@@ -72,10 +72,13 @@ int main(int argc,char **argv) {
     for(int fd=3;fd<(int)descriptors.rlim_cur;fd++)close(fd);
     int abi=(int)syscall(__NR_landlock_create_ruleset,NULL,0,1);
     if(argc==2 && !strcmp(argv[1],"probe")) { printf("{\"landlockAbi\":%d,\"minimumAbi\":6,\"established\":false}\n",abi);return abi>=6 ? 0 : 78; }
-    if(argc<6 || strcmp(argv[1],"run") || strcmp(argv[4],"--"))return fail("invalid command");
+    int mediated=argc>=7 && !strcmp(argv[1],"exec") && !strcmp(argv[5],"--");
+    if(!mediated && (argc<6 || strcmp(argv[1],"run") || strcmp(argv[4],"--")))return fail("invalid command");
     if(abi<6)return fail("Landlock ABI6 unavailable; command was not executed");
     char *project=realpath(argv[2],NULL),*programs=realpath(argv[3],NULL);
     if(!project || !programs || !strcmp(project,"/") || !strcmp(programs,"/"))return fail("invalid roots");
+    char *cwd=realpath(mediated ? argv[4] : argv[2],NULL);
+    if(!cwd || (strcmp(cwd,project) && (strncmp(cwd,project,strlen(project)) || cwd[strlen(project)]!='/')))return fail("cwd outside project");
     struct stat status;if(stat(project,&status) || !S_ISDIR(status.st_mode))return fail("project is not a directory");
     if(prctl(PR_SET_NO_NEW_PRIVS,1,0,0,0))return fail("no_new_privs unavailable");
     prctl(PR_SET_DUMPABLE,0,0,0,0);
@@ -85,9 +88,10 @@ int main(int argc,char **argv) {
     if(path(rules,project,WRITE_TREE,0) || path(rules,programs,READ_EXEC,0) ||
        path(rules,"/system",READ_EXEC,0) || path(rules,"/apex",READ_EXEC,0) || path(rules,"/vendor",READ_EXEC,1) ||
        path(rules,"/dev/null",(1ULL<<1)|(1ULL<<2),0) || path(rules,"/dev/urandom",1ULL<<2,0))return fail("path policy failed");
-    if(chdir(project) || syscall(__NR_landlock_restrict_self,rules,0))return fail("filesystem restriction failed");
-    close(rules);free(project);free(programs);
+    if(chdir(cwd) || syscall(__NR_landlock_restrict_self,rules,0))return fail("filesystem restriction failed");
+    close(rules);free(project);free(programs);free(cwd);
     if(filter())return fail("syscall policy failed");
-    puts("{\"sandboxReady\":true,\"network\":\"denied\",\"projectWrite\":true}");fflush(stdout);
-    execv(argv[5],&argv[5]);return fail("program could not start");
+    if(!mediated){puts("{\"sandboxReady\":true,\"network\":\"denied\",\"projectWrite\":true}");fflush(stdout);}
+    int command=mediated ? 6 : 5;
+    execvp(argv[command],&argv[command]);return fail("program could not start");
 }

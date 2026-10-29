@@ -1,12 +1,25 @@
 //! Android入口只组合固定codex-worktree库；实际分配/元数据/清理均由原版管理器执行。
 use std::path::PathBuf;
+use std::io::{Read, stdin};
+use std::collections::HashMap;
+#[derive(serde::Deserialize)]
+#[serde(deny_unknown_fields)]
+struct Input { desktop: HashMap<String, serde_json::Value>, base: Option<String> }
 use anyhow::{Context, Result, ensure};
 use codex_worktree::{CreateWorktree, WorktreeManager, WorktreeSettings};
 fn main() -> Result<()> {
     let args: Vec<String> = std::env::args().skip(1).collect();
     let home = PathBuf::from(std::env::var_os("CODEX_HOME").context("missing CODEX_HOME")?);
-    let manager = WorktreeManager::new(WorktreeSettings::for_cli(&home, None)?);
+    let mut document = Vec::new();
+    stdin().take(65537).read_to_end(&mut document)?;
+    ensure!(document.len() <= 65536, "worktree configuration exceeds budget");
+    let input: Input = serde_json::from_slice(&document)?;
+    let settings = WorktreeSettings::for_cli(&home, Some(&input.desktop))?;
+    let manager = WorktreeManager::new(settings.clone());
     match args.as_slice() {
+        [command, _source] if command == "settings" => {
+            println!("{}", serde_json::json!({"root":settings.root,"autoCleanup":settings.auto_cleanup_enabled,"keepCount":settings.keep_count}));
+        }
         [command, source] if command == "list" => {
             let mut rows = Vec::new();
             for checkout in manager.list(&PathBuf::from(source))? {
@@ -18,7 +31,7 @@ fn main() -> Result<()> {
         }
         [command, source] if command == "create" => {
             let source_cwd = PathBuf::from(source);
-            let base = codex_worktree::default_worktree_base(&source_cwd)?;
+            let base = match input.base { Some(value) => { ensure!(!value.is_empty() && value.len() <= 1024 && !value.chars().any(char::is_control), "invalid base"); value }, None => codex_worktree::default_worktree_base(&source_cwd)? };
             let checkout = manager.create(&CreateWorktree { source_cwd, base: Some(base) })?;
             println!("{}", serde_json::to_string(&checkout)?);
         }

@@ -31,7 +31,7 @@ class NativeEndpoints(private val context:Context,private val scope:CoroutineSco
         Unit},
     private val spawner:EndpointProcessSpawner=EndpointProcessSpawner{file,args,env,cwd->check(file.isFile && file.canExecute()){ "当前包没有原版CLI产物" }
         NativeCoreProcess(file,args,env,cwd)}) {
-    private class Lease(val id:String,val kind:NativeEndpointKind,val directory:File,var payload:ByteArray,val plan:(File,ByteArray)->NativeEndpointPlan,val localToken:ByteArray,val remoteId:String?,val scoped:Boolean,val extraEnvironment:MutableMap<String,String>){
+    private class Lease(val id:String,val kind:NativeEndpointKind,val directory:File,var payload:ByteArray,val plan:(File,ByteArray)->NativeEndpointPlan,val localToken:ByteArray,val remoteId:String?,val scoped:Boolean,val extraEnvironment:MutableMap<String,String>,val dependency:String?){
         var owner:String?=null
         lateinit var job:Job
         var timeout:Job?=null
@@ -65,7 +65,7 @@ class NativeEndpoints(private val context:Context,private val scope:CoroutineSco
     private fun sha(bytes:ByteArray)=MessageDigest.getInstance("SHA-256").digest(bytes).joinToString(""){"%02x".format(it)}
     private fun reject(kind:NativeEndpointKind,message:String){if(state.value[kind]?.running==true)return
         mutable.update{it+(kind to NativeEndpointStatus(UUID.randomUUID().toString(),kind,running=false,message="未启动",error=message))}}
-    private fun reserve(kind:NativeEndpointKind,payload:ByteArray,remoteId:String?=null,scoped:Boolean=false,extraEnvironment:Map<String,String> = emptyMap(),plan:(File,ByteArray)->NativeEndpointPlan){
+    private fun reserve(kind:NativeEndpointKind,payload:ByteArray,remoteId:String?=null,scoped:Boolean=false,extraEnvironment:Map<String,String> = emptyMap(),dependency:String?=null,plan:(File,ByteArray)->NativeEndpointPlan){
         if(leases.containsKey(kind)){payload.fill(0)
         return}
         var reserved:Lease?=null
@@ -76,7 +76,7 @@ class NativeEndpoints(private val context:Context,private val scope:CoroutineSco
             val id=UUID.randomUUID().toString()
         val folder=File(root,id)
         check(folder.mkdir())
-            val lease=Lease(id,kind,folder,payload,plan,if(kind in setOf(NativeEndpointKind.TUNNEL,NativeEndpointKind.REMOTE_EXECUTOR))ByteArray(0)else randomToken(),remoteId,scoped,extraEnvironment.toMutableMap()).also{reserved=it}
+            val lease=Lease(id,kind,folder,payload,plan,if(kind in setOf(NativeEndpointKind.TUNNEL,NativeEndpointKind.REMOTE_EXECUTOR))ByteArray(0)else randomToken(),remoteId,scoped,extraEnvironment.toMutableMap(),dependency).also{reserved=it}
             records.write(records.entries+NativeEndpointRecords.Entry(id,kind,System.currentTimeMillis()))
         pendingMutable.value=records.entries
             lease.job=scope.launch(start=CoroutineStart.LAZY){run(lease)}
@@ -121,6 +121,7 @@ class NativeEndpoints(private val context:Context,private val scope:CoroutineSco
         val lease=leases[kind]?.takeIf{it.id==id} ?: return
         if(lease.owner==null){finishUnstarted(lease,"启动已取消")
         return}
+        leases.values.filter{it.dependency==lease.id}.forEach{stop(it.kind,it.id)}
         lease.generation.stop(lease.id)
         status(lease){it.copy(ready=false,stopping=true,message="正在关闭服务和连接")}
         lease.localToken.fill(0)
@@ -178,12 +179,15 @@ class NativeEndpoints(private val context:Context,private val scope:CoroutineSco
         val value=Json.parseToJsonElement(bytes.toString(Charsets.UTF_8)).jsonObject["remoteControlEnabled"] ?: return null
         return requireNotNull((value as? JsonPrimitive)?.booleanOrNull){"远控持久设置损坏，请核查原版配置"}
     }
-    fun startRemoteExecutor(url:String,environment:String,name:String,auth:RemoteExecutorAuth,token:String,expires:Long,profile:String,region:String,service:String){
+    fun startRemoteExecutor(url:String,environment:String,name:String,auth:RemoteExecutorAuth,token:String,expires:Long,profile:String,region:String,service:String,forward:Boolean=false,concurrent:Int=1,strict:Boolean=false){
         try{
-            val plan=RemoteExecutorPlan.build(url,environment,name,auth,profile,region,service)
+            val owned=if(forward)state.value[NativeEndpointKind.EXECUTOR]?.takeIf{it.ready && it.running && !it.stopping} ?: error("请先启动本次已认证本机执行器")else null
+            val plan=RemoteExecutorPlan.build(url,environment,name,auth,profile,region,service,owned?.address,concurrent,strict)
             val payload=if(auth==RemoteExecutorAuth.SCOPED)RemoteExecutorPlan.credential(environment,token,expires)else ByteArray(0)
-            val extra=if(auth==RemoteExecutorAuth.AGENT_IDENTITY){NativeEndpointPlans.credential(token,65536).fill(0);mapOf("CODEX_ACCESS_TOKEN" to token)}else emptyMap()
-            reserve(NativeEndpointKind.REMOTE_EXECUTOR,payload,environment,auth==RemoteExecutorAuth.SCOPED,extra){_,_->plan}
+            val extra=mutableMapOf<String,String>()
+            if(auth==RemoteExecutorAuth.AGENT_IDENTITY){NativeEndpointPlans.credential(token,65536).fill(0);extra["CODEX_ACCESS_TOKEN"]=token}
+            if(owned!=null){check(leases[NativeEndpointKind.EXECUTOR]?.id==owned.id);extra["CODEX_ANDROID_FORWARD_AUTH"]=buildJsonObject{put("address",owned.address);put("credential",requireNotNull(clientCredential(NativeEndpointKind.EXECUTOR)))}.toString()}
+            reserve(NativeEndpointKind.REMOTE_EXECUTOR,payload,environment,auth==RemoteExecutorAuth.SCOPED,extra,owned?.id){_,_->plan}
         }catch(failure:Exception){reject(NativeEndpointKind.REMOTE_EXECUTOR,failure.message ?: "远程执行配置无效")}
     }
     private fun remoteEvent(lease:Lease,line:String,ready:CompletableDeferred<String>){
@@ -228,6 +232,11 @@ class NativeEndpoints(private val context:Context,private val scope:CoroutineSco
         if(lease.ack===ack)lease.ack=null}
         }
     }
+    private fun checkDependency(lease:Lease){
+        val id=lease.dependency ?: return
+        val row=state.value[NativeEndpointKind.EXECUTOR]
+        check(row?.id==id && row.ready && row.running && !row.stopping && leases[NativeEndpointKind.EXECUTOR]?.id==id){"本次转发目标已经停止或替换，未继续注册"}
+    }
     private suspend fun run(lease:Lease){
         var vault:OriginalVaultServer?=null
         var verification:OriginalVerificationServer?=null
@@ -252,6 +261,7 @@ class NativeEndpoints(private val context:Context,private val scope:CoroutineSco
                 val plan=lease.plan(lease.directory,lease.localToken)
                 env.putAll(plan.environment)
                 env.putAll(lease.extraEnvironment)
+                checkDependency(lease)
                 val process=spawner.spawn(File(context.applicationInfo.nativeLibraryDir,"libcodex_cli.so"),settings.arguments+plan.arguments,env,workspace).also{lease.process=it}
                 v.authorize(process.pid)
         verification?.authorize(process.pid)
@@ -284,6 +294,7 @@ class NativeEndpoints(private val context:Context,private val scope:CoroutineSco
         lease.payload.fill(0)
         lease.payload=ByteArray(0)}}
                     val address=withTimeout(if(lease.kind==NativeEndpointKind.REMOTE_EXECUTOR)120_000L else 20_000L){ready.await()}
+                    checkDependency(lease)
                     check(withContext(Dispatchers.IO){process.pollExit()}==null){"服务在监听建立后退出"}
                     if(lease.generation.ready(lease.id)){
                         lease.initialReady=true
@@ -319,6 +330,7 @@ class NativeEndpoints(private val context:Context,private val scope:CoroutineSco
     private suspend fun cleanupProcess(lease:Lease){
         lease.rotation?.cancel()
         lease.ack?.cancel()
+        leases.values.filter{it.dependency==lease.id}.forEach{stop(it.kind,it.id)}
         val process=lease.process ?: return
         runCatching{process.requestTermination()}
         withTimeoutOrNull(3000){while(runCatching{process.pollExit()==null}.getOrDefault(false))delay(25)}

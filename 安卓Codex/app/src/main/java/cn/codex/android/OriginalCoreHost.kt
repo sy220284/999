@@ -221,9 +221,15 @@ class OriginalCoreHost(
         selectThread(response.getValue("thread").jsonObject, before)
         mutable.update { it.copy(historyCursor = response.string("itemsBackwardsCursor").ifBlank { null }) }
     }
+    private suspend fun projectRoot(api:OriginalCodexClient,cwd:String):File{
+        val normal=withContext(Dispatchers.IO){runCatching{ManagedProjectRoots.resolve(workspace,File(cwd),emptyList())}.getOrNull()}
+        if(normal!=null)return normal
+        val managed=worktrees.managedRows(api)
+        return withContext(Dispatchers.IO){ManagedProjectRoots.resolve(workspace,File(cwd),managed)}
+    }
     private suspend fun selectThread(thread: JsonObject, throughVersion: Long = state.value.threadUpdates.version) {
         val selectionEpoch=lifecycle.state.connectionEpoch;val selectionConnection=connection ?: error("原版连接已结束")
-        val root=withContext(Dispatchers.IO){val cwd=File(thread.string("cwd")).canonicalFile;val managed=File(engineHome,"worktrees").canonicalFile;if(cwd==workspace.canonicalFile || cwd.path.startsWith(managed.path+File.separator))cwd else workspace.canonicalFile}
+        val root=projectRoot(OriginalCodexClient(selectionConnection),thread.string("cwd"))
         ensureCurrent(selectionEpoch,selectionConnection)
         if(root!=files.root.canonicalFile){
             check(!files.state.value.busy && files.state.value.watchId==null){"请先结束文件操作和目录监听，再切换项目会话"}
@@ -286,7 +292,8 @@ class OriginalCoreHost(
     }
     /** 已加载列表跨本次共享核心客户端；历史按原版来源分页，子代理不混作根任务。 */
     fun readAgents(source:String="loaded",more:Boolean=false)=operation { api->
-        require(source in setOf("loaded","interactive","exec"))
+        val section=source.takeIf{it.startsWith("section:")}?.removePrefix("section:")
+        require(source in setOf("loaded","interactive","exec") || section?.let{runCatching{UUID.fromString(it).toString()==it}.getOrDefault(false)}==true)
         val epoch=lifecycle.state.connectionEpoch
         val cursor=if(more){check(state.value.agentsSource==source);state.value.agentsCursor ?: return@operation}else null
         val observedStatuses=state.value.threadStatuses
@@ -298,7 +305,7 @@ class OriginalCoreHost(
             for(id in ids){try{val thread=api.read(id,false).jsonObject.getValue("thread").jsonObject;require(thread.string("id")==id);found+=thread}catch(cancelled:CancellationException){throw cancelled}catch(_:Exception){failures++};ensureCurrent(epoch,api.connection)}
             rows=found
         }else{
-            page=api.call("thread/list",buildJsonObject{put("limit",30);put("archived",false);put("useStateDbOnly",true);put("sortKey","recency_at");put("sourceKinds",JsonArray((if(source=="exec")listOf("exec","appServer")else listOf("cli","vscode")).map(::JsonPrimitive)));cursor?.let{put("cursor",it)}}).jsonObject
+            page=api.call("thread/list",buildJsonObject{put("limit",30);put("archived",false);put("useStateDbOnly",true);put("sortKey",if(section!=null)"section_position"else"recency_at");if(section!=null){put("sectionId",section);put("sortDirection","asc")};put("sourceKinds",JsonArray((if(section!=null)listOf("cli","vscode","exec","appServer","subAgent","subAgentReview","subAgentCompact","subAgentThreadSpawn","subAgentOther","unknown")else if(source=="exec")listOf("exec","appServer")else listOf("cli","vscode")).map(::JsonPrimitive)));cursor?.let{put("cursor",it)}}).jsonObject
             rows=page.getValue("data").jsonArray.map{it.jsonObject};require(rows.size<=30)
         }
         ensureCurrent(epoch,api.connection)
@@ -676,7 +683,7 @@ class OriginalCoreHost(
                             try{
                                 val threadId=(message.params as? JsonObject)?.string("threadId").orEmpty();require(threadId.isNotBlank())
                                 val thread=withTimeout(5000){OriginalCodexClient(rpc).read(threadId,false)}.jsonObject.getValue("thread").jsonObject;require(thread.string("id")==threadId)
-                                val root=withContext(Dispatchers.IO){File(thread.string("cwd")).canonicalFile.also{folder->val normal=workspace.canonicalFile;val worktrees=File(engineHome,"worktrees").canonicalFile;require(folder==normal || folder.path.startsWith(worktrees.path+File.separator));require(folder.isDirectory)}}
+                                val root=withTimeout(5000){projectRoot(OriginalCodexClient(rpc),thread.string("cwd"))}
                                 if(!current(epoch,rpc))return
                                 androidToolRoots[message]=root
                             }catch(failure:Exception){if(failure is CancellationException && failure !is TimeoutCancellationException)throw failure;rpc.respond(message.id,OriginalAndroidTools.response(false,"无法核对本次工具所属项目目录，请在会话中重新请求"));return}

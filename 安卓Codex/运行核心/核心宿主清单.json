@@ -510,6 +510,18 @@
         {
           "path": "codex-rs/app-server/src/attestation.rs",
           "sha256": "28f9776283803b3a691f3f5736df6df060b77f6dfe22002b38c4df2056a229ef"
+        },
+        {
+          "path": "codex-rs/exec-server/src/forward.rs",
+          "sha256": "ed4be16bcf1433c69e96f117540fd5243912bdebad1e2fef908be20daec2297f"
+        },
+        {
+          "path": "codex-rs/app-server/src/request_processors/thread_processor.rs",
+          "sha256": "37ff0875e2b6d3def2fc727fd065574bd243cea2aa836021ebb218ac83b898e7"
+        },
+        {
+          "path": "codex-rs/app-server-protocol/src/protocol/v2/thread.rs",
+          "sha256": "3532f87c9e55c9e539ed3c48c74701a14f4b9e401564b5cbafe624941302755c"
         }
       ]
     },
@@ -519,7 +531,7 @@
       "binary": "codex-android-worktree",
       "androidInstall": "nativeLibraryDir/libcodex_worktree.so",
       "status": "源码接入，未构建/运行",
-      "ipc": "有限参数数组；原版分配/元数据/绑定/保守清理，未知结果保留目录",
+      "ipc": "参数数组+有界stdin合并desktop配置；原版for_cli解析自定义根与指定版本；创建预览冻结配置，未知结果保留目录",
       "abi": [
         "arm64-v8a",
         "x86_64"
@@ -544,8 +556,8 @@
       "package": "Android条件式Landlock/seccomp适配，非原版Linux沙箱二进制",
       "binary": "android_project_sandbox.c",
       "androidInstall": "nativeLibraryDir/libcodex_sandbox.so",
-      "status": "源码接入，未构建/内核验证；普通模型未接入",
-      "ipc": "ABI6/规则全部建立后才exec；失败无普通执行替代，仅专用命令入口",
+      "status": "专用入口及显式默认项目公共命令限制源码已接，未构建/内核验证；非全核心隔离",
+      "ipc": "ABI6/规则全部建立后才exec；宿主冻结策略包裹原版公共spawn_process，白名单环境、不继承额外fd、不支持即拒绝；其他启动点未隔离",
       "abi": [
         "arm64-v8a",
         "x86_64"
@@ -558,6 +570,14 @@
         {
           "path": "codex-rs/cli/src/main.rs",
           "sha256": "ac51c153916132c0be2c37ea1136562685b832957bc2e43e53d71608d0b28a4a"
+        },
+        {
+          "path": "codex-rs/sandboxing/src/spawn.rs",
+          "sha256": "6a92bc742aaca33e210f9d494d7f19722c96ec2698f2c239718ae053244d645c"
+        },
+        {
+          "path": "codex-rs/sandboxing/src/manager.rs",
+          "sha256": "8abe2a5f66f8101a669dd0c1571fb7c5edbab9eff2e80c8d13d9064bc5bc175d"
         }
       ]
     }

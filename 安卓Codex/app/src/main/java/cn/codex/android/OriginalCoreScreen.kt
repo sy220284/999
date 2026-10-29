@@ -69,6 +69,9 @@ internal class OriginalRequestKey(private val request:ServerMessage.Request) {
     var sessionInitialTab by remember { mutableStateOf("目标") }
     var extensions by remember { mutableStateOf(false) }
     var consent by remember { mutableStateOf(false) }
+    val policyContext=LocalContext.current
+    var restrictedCommands by remember { mutableStateOf(AndroidCommandPolicy.enabled(policyContext)) }
+    var policyError by remember { mutableStateOf<String?>(null) }
     var draft by remember { mutableStateOf("") }
     var renamed by remember { mutableStateOf<String?>(null) }
     val context = LocalContext.current
@@ -300,7 +303,12 @@ internal class OriginalRequestKey(private val request:ServerMessage.Request) {
             }
         }
     }
-    if (consent) AlertDialog(onDismissRequest = { consent = false }, title = { Text("手机执行权限") }, text = { Text("原版核心将以本应用身份运行命令。Android 应用隔离无法把命令限制在单个项目目录内，命令也可能访问本应用的其他数据。该模式保留原版审批机制；请逐条检查命令和文件修改。是否在本次启动中继续？") }, confirmButton = { TextButton(onClick = { consent = false; host.connect() }) { Text("同意并启动") } }, dismissButton = { TextButton(onClick = { consent = false }) { Text("取消") } })
+    if (consent) AlertDialog(onDismissRequest = { consent = false }, title = { Text("手机执行权限") }, text = { Column {
+        Row{Checkbox(restrictedCommands,{restrictedCommands=it});Text("限制默认项目命令（实验）",Modifier.padding(top=12.dp))}
+        Text(if(restrictedCommands)"部分命令将使用实验受限模式：限默认项目、禁联网、不传账号凭证；缺产物/内核不支持即拒绝，不回退普通执行。自定义工作树、特殊启动参数与Shell快照暂不支持。核心直接文件操作、Hooks/MCP/插件及其他启动点仍未隔离。" else "原版核心以本应用身份运行命令，可能访问本应用其他数据。Android应用隔离不等于项目沙箱。")
+        Text("请继续逐条检查原版命令和文件审批。更改策略前需关闭全部核心与连接服务。")
+        policyError?.let{Text(it,color=MaterialTheme.colorScheme.error)}
+    } }, confirmButton = { TextButton(onClick = { try{if(AndroidCommandPolicy.enabled(policyContext)!=restrictedCommands)AndroidCommandPolicy.save(policyContext,restrictedCommands);policyError=null;consent = false;host.connect()}catch(failure:Exception){policyError=failure.message ?: "执行策略未保存"} }) { Text("同意并启动") } }, dismissButton = { TextButton(onClick = { consent = false }) { Text("取消") } })
     renamed?.let { title -> AlertDialog(onDismissRequest = { renamed = null }, title = { Text("重命名原版会话") }, text = { OutlinedTextField(title, { renamed = it }, label = { Text("会话名称") }) }, confirmButton = { TextButton(onClick = { host.rename(title); renamed = null }, enabled = title.isNotBlank()) { Text("保存") } }, dismissButton = { TextButton(onClick = { renamed = null }) { Text("取消") } }) }
 }
 private fun originalItemTitle(type: String) = when (type) { "reasoning" -> "思考过程"; "plan" -> "工作计划"; "commandExecution" -> "命令执行"; "fileChange" -> "文件修改"; "mcpToolCall" -> "MCP 工具"; "collabAgentToolCall" -> "代理协作"; "contextCompaction" -> "上下文压缩"; else -> "工具记录 · $type" }

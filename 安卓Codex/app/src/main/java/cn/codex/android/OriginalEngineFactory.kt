@@ -52,6 +52,9 @@ object NativeOriginalEngineFactory:OriginalEngineFactory {
         remove("CODEX_ANDROID_VAULT_HOST_PID")
             remove("CODEX_INTERNAL_APP_SERVER_REMOTE_CONTROL_DISABLED")
                 remove("CODEX_ANDROID_DEBUG_CONNECTION_FILE")
+                remove("CODEX_ANDROID_FORWARD_AUTH")
+                remove("CODEX_ANDROID_COMMAND_SANDBOX")
+                remove("CODEX_ANDROID_EXECUTOR_EVENTS")
                 remove("CODEX_ANDROID_DAEMON_PARENT_STDIN")
         remove("CODEX_ANDROID_DAEMON_RECEIPT")
         }
@@ -60,6 +63,7 @@ object NativeOriginalEngineFactory:OriginalEngineFactory {
             args+=listOf("-c","model_provider=\"android_service\"","-c","model_providers.android_service={name=\"手机模型服务\",base_url=$base,wire_api=\"responses\",env_key=\"CODEX_ANDROID_API_KEY\"}")
             if(config.apiKey.isNotBlank())env["CODEX_ANDROID_API_KEY"]=config.apiKey
         }
+        env.putAll(AndroidCommandPolicy.environment(context))
         return OriginalProcessSettings(args,env)
     }
     override suspend fun open(launch:OriginalEngineLaunch):OriginalEngineSession {
