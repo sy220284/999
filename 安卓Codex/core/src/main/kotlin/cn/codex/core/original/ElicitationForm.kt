@@ -4,9 +4,9 @@ import cn.codex.core.string
 import kotlinx.serialization.json.*
 
 /** 普通字段使用原生控件；嵌套对象/数组使用 JSON 内容并执行同一份结构校验。 */
-class ElicitationForm(val schema: JsonObject) {
+class ElicitationForm(val schema: JsonObject,suppliedResources:List<JsonObject> = emptyList()) {
     private val normalized=runCatching{normalize(schema,0)}.getOrNull() as? JsonObject
-    private val validator=normalized?.let(::JsonSchemaFormValidator)
+    private val validator=normalized?.let{JsonSchemaFormValidator(it,suppliedResources.map{resource->normalize(resource,0).jsonObject})}
     data class Field(val name: String, val schema: JsonObject, val required: Boolean) {
         val type get() = if(schema.string("type")=="openai/imagePicker")"string"else (schema["type"] as? JsonPrimitive)?.contentOrNull ?: if (options?.firstOrNull() is JsonPrimitive && options!!.first().jsonPrimitive.isString) "string" else "json"
         val title get() = schema.string("title", name)
@@ -21,7 +21,7 @@ class ElicitationForm(val schema: JsonObject) {
     }
     private val required = (schema["required"] as? JsonArray).orEmpty().mapNotNull { (it as? JsonPrimitive)?.takeIf{part->part.isString}?.content }.toSet()
     val fields = (schema["properties"] as? JsonObject).orEmpty().entries.take(128).map { (name, raw) -> Field(name, raw as? JsonObject ?: buildJsonObject {}, name in required) }
-    val rawInput = schema.keys.any { it in setOf("oneOf", "anyOf", "allOf", "\$ref", "if") }
+    val rawInput = schema.keys.any { it in setOf("oneOf", "anyOf", "allOf", "\$ref", "\$dynamicRef", "if") }
     val supported = schema.toString().toByteArray().size<=256*1024 && (schema["properties"] as? JsonObject).orEmpty().size<=128 && (schema["type"] as? JsonPrimitive)?.content == "object" && validator?.supported()==true
     val initialValues = if (rawInput) mapOf("__form_json" to (schema["default"] ?: buildJsonObject {}).toString()) else fields.mapNotNull { field -> field.schema["default"]?.let { field.name to if (it is JsonPrimitive && it.isString) it.content else it.toString() } }.toMap()
     fun content(values: Map<String, String>): JsonObject {

@@ -20,7 +20,7 @@ import java.util.concurrent.ConcurrentHashMap
 fun interface EndpointProcessSpawner {
     fun spawn(executable:File,arguments:List<String>,environment:Map<String,String>,directory:File):OwnedNativeProcess
 }
-data class NativeEndpointStatus(val id:String,val kind:NativeEndpointKind,val running:Boolean=true,val ready:Boolean=false,val stopping:Boolean=false,val rotating:Boolean=false,val address:String="",val message:String="等待前台服务启动",val error:String?=null)
+data class NativeEndpointStatus(val id:String,val kind:NativeEndpointKind,val running:Boolean=true,val ready:Boolean=false,val stopping:Boolean=false,val rotating:Boolean=false,val address:String="",val credentialSequence:Long=0,val message:String="等待前台服务启动",val error:String?=null)
 class DaemonConnection(val id:String,val address:String,val credential:String){
     override fun toString()="DaemonConnection(redacted)"
 }
@@ -31,13 +31,16 @@ class NativeEndpoints(private val context:Context,private val scope:CoroutineSco
         Unit},
     private val spawner:EndpointProcessSpawner=EndpointProcessSpawner{file,args,env,cwd->check(file.isFile && file.canExecute()){ "当前包没有原版CLI产物" }
         NativeCoreProcess(file,args,env,cwd)}) {
-    private class Lease(val id:String,val kind:NativeEndpointKind,val directory:File,var payload:ByteArray,val plan:(File,ByteArray)->NativeEndpointPlan,val localToken:ByteArray){
+    private class Lease(val id:String,val kind:NativeEndpointKind,val directory:File,var payload:ByteArray,val plan:(File,ByteArray)->NativeEndpointPlan,val localToken:ByteArray,val remoteId:String?,val scoped:Boolean,val extraEnvironment:MutableMap<String,String>){
         var owner:String?=null
         lateinit var job:Job
         var timeout:Job?=null
         var rotation:Job?=null
-        var ack:CompletableDeferred<Unit>?=null
+        @Volatile var ack:CompletableDeferred<Unit>?=null
         var cleanupFailed=false
+        @Volatile var credentialSequence=0L
+        @Volatile var remoteConnected=false
+        @Volatile var initialReady=false
         val writer=Mutex()
         val generation=NativeEndpointGeneration().apply{start(id)}
         @Volatile var process:OwnedNativeProcess?=null
@@ -62,7 +65,7 @@ class NativeEndpoints(private val context:Context,private val scope:CoroutineSco
     private fun sha(bytes:ByteArray)=MessageDigest.getInstance("SHA-256").digest(bytes).joinToString(""){"%02x".format(it)}
     private fun reject(kind:NativeEndpointKind,message:String){if(state.value[kind]?.running==true)return
         mutable.update{it+(kind to NativeEndpointStatus(UUID.randomUUID().toString(),kind,running=false,message="未启动",error=message))}}
-    private fun reserve(kind:NativeEndpointKind,payload:ByteArray,plan:(File,ByteArray)->NativeEndpointPlan){
+    private fun reserve(kind:NativeEndpointKind,payload:ByteArray,remoteId:String?=null,scoped:Boolean=false,extraEnvironment:Map<String,String> = emptyMap(),plan:(File,ByteArray)->NativeEndpointPlan){
         if(leases.containsKey(kind)){payload.fill(0)
         return}
         var reserved:Lease?=null
@@ -73,7 +76,7 @@ class NativeEndpoints(private val context:Context,private val scope:CoroutineSco
             val id=UUID.randomUUID().toString()
         val folder=File(root,id)
         check(folder.mkdir())
-            val lease=Lease(id,kind,folder,payload,plan,if(kind==NativeEndpointKind.TUNNEL)ByteArray(0)else randomToken()).also{reserved=it}
+            val lease=Lease(id,kind,folder,payload,plan,if(kind in setOf(NativeEndpointKind.TUNNEL,NativeEndpointKind.REMOTE_EXECUTOR))ByteArray(0)else randomToken(),remoteId,scoped,extraEnvironment.toMutableMap()).also{reserved=it}
             records.write(records.entries+NativeEndpointRecords.Entry(id,kind,System.currentTimeMillis()))
         pendingMutable.value=records.entries
             lease.job=scope.launch(start=CoroutineStart.LAZY){run(lease)}
@@ -85,6 +88,7 @@ class NativeEndpoints(private val context:Context,private val scope:CoroutineSco
         if(lease.owner==null)finishUnstarted(lease,"前台服务未及时启动，请保持应用在前台后重试")}
         }catch(failure:Exception){payload.fill(0)
         reserved?.localToken?.fill(0)
+        reserved?.extraEnvironment?.clear()
         reserved?.directory?.let{runCatching{deleteOwnedDirectory(it)}}
         if(records.error!=null)storeErrorMutable.value=records.error
         reject(kind,failure.message ?: "无法准备服务")}
@@ -95,6 +99,7 @@ class NativeEndpoints(private val context:Context,private val scope:CoroutineSco
         lease.timeout?.cancel()
         lease.payload.fill(0)
         lease.localToken.fill(0)
+        lease.extraEnvironment.clear()
         runCatching{deleteOwnedDirectory(lease.directory)}.onFailure{lease.cleanupFailed=true;storeErrorMutable.value="服务临时目录未完全清理，请核查"}
         lease.generation.finish(lease.id)
         runCatching{records.write(records.entries.filterNot{it.id==lease.id && !lease.cleanupFailed})}.onFailure{storeErrorMutable.value=records.error ?: "服务记录或临时目录未完成清理，请核查"}
@@ -119,6 +124,7 @@ class NativeEndpoints(private val context:Context,private val scope:CoroutineSco
         lease.generation.stop(lease.id)
         status(lease){it.copy(ready=false,stopping=true,message="正在关闭服务和连接")}
         lease.localToken.fill(0)
+        lease.extraEnvironment.clear()
         runCatching{lease.verifier?.close()}
         lease.job.cancel()
     }
@@ -140,7 +146,7 @@ class NativeEndpoints(private val context:Context,private val scope:CoroutineSco
         val lease=leases[NativeEndpointKind.DAEMON] ?: error("共享核心资源已结束")
         val started=lease.config ?: error("共享核心配置不可用")
         check(started.endpoint.trimEnd('/')==config.endpoint.trimEnd('/') && started.apiKey==config.apiKey && started.allowLoopbackHttp==config.allowLoopbackHttp){"模型连接设置已变化，请先重启共享核心"}
-        return DaemonConnection(lease.id,row.address,requireNotNull(clientCredential(NativeEndpointKind.DAEMON)))
+        return DaemonConnection(lease.id,row.address,if(row.address.startsWith("unix://"))""else requireNotNull(clientCredential(NativeEndpointKind.DAEMON)))
     }
     fun startProxy(upstream:String,key:String,port:Int){
         try{NativeEndpointPlans.proxy(upstream,port,"/receipt","/token")
@@ -163,8 +169,45 @@ class NativeEndpoints(private val context:Context,private val scope:CoroutineSco
     }
     fun startExecutor(port:Int){try{NativeEndpointPlans.executor("a".repeat(64),port)
         reserve(NativeEndpointKind.EXECUTOR,ByteArray(0)){_,token->NativeEndpointPlans.executor(sha(token),port)}}catch(error:Exception){reject(NativeEndpointKind.EXECUTOR,error.message ?: "执行服务配置无效")}}
-    fun startDaemon(port:Int,remote:Boolean){try{NativeEndpointPlans.daemon("a".repeat(64),port,remote)
-        reserve(NativeEndpointKind.DAEMON,ByteArray(0)){_,token->NativeEndpointPlans.daemon(sha(token),port,remote)}}catch(error:Exception){reject(NativeEndpointKind.DAEMON,error.message ?: "共享核心配置无效")}}
+    fun startDaemon(port:Int,remote:Boolean,unix:Boolean=false){try{NativeEndpointPlans.daemon("a".repeat(64),port,remote)
+        reserve(NativeEndpointKind.DAEMON,ByteArray(0)){dir,token->val saved=if(remote)null else savedRemotePreference();if(unix)NativeEndpointPlans.unixDaemon(daemonSocket(dir.name).absolutePath,remote || saved==true,!remote && saved==false)else NativeEndpointPlans.daemon(sha(token),port,remote || saved==true,!remote && saved==false)}}catch(error:Exception){reject(NativeEndpointKind.DAEMON,error.message ?: "共享核心配置无效")}}
+    fun savedRemotePreference():Boolean?{
+        val file=File(context.filesDir,"原版核心数据/app-server-daemon/settings.json")
+        if(!file.isFile)return null
+        val bytes=file.inputStream().use{it.readNBytes(65537)};require(bytes.size<=65536){"远控设置超过读取预算"}
+        val value=Json.parseToJsonElement(bytes.toString(Charsets.UTF_8)).jsonObject["remoteControlEnabled"] ?: return null
+        return requireNotNull((value as? JsonPrimitive)?.booleanOrNull){"远控持久设置损坏，请核查原版配置"}
+    }
+    fun startRemoteExecutor(url:String,environment:String,name:String,auth:RemoteExecutorAuth,token:String,expires:Long,profile:String,region:String,service:String){
+        try{
+            val plan=RemoteExecutorPlan.build(url,environment,name,auth,profile,region,service)
+            val payload=if(auth==RemoteExecutorAuth.SCOPED)RemoteExecutorPlan.credential(environment,token,expires)else ByteArray(0)
+            val extra=if(auth==RemoteExecutorAuth.AGENT_IDENTITY){NativeEndpointPlans.credential(token,65536).fill(0);mapOf("CODEX_ACCESS_TOKEN" to token)}else emptyMap()
+            reserve(NativeEndpointKind.REMOTE_EXECUTOR,payload,environment,auth==RemoteExecutorAuth.SCOPED,extra){_,_->plan}
+        }catch(failure:Exception){reject(NativeEndpointKind.REMOTE_EXECUTOR,failure.message ?: "远程执行配置无效")}
+    }
+    private fun remoteEvent(lease:Lease,line:String,ready:CompletableDeferred<String>){
+        val value=runCatching{Json.parseToJsonElement(line).jsonObject}.getOrNull() ?: return
+        if(value["androidRemoteExecutor"]?.jsonPrimitive?.intOrNull!=1 || value["pid"]?.jsonPrimitive?.intOrNull!=lease.process?.pid || value.string("environmentId")!=lease.remoteId)return
+        val sequence=value["credentialSequence"]?.jsonPrimitive?.longOrNull
+        if(sequence!=null){
+            if(sequence!=lease.credentialSequence+1)return
+            lease.credentialSequence=sequence;lease.ack?.complete(Unit);status(lease){it.copy(credentialSequence=sequence)};return
+        }
+        if(value.string("transport") !in setOf("noise","direct"))return
+        when(value.string("state")){
+            "connected"->{lease.remoteConnected=true;ready.complete("远程环境：${lease.remoteId}");if(lease.initialReady)status(lease){if(it.stopping)it else it.copy(ready=true,message="远程转发层已连接，等待客户端使用")}}
+            "disconnected"->{lease.remoteConnected=false;status(lease){if(it.stopping)it else it.copy(ready=false,message="远程转发连接已断开，恢复由原版处理；请核查任务实际结果")}}
+        }
+    }
+    fun rotateRemoteCredential(token:String,expires:Long){
+        val lease=leases[NativeEndpointKind.REMOTE_EXECUTOR] ?: return
+        val row=state.value[lease.kind] ?: return
+        if(!lease.scoped || !row.running || row.stopping || row.rotating || lease.credentialSequence<1)return
+        val bytes=try{RemoteExecutorPlan.credential(requireNotNull(lease.remoteId),token,expires)}catch(_:Exception){status(lease){it.copy(error="替换凭证或过期时间无效")};return}
+        val ack=CompletableDeferred<Unit>();lease.ack=ack;status(lease){it.copy(rotating=true,error=null)}
+        lease.rotation=scope.launch(Dispatchers.IO){try{withTimeout(15_000){lease.writer.withLock{requireNotNull(lease.process).output.apply{write(bytes);flush()}};ack.await()};status(lease){if(it.stopping || !it.running)it else it.copy(rotating=false,message="已确认本机接受第${lease.credentialSequence}版凭证；不代表远端已接受")}}catch(failure:Exception){if(failure is CancellationException && failure !is TimeoutCancellationException)throw failure;status(lease){it.copy(error="凭证更新结果未确认，已关闭此执行服务")};stop(lease.kind,lease.id)}finally{bytes.fill(0);if(lease.ack===ack)lease.ack=null}}
+    }
     fun rotateTunnel(value:String){
         val lease=leases[NativeEndpointKind.TUNNEL] ?: return
         val row=state.value[NativeEndpointKind.TUNNEL] ?: return
@@ -207,6 +250,8 @@ class NativeEndpoints(private val context:Context,private val scope:CoroutineSco
         env["CODEX_ANDROID_DAEMON_RECEIPT"]=File(lease.directory,"ready.json").absolutePath
                 }
                 val plan=lease.plan(lease.directory,lease.localToken)
+                env.putAll(plan.environment)
+                env.putAll(lease.extraEnvironment)
                 val process=spawner.spawn(File(context.applicationInfo.nativeLibraryDir,"libcodex_cli.so"),settings.arguments+plan.arguments,env,workspace).also{lease.process=it}
                 v.authorize(process.pid)
         verification?.authorize(process.pid)
@@ -216,6 +261,7 @@ class NativeEndpoints(private val context:Context,private val scope:CoroutineSco
         val ready=CompletableDeferred<String>()
                 launch(Dispatchers.IO){try{val input=BufferedInputStream(process.input)
         while(isActive){val line=readLine(input) ?: break
+                    if(lease.kind==NativeEndpointKind.REMOTE_EXECUTOR)remoteEvent(lease,line,ready)
                     if(line=="AUTH_UPDATED" && lease.kind==NativeEndpointKind.TUNNEL)lease.ack?.complete(Unit)
                     NativeEndpointPlans.readyLine(lease.kind,line)?.let{ready.complete(it)}
                 }
@@ -237,9 +283,12 @@ class NativeEndpoints(private val context:Context,private val scope:CoroutineSco
         process.output.flush()
         lease.payload.fill(0)
         lease.payload=ByteArray(0)}}
-                    val address=withTimeout(20_000){ready.await()}
+                    val address=withTimeout(if(lease.kind==NativeEndpointKind.REMOTE_EXECUTOR)120_000L else 20_000L){ready.await()}
                     check(withContext(Dispatchers.IO){process.pollExit()}==null){"服务在监听建立后退出"}
-                    if(lease.generation.ready(lease.id))status(lease){if(it.stopping)it else it.copy(ready=true,address=address,message="监听已建立，连接需满足认证与服务条件")}
+                    if(lease.generation.ready(lease.id)){
+                        lease.initialReady=true
+                        status(lease){if(it.stopping)it else it.copy(ready=lease.kind!=NativeEndpointKind.REMOTE_EXECUTOR || lease.remoteConnected,address=address,message=if(lease.kind==NativeEndpointKind.REMOTE_EXECUTOR)"远程转发连接状态已核对；等待客户端授权使用"else"监听已建立，连接需满足认证与服务条件")}
+                    }
                     if(lease.kind==NativeEndpointKind.PROXY)withContext(Dispatchers.IO){File(lease.directory,"client-token").delete()}
                     while(currentCoroutineContext().isActive){exit=withContext(Dispatchers.IO){process.pollExit()}
         if(exit!=null)break
@@ -253,7 +302,9 @@ class NativeEndpoints(private val context:Context,private val scope:CoroutineSco
         runCatching{vault?.close()}
         lease.payload.fill(0)
         lease.localToken.fill(0)
+        lease.extraEnvironment.clear()
         lease.config=null
+        if(lease.kind==NativeEndpointKind.DAEMON)daemonSocket(lease.id).delete()
         runCatching{deleteOwnedDirectory(lease.directory)}.onFailure{lease.cleanupFailed=true;storeErrorMutable.value="服务临时目录未完全清理，请核查"}}
             withContext(NonCancellable+Dispatchers.Main.immediate){
                 leases.remove(lease.kind,lease)
@@ -274,6 +325,7 @@ class NativeEndpoints(private val context:Context,private val scope:CoroutineSco
         runCatching{process.close()}
         lease.process=null
     }
+    private fun daemonSocket(id:String)=File(context.cacheDir,"d-${id.take(12)}.sock")
     private fun readReceipt(lease:Lease,pid:Int):String?=runCatching{
         val file=File(lease.directory,"ready.json")
         if(!file.isFile)return@runCatching null
@@ -284,7 +336,7 @@ class NativeEndpoints(private val context:Context,private val scope:CoroutineSco
         if(lease.kind==NativeEndpointKind.PROXY){val port=value["port"]?.jsonPrimitive?.int ?: error("没有端口")
         require(port in 1..65535)
         "http://127.0.0.1:$port/v1"}
-        else value.string("address").takeIf{it.matches(Regex("ws://127\\.0\\.0\\.1:[0-9]{1,5}")) && java.net.URI(it).port in 1..65535}
+        else value.string("address").takeIf{if(it.startsWith("unix://"))it=="unix://${daemonSocket(lease.id).absolutePath}"else it.matches(Regex("ws://127\\.0\\.0\\.1:[0-9]{1,5}")) && java.net.URI(it).port in 1..65535}
     }.getOrNull()
     private fun deleteOwnedDirectory(folder:File){
         require(folder.absoluteFile.parentFile==root.absoluteFile && UUID.fromString(folder.name).toString()==folder.name)

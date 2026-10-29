@@ -32,7 +32,7 @@ client = (r/'core/src/main/kotlin/cn/codex/core/original/OriginalCodexClient.kt'
 ui = (r/'app/src/main/java/cn/codex/android/OriginalEventsScreen.kt').read_text()
 assert 'method in OriginalRemainingEvents.methods' in host
 assert 'OriginalEventsScreen(host' in (r/'app/src/main/java/cn/codex/android/OriginalCoreScreen.kt').read_text()
-assert 'executeAndroidTool(request)' in ui and 'androidTools.execute(params)' in host
+assert 'executeAndroidTool(request)' in ui and 'OriginalAndroidTools(approvedRoot).execute(params)' in host and 'androidToolRoots[message]=root' in host and 'canonicalFile==approvedRoot' in host
 assert 'put("dynamicTools", OriginalAndroidTools.definitions())' in client
 # 默认TS生成物剔除了experimental字段，此处直接核对固定Rust原声明。
 assert 'pub dynamic_tools: Option<Vec<DynamicToolSpec>>' in (source/'src/protocol/v2/thread.rs').read_text()

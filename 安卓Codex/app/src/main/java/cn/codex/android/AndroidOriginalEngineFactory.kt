@@ -1,6 +1,9 @@
 package cn.codex.android
 
 import cn.codex.core.original.AppServerConnection
+import cn.codex.core.original.NativeEndpointPlans
+import cn.codex.core.original.NativeEndpointKind
+import java.io.File
 import kotlinx.coroutines.*
 import okhttp3.*
 import okio.ByteString
@@ -17,6 +20,7 @@ object AndroidOriginalEngineFactory:OriginalEngineFactory {
     override suspend fun open(launch:OriginalEngineLaunch):OriginalEngineSession {
         val manager=(launch.context.applicationContext as CodexApplication).nativeEndpoints
         val daemon=manager.daemonConnection(launch.config) ?: return NativeOriginalEngineFactory.open(launch)
+        if(daemon.address.startsWith("unix://"))return unix(launch,manager,daemon)
         val wire=LoopbackAppServerSocket()
         var connection:AppServerConnection?=null
         try{
@@ -29,6 +33,22 @@ object AndroidOriginalEngineFactory:OriginalEngineFactory {
                 override fun close(){if(!closed.compareAndSet(false,true))return;rpc.close();wire.close();manager.stop(cn.codex.core.original.NativeEndpointKind.DAEMON,daemon.id)}
             }
         }catch(failure:Throwable){connection?.close();wire.close();throw failure}
+    }
+
+    private suspend fun unix(launch:OriginalEngineLaunch,manager:NativeEndpoints,daemon:DaemonConnection):OriginalEngineSession{
+        var process:NativeCoreProcess?=null;var rpc:AppServerConnection?=null;var completed:OriginalEngineSession?=null
+        try{return withContext(Dispatchers.IO){
+            val context=launch.context;val binary=File(context.applicationInfo.nativeLibraryDir,"libcodex_cli.so");check(binary.isFile && binary.canExecute()){"缺少原版Unix控制代理程序"}
+            val environment=mapOf("PATH" to (context.applicationContext as CodexApplication).toolPath,"HOME" to launch.home.absolutePath,"CODEX_HOME" to launch.home.absolutePath,"TMPDIR" to context.cacheDir.absolutePath)
+            val child=NativeCoreProcess(binary,NativeEndpointPlans.unixProxy(daemon.address.removePrefix("unix://")),environment,launch.workspace).also{process=it}
+            launch.scope.launch(Dispatchers.IO){runCatching{child.errors.use{input->val bytes=ByteArray(8192);while(input.read(bytes)>=0){ }}}}
+            val proxyConnection=AppServerConnection(child.input,child.output,launch.scope,child::close).also{rpc=it}
+            object:OriginalEngineSession{
+                override val connection=proxyConnection
+                private val closed=AtomicBoolean()
+                override fun close(){if(!closed.compareAndSet(false,true))return;proxyConnection.close();child.close();manager.stop(NativeEndpointKind.DAEMON,daemon.id)}
+            }.also{completed=it}
+        }}catch(failure:Throwable){withContext(NonCancellable+Dispatchers.IO){runCatching{completed?.close()};runCatching{rpc?.close()};runCatching{process?.close()}};throw failure}
     }
 }
 

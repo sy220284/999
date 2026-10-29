@@ -57,4 +57,11 @@ class OriginalCliControllerTest {
         }finally{scope.cancel();dispatcher.close()}
     }
 
+    @Test fun failedDoctorReportStillKeepsTheActualStructuredFailure()=runBlocking {
+        val dispatcher=Executors.newSingleThreadExecutor().asCoroutineDispatcher();val scope=CoroutineScope(SupervisorJob()+dispatcher)
+        val report="""{"schemaVersion":1,"generatedAt":"now","overallStatus":"fail","codexVersion":"test","checks":{"sandbox.helpers":{"id":"sandbox.helpers","status":"fail","summary":"unsupported","details":{}}}}"""
+        val controller=OriginalCliController(scope,{false},OriginalMutationLifecycle.None){OriginalCliResult(1,report)}
+        try{withContext(dispatcher){controller.maintain(OriginalCliCommands.doctor())};withTimeout(3000){controller.state.first{!it.busy}};assertEquals("fail",controller.state.value.doctor?.checks?.single()?.status);assertNotNull(controller.state.value.error)}finally{scope.cancel();dispatcher.close()}
+    }
+
 }

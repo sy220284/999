@@ -73,7 +73,8 @@ class OriginalCoreHost(
     private val remainingEvents = OriginalRemainingEvents()
     val realtimeAudio = OriginalRealtimeAudio(context,scope)
     private val workspace = File(context.filesDir, "工作区/原版项目").apply { mkdirs() }
-    private val androidTools = OriginalAndroidTools(workspace)
+    private val androidToolRoots=java.util.IdentityHashMap<ServerMessage.Request,File>()
+    fun androidToolRoot(request:ServerMessage.Request)=androidToolRoots[request]?.absolutePath
     private val toolJobs = java.util.IdentityHashMap<ServerMessage.Request,Job>()
     private val engineHome = File(context.filesDir, "原版核心数据").apply { mkdirs() }
     val configurationJournal get() = (context.applicationContext as CodexApplication).configurationJournal
@@ -87,9 +88,10 @@ class OriginalCoreHost(
     val settings: OriginalSettingsController = OriginalSettingsController(scope, workspace.absolutePath,
         activeTask = { state.value.working || state.value.turnId != null || state.value.loading || state.value.closing || otherTaskRunning() || configurationChanging },
         threadId = { state.value.threadId }, lifecycle = configurationJournal.lifecycle("原版实验设置"))
-    val files: OriginalFilesController = OriginalFilesController(scope, workspace,
+    var files: OriginalFilesController = OriginalFilesController(scope, workspace,
         activeTask = { state.value.working || state.value.turnId != null || state.value.loading || state.value.closing || otherTaskRunning() || configurationChanging },
         lifecycle = configurationJournal.lifecycle("原版项目文件"))
+        private set
     val library: OriginalLibraryController = OriginalLibraryController(scope, workspace.absolutePath, { state.value.threadId },
         { state.value.working || state.value.turnId != null || state.value.loading || state.value.closing || otherTaskRunning() || configurationChanging }, configurationJournal.lifecycle("市场、分享与应用目录"))
     val services: OriginalServicesController = OriginalServicesController(scope, { state.value.threadId },
@@ -103,6 +105,8 @@ class OriginalCoreHost(
     val history=OriginalHistoryController(scope,{state.value.threadId},{completionBusy()},configurationJournal.lifecycle("会话记录与后台终端"))
     val advanced=OriginalAdvancedController(scope,{state.value.threadId},workspace.absolutePath,{completionBusy()},configurationJournal.lifecycle("会话设置、记忆与采样"))
     val connections=OriginalConnectionsController(scope,{state.value.threadId},{completionBusy()},configurationJournal.lifecycle("环境、远控与服务认证"))
+    val worktrees=OriginalWorktrees(scope,{completionBusy()},configurationJournal.lifecycle("托管工作树"),workspace.absolutePath,AndroidWorktreeRunner(context,workspace,engineHome)::execute)
+    val agentActions=OriginalAgentActions(scope,{completionBusy()},configurationJournal.lifecycle("共享代理操作"))
     val cli=OriginalCliController(scope,{state.value.connected || (context.applicationContext as CodexApplication).nativeEndpoints.daemonRunning || completionBusy()},configurationJournal.lifecycle("云任务与本机维护"),OriginalCliRunner(context,scope,workspace,engineHome)::execute)
     val search=OriginalSearchController(scope,workspace.absolutePath)
     val webRtc:OriginalWebRtcAudio=OriginalWebRtcAudio(context,scope){realtime.stop()}
@@ -110,7 +114,7 @@ class OriginalCoreHost(
     val microphone=OriginalRealtimeMicrophone(context,scope){bytes -> realtime.sendAudio(bytes)}
     init {scope.launch{realtime.state.map{it.running}.distinctUntilChanged().collect{running->if(!running)webRtc.close()}}}
     fun commandWorkspace() = workspace.absolutePath
-    val managedChanging get() = cli.state.value.busy || sshTrust.state.value.working || projects.operations.state.value.mutating || history.operations.state.value.mutating || advanced.operations.state.value.mutating || connections.operations.state.value.mutating || queue.operations.state.value.mutating || realtime.state.value.running || library.operations.state.value.mutating || services.operations.state.value.mutating || migration.operations.state.value.mutating
+    val managedChanging get() = worktrees.operations.state.value.mutating || agentActions.operations.state.value.mutating || cli.state.value.busy || sshTrust.state.value.working || projects.operations.state.value.mutating || history.operations.state.value.mutating || advanced.operations.state.value.mutating || connections.operations.state.value.mutating || queue.operations.state.value.mutating || realtime.state.value.running || library.operations.state.value.mutating || services.operations.state.value.mutating || migration.operations.state.value.mutating
     val configurationChanging get() = state.value.toolBusy || (context.applicationContext as CodexApplication).gitOperations.state.value.running || (context.applicationContext as CodexApplication).fullTerminal.state.value.running || commands.state.value.running || extensions.state.value.mutating || mcp.state.value.mutating || settings.state.value.mutating || files.state.value.mutating || managedChanging
     fun mcpImports() = McpTools(context).connections().map { it.name to it.url }
     private fun error(error: Throwable) { mutable.update { it.copy(error = error.message ?: "原版核心操作失败") } }
@@ -161,7 +165,7 @@ class OriginalCoreHost(
         ensureCurrent(epoch, rpc)
         if (config.apiKey.isNotBlank() && config.endpoint.trimEnd('/') == "https://api.openai.com/v1" && api.account().jsonObject["account"] == JsonNull) api.loginApiKey(config.apiKey)
         ensureCurrent(epoch, rpc)
-        client = api;projects.bind(api);history.bind(api);advanced.bind(api);connections.bind(api);queue.bind(api); search.bind(api);realtime.bind(api);extensions.bind(api); mcp.bind(api); commands.bind(api); settings.bind(api); files.bind(api); library.bind(api); services.bind(api); migration.bind(api)
+        client = api;worktrees.bind(api);agentActions.bind(api);projects.bind(api);history.bind(api);advanced.bind(api);connections.bind(api);queue.bind(api); search.bind(api);realtime.bind(api);extensions.bind(api); mcp.bind(api); commands.bind(api); settings.bind(api); files.bind(api); library.bind(api); services.bind(api); migration.bind(api)
         mutable.update { it.copy(connected = true, status = "原版核心已连接 · 凭证由手机 Keystore 加密保存", model = config.model) }
         refreshThreads(api, false); readAccount(api, epoch)
     }
@@ -170,7 +174,7 @@ class OriginalCoreHost(
         if (state.value.closing) return
         lifecycle.disconnect(lifecycle.state.connectionEpoch)
         mutable.update{it.copy(verifyingElicitation=null,verificationError=null)}
-        microphone.stop();realtimeAudio.stop();webRtc.close();projects.bind(null);history.bind(null);advanced.bind(null);connections.bind(null);queue.bind(null);search.bind(null);realtime.bind(null);remainingEvents.reset();toolJobs.values.toList().forEach { it.cancel() };toolJobs.clear()
+        microphone.stop();realtimeAudio.stop();webRtc.close();worktrees.bind(null);agentActions.bind(null);projects.bind(null);history.bind(null);advanced.bind(null);connections.bind(null);queue.bind(null);search.bind(null);realtime.bind(null);remainingEvents.reset();toolJobs.values.toList().forEach { it.cancel() };toolJobs.clear();androidToolRoots.clear()
         if (cancelStartup) startupJob?.cancel()
         operationJob?.cancel(); operationJob = null
         reservedTask = null
@@ -217,7 +221,15 @@ class OriginalCoreHost(
         selectThread(response.getValue("thread").jsonObject, before)
         mutable.update { it.copy(historyCursor = response.string("itemsBackwardsCursor").ifBlank { null }) }
     }
-    private fun selectThread(thread: JsonObject, throughVersion: Long = state.value.threadUpdates.version) {
+    private suspend fun selectThread(thread: JsonObject, throughVersion: Long = state.value.threadUpdates.version) {
+        val selectionEpoch=lifecycle.state.connectionEpoch;val selectionConnection=connection ?: error("原版连接已结束")
+        val root=withContext(Dispatchers.IO){val cwd=File(thread.string("cwd")).canonicalFile;val managed=File(engineHome,"worktrees").canonicalFile;if(cwd==workspace.canonicalFile || cwd.path.startsWith(managed.path+File.separator))cwd else workspace.canonicalFile}
+        ensureCurrent(selectionEpoch,selectionConnection)
+        if(root!=files.root.canonicalFile){
+            check(!files.state.value.busy && files.state.value.watchId==null){"请先结束文件操作和目录监听，再切换项目会话"}
+            files.bind(null)
+            files=OriginalFilesController(scope,root,{completionBusy()},configurationJournal.lifecycle("原版项目文件")).also{it.bind(client)}
+        }
         microphone.stop();realtimeAudio.stop();queue.selectThread(thread.string("id"))
         val turns = (thread["turns"] as? JsonArray).orEmpty().mapNotNull { it as? JsonObject }
         val active = turns.lastOrNull { it.string("status") == "inProgress" }?.string("id")
@@ -291,6 +303,7 @@ class OriginalCoreHost(
         }
         ensureCurrent(epoch,api.connection)
         val next=page.string("nextCursor").ifBlank{null};require(next==null || next!=cursor && next.length<=8192)
+        agentActions.refreshed(rows.map{it.string("id")}.toSet())
         val combined=((if(more)state.value.agentsOverview else emptyList())+rows).distinctBy{it.string("id")};require(combined.size<=200){"总览最多保留200项，请按来源缩小范围"}
         mutable.update{current->val refreshed=rows.map{it.string("id")}.toSet();current.copy(agentsOverview=combined,agentsCursor=next,agentsSource=source,agentsReadFailures=failures,threadStatuses=current.threadStatuses.filter{(id,value)->id !in refreshed || value!==observedStatuses[id]})}
     }
@@ -595,7 +608,7 @@ class OriginalCoreHost(
         // 请求 ID 可在重连后复用，必须核对当前队列中的同一个请求实例。
         if (state.value.requests.none { it === request }) return@launch
         try {
-            toolJobs.remove(request)?.cancel()
+            toolJobs.remove(request)?.cancel();androidToolRoots.remove(request)
             rpc.respond(request.id, result)
             if (current(epoch, rpc)) mutable.update { it.copy(requests = it.requests.filterNot { pending -> pending === request }) }
         } catch (failure: Exception) { if (current(epoch, rpc)) error(failure) }
@@ -637,9 +650,12 @@ class OriginalCoreHost(
             mutable.update { it.copy(toolBusy = true) }
             try {
                 val params = request.params as? JsonObject ?: buildJsonObject {}
-                val result = withContext(Dispatchers.IO) { androidTools.execute(params) }
+                val approvedRoot=requireNotNull(androidToolRoots[request]){"未取得本次批准的项目目录"}
+                val actual=OriginalCodexClient(rpc).read(params.string("threadId"),false).jsonObject.getValue("thread").jsonObject
+                val result=withContext(Dispatchers.IO){require(File(actual.string("cwd")).canonicalFile==approvedRoot){"会话目录已变化，请重新核查"};OriginalAndroidTools(approvedRoot).execute(params)}
                 if(current(epoch,rpc) && state.value.requests.any { it === request }) {
                     rpc.respond(request.id,result)
+                    androidToolRoots.remove(request)
                     mutable.update { it.copy(requests = it.requests.filterNot { pending -> pending === request }) }
                     remainingEvents.notice("tool/${request.id}","手机工具执行结果",result.toString(),params.string("threadId"),params.string("turnId"))
                     mutable.update { it.copy(events = remainingEvents.state) }
@@ -650,11 +666,23 @@ class OriginalCoreHost(
     }
     private suspend fun onMessage(epoch: Long, rpc: AppServerConnection, message: ServerMessage) {
         if (!current(epoch, rpc)) return
+        androidToolRoots.keys.removeIf{request->state.value.requests.none{it===request}}
         when (message) {
             is ServerMessage.Request -> {
                 if (message.method in setOf("item/commandExecution/requestApproval", "item/fileChange/requestApproval", "item/tool/requestUserInput", "mcpServer/elicitation/request", "item/permissions/requestApproval", "execCommandApproval", "applyPatchApproval", "item/tool/call")) {
                     if (state.value.requests.size >= 32) rpc.reject(message.id, -32000, "待处理交互数量达到上限")
-                    else mutable.update { it.copy(requests = it.requests + message) }
+                    else {
+                        if(message.method=="item/tool/call"){
+                            try{
+                                val threadId=(message.params as? JsonObject)?.string("threadId").orEmpty();require(threadId.isNotBlank())
+                                val thread=withTimeout(5000){OriginalCodexClient(rpc).read(threadId,false)}.jsonObject.getValue("thread").jsonObject;require(thread.string("id")==threadId)
+                                val root=withContext(Dispatchers.IO){File(thread.string("cwd")).canonicalFile.also{folder->val normal=workspace.canonicalFile;val worktrees=File(engineHome,"worktrees").canonicalFile;require(folder==normal || folder.path.startsWith(worktrees.path+File.separator));require(folder.isDirectory)}}
+                                if(!current(epoch,rpc))return
+                                androidToolRoots[message]=root
+                            }catch(failure:Exception){if(failure is CancellationException && failure !is TimeoutCancellationException)throw failure;rpc.respond(message.id,OriginalAndroidTools.response(false,"无法核对本次工具所属项目目录，请在会话中重新请求"));return}
+                        }
+                        mutable.update { it.copy(requests = it.requests + message) }
+                    }
                 } else if(message.method == "currentTime/read") {
                     rpc.respond(message.id,buildJsonObject{put("currentTimeAt",System.currentTimeMillis()/1000L)})
                 } else if(message.method == "account/chatgptAuthTokens/refresh" || message.method == "attestation/generate") {
@@ -766,7 +794,7 @@ class OriginalCoreHost(
         if (method == "account/updated") {
             scope.launch { runSuspendCatching { client?.let { readAccount(it) } }.onFailure { if (current(epoch, rpc)) error(it) } }; return
         }
-        if (method == "serverRequest/resolved") { toolJobs.keys.filter { it.id == params["requestId"] }.toList().forEach { toolJobs.remove(it)?.cancel() }; mutable.update { it.copy(requests = it.requests.filterNot { r -> r.id == params["requestId"] }) }; return }
+        if (method == "serverRequest/resolved") { androidToolRoots.keys.removeIf{it.id==params["requestId"]}; toolJobs.keys.filter { it.id == params["requestId"] }.toList().forEach { toolJobs.remove(it)?.cancel() }; mutable.update { it.copy(requests = it.requests.filterNot { r -> r.id == params["requestId"] }) }; return }
         if (params.string("threadId").isNotBlank() && params.string("threadId") != state.value.threadId) return
         if (state.value.threadUpdates.threads[state.value.threadId]?.availability in setOf("closed", "deleted") && (method.startsWith("turn/") || method.startsWith("item/"))) return
         when (method) {

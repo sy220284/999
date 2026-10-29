@@ -9,7 +9,7 @@ import tree_sitter_rust
 rust=Parser(Language(tree_sitter_rust.language()))
 spec=importlib.util.spec_from_file_location('cli_patch',native/'应用CLI补丁.py');patch=importlib.util.module_from_spec(spec);spec.loader.exec_module(patch)
 manifest=json.loads((native/'安卓服务补丁来源.json').read_text())
-patches=[native/x for x in ['安卓依赖适配.patch','安卓用户验证.patch','安卓CLI差异确认.patch','安卓本机服务.patch']]
+patches=[native/x for x in ['安卓依赖适配.patch','安卓用户验证.patch','安卓CLI差异确认.patch','安卓本机服务.patch','安卓诊断连接.patch','安卓远程执行状态.patch','安卓Unix共享核心.patch']]
 paths={'codex-rs/Cargo.lock'}
 for item in patches:
  paths.update(re.findall(r'^\+\+\+ b/(.+)$',item.read_text(),re.M))
@@ -21,6 +21,9 @@ with tempfile.TemporaryDirectory() as temporary:
  assert patch.apply(root)=='applied'
  assert patch.apply(root,native/'安卓本机服务.patch',native/'安卓服务补丁来源.json')=='applied'
  assert patch.apply(root,native/'安卓本机服务.patch',native/'安卓服务补丁来源.json')=='already_applied'
+ for diff,record in [('安卓诊断连接.patch','安卓诊断补丁来源.json'),('安卓远程执行状态.patch','安卓远程执行补丁来源.json'),('安卓Unix共享核心.patch','安卓Unix补丁来源.json')]:
+  assert patch.apply(root,native/diff,native/record)=='applied'
+  assert patch.apply(root,native/diff,native/record)=='already_applied'
  parsed=0
  for name in sorted(paths):
   target=root/name
@@ -36,7 +39,7 @@ with tempfile.TemporaryDirectory() as temporary:
  lock=tomllib.loads((root/'codex-rs/Cargo.lock').read_text())
  package=next(x for x in lock['package']if x['name']=='codex-responses-api-proxy');assert 'subtle' in package['dependencies']
  assert next(x for x in lock['package']if x['name']=='subtle')['version']=='2.6.1'
- print(f'组合四份补丁通过；{parsed}份Rust语法、TOML/Cargo.lock解析及现有依赖增量一致。')
+ print(f'组合七份补丁通过；{parsed}份Rust语法、TOML/Cargo.lock解析及现有依赖增量一致。')
 def read(name):return (r/name).read_text()
 manager=read('app/src/main/java/cn/codex/android/NativeEndpoints.kt')
 for term in ['CoroutineStart.LAZY','startReserved','stopOwned','lease.owner==owner','lease.id','AUTH_UPDATED','process.pollExit()','v.authorize(process.pid)','verification?.authorize(process.pid)','cleanupProcess(lease)','lease.payload.fill(0)','lease.localToken.fill(0)','daemonConnection(config:ApiConfig)']:
@@ -51,4 +54,23 @@ update=read('app/src/main/java/cn/codex/android/AndroidAppUpdates.kt')
 for term in ['GET_SIGNING_CERTIFICATES','candidate.longVersionCode>installed.longVersionCode','signers(installed.signingInfo)==signers(candidate.signingInfo)','canRequestPackageInstalls','Intent.ACTION_VIEW','approved.sha256']:assert term in update,term
 assert 'REQUEST_INSTALL_PACKAGES' in read('app/src/main/AndroidManifest.xml')
 assert 'app.originalCore.cli.stop()' in read('app/src/main/java/cn/codex/android/ConfigurationExecutionService.kt')
-print('四类本机服务/确切资源所有权/本机WS客户端/逐字节应用/签名更新/中文入口静态核对通过；非类型、链接或运行证明。')
+print('本机与远程服务/确切资源所有权/本机WS客户端/逐字节应用/签名更新/中文入口静态核对通过；非类型、链接或运行证明。')
+
+# 新路径必须连接原版实现；以下仍是静态契约检查，不替代类型或运行测试。
+helper=read('app/src/main/java/cn/codex/android/AndroidDebugCore.kt')
+for term in ['v.authorize(child.pid)','verification.authorize(child.pid)','NativeEndpointPlans.daemon(hash,0,false,true)']:
+ assert term in helper,term
+assert 'CODEX_ANDROID_DEBUG_CONNECTION_FILE' in helper
+runner=read('app/src/main/java/cn/codex/android/OriginalCliRunner.kt')
+assert 'helper.start();environment.putAll(helper.environment)' in runner and 'debug?.close()' in runner
+for path in ['app-server-test-client/src/lib.rs','exec-server/src/remote.rs','exec-server/src/remote/direct.rs','cli/src/exec_server_credential.rs','app-server-transport/src/transport/unix_socket.rs']:
+ assert any(x['path']=='codex-rs/'+path for metadata in ['安卓诊断补丁来源.json','安卓远程执行补丁来源.json','安卓Unix补丁来源.json']for x in json.loads((native/metadata).read_text())['files'])
+sandbox=read('运行核心/补充源码/android_project_sandbox.c')
+for term in ['if(abi<6)return fail','PR_SET_NO_NEW_PRIVS','__NR_landlock_restrict_self','SECCOMP_MODE_FILTER','__NR_socket','__NR_connect','__NR_io_uring_setup','__NR_ptrace','__NR_pidfd_getfd','SECCOMP_RET_KILL_PROCESS','if(filter())return fail','execv(argv[5]']:
+ assert term in sandbox,term
+assert sandbox.index('if(filter())return fail')<sandbox.index('execv(argv[5]')
+subprocess.run(['bash','-n',str(native/'构建安卓沙箱.sh')],check=True)
+worktree=read('运行核心/补充源码/android_worktree_cli.rs')
+for term in ['WorktreeManager','default_worktree_base','manager.create','manager.bind_thread','manager.remove']:assert term in worktree,term
+assert 'androidToolRoots[message]=root' in read('app/src/main/java/cn/codex/android/OriginalCoreHost.kt')
+print('诊断确切PID/原版工作树库/远程执行连接事件与顺序凭证确认/Unix控制代理/条件式沙箱拒绝路径已静态核对，未运行目标。')

@@ -1,0 +1,11 @@
+{
+  "source_commit": "970111f6cb62cc02fe36a82ea7d71b37a2889c97",
+  "patch_sha256": "9e49b685e6776fce14e2cb173cdcfc6951ad4852078e2859f13669d15187e9e2",
+  "files": [
+    {
+      "path": "codex-rs/app-server-transport/src/transport/unix_socket.rs",
+      "before": "a2ff08a28cb52c8a11895bb4cff41401180fb0efd0491984b77af381e7efafe3",
+      "after": "4f29edfdc8948517873075994dca0ff03a7de41b12c2e73c9da629ffaa36e827"
+    }
+  ]
+}

@@ -1,6 +1,8 @@
 package cn.codex.android
 
 import android.content.Intent
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import android.net.Uri
 import androidx.compose.foundation.*
 import androidx.compose.foundation.layout.*
@@ -44,7 +46,9 @@ internal class OriginalRequestKey(private val request:ServerMessage.Request) {
     val connectionsStatus by host.connections.operations.state.collectAsState()
     val searchStatus by host.search.state.collectAsState()
     val realtimeStatus by host.realtime.state.collectAsState()
-    val managedBusy = cliStatus.busy || sshStatus.working || projectsStatus.mutating || historyStatus.mutating || advancedStatus.mutating || connectionsStatus.mutating || queueStatus.busy || realtimeStatus.running || libraryStatus.mutating || servicesStatus.mutating || migrationStatus.mutating
+    val agentActionStatus by host.agentActions.operations.state.collectAsState()
+    val worktreeStatus by host.worktrees.operations.state.collectAsState()
+    val managedBusy = worktreeStatus.busy ||  agentActionStatus.busy ||  cliStatus.busy || sshStatus.working || projectsStatus.mutating || historyStatus.mutating || advancedStatus.mutating || connectionsStatus.mutating || queueStatus.busy || realtimeStatus.running || libraryStatus.mutating || servicesStatus.mutating || migrationStatus.mutating
     val configurationRecords by host.configurationJournal.records.collectAsState()
     val configurationReadError by host.configurationJournal.readError.collectAsState()
     val activeConfiguration by host.configurationJournal.active.collectAsState()
@@ -323,11 +327,23 @@ internal fun openOriginalLogin(context: android.content.Context, url: String) {
     var declined by remember(request){mutableStateOf(false)}
     var decided by remember(request){mutableStateOf(false)}
     var validationJob by remember(request){mutableStateOf<Job?>(null)}
+    var suppliedResources by remember(request){mutableStateOf<List<JsonObject>>(emptyList())}
+    var resourceImportOwner by remember(request){mutableStateOf<ServerMessage.Request?>(null)}
+    var resourceError by remember(request){mutableStateOf<String?>(null)}
+    val resourcePicker=rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()){uri->
+        if(uri!=null && resourceImportOwner===request && !decided && !declined){
+            resourceImportOwner=null;validationJob?.cancel();formLoading=true;formScope.launch{try{
+                val documents=withContext(Dispatchers.IO){context.contentResolver.openInputStream(uri).use{input->requireNotNull(input);val bytes=input.readNBytes(256*1024+1);require(bytes.size<=256*1024);SchemaResourceBundle.parse(bytes.toString(Charsets.UTF_8))}}
+                if(!decided && !declined){suppliedResources=documents;resourceError=null}
+            }catch(failure:Exception){if(failure is CancellationException)throw failure;resourceError="离线规则无法读取或资源标识无效，未改变当前规则";formLoading=false}}
+        }
+    }
     val form=preparedForm
-    LaunchedEffect(request){
-        val prepared=withContext(Dispatchers.Default){runCatching{(params["requestedSchema"] as? JsonObject)?.let(::ElicitationForm)}.getOrNull()}
+    LaunchedEffect(request,suppliedResources){
+        validationJob?.cancel();formLoading=true
+        val prepared=withContext(Dispatchers.Default){runCatching{(params["requestedSchema"] as? JsonObject)?.let{ElicitationForm(it,suppliedResources)}}.getOrNull()}
         preparedForm=prepared;formLoading=false
-        if(elicitation && prepared!=null)answers=prepared.initialValues
+        if(elicitation && prepared!=null && answers.isEmpty())answers=prepared.initialValues
     }
     var formError by remember(request) { mutableStateOf("") }
     val reviewedItem = items.firstOrNull { it.id == params.string("itemId") }
@@ -373,6 +389,16 @@ internal fun openOriginalLogin(context: android.content.Context, url: String) {
                         } else OutlinedTextField(answers[field.name].orEmpty(), { answers = answers + (field.name to it) }, label = { Text(if (field.type in setOf("json", "object", "array")) "${field.title}（JSON）" else field.title) }, modifier = Modifier.fillMaxWidth())
                     }
                 } else Text("此表单包含无法离线解析的引用或验证规则，可拒绝后继续其他任务。", style = MaterialTheme.typography.bodySmall)
+                if(params["requestedSchema"] is JsonObject){
+                    TextButton(onClick={resourceImportOwner=request;resourcePicker.launch(arrayOf("application/json","text/plain","application/octet-stream"))},enabled=!decided && !formLoading && !formValidating){Text("选择本次表单缺失的离线规则")}
+                    if(suppliedResources.isNotEmpty()){
+                        Text("已加入${suppliedResources.size}份规则，仅用于本次验证：",style=MaterialTheme.typography.bodySmall)
+                        suppliedResources.forEach{Text(it.string("\$id"),style=MaterialTheme.typography.bodySmall)}
+                        TextButton(onClick={validationJob?.cancel();formLoading=true;suppliedResources=emptyList()},enabled=!decided && !formValidating){Text("移除附加规则")}
+                    }
+                    Text("规则文件应来自你信任的服务方。选择文件不会自动批准或发送填写内容，也不会从引用地址联网下载。",style=MaterialTheme.typography.bodySmall)
+                    resourceError?.let{Text(it,color=MaterialTheme.colorScheme.error)}
+                }
                 if(formValidating){LinearProgressIndicator(Modifier.fillMaxWidth());Text("正在核对填写内容…")}
                 if (formError.isNotBlank()) Text(formError, color = MaterialTheme.colorScheme.error)
             } else {
@@ -387,13 +413,14 @@ internal fun openOriginalLogin(context: android.content.Context, url: String) {
     }, confirmButton = {
         if(elicitation && params.string("mode")=="openai/userVerification")TextButton(onClick=onVerify,enabled=!verifying && !decided){Text(if(verifying)"正在系统验证" else "验证并同意")}
         else if (elicitation && (params.string("mode") == "url" || form?.supported == true)) TextButton(onClick = {
-            if(!formValidating && !decided){
+            if(!formValidating && !formLoading && !decided){
+                val approvedForm=form;val approvedResources=suppliedResources
                 val snapshot=answers;formValidating=true;formError=""
                 validationJob=formScope.launch{
                     try{
-                        val content=withContext(Dispatchers.Default){if(params.string("mode")=="url")JsonNull else requireNotNull(form).content(snapshot)}
+                        val content=withContext(Dispatchers.Default){if(params.string("mode")=="url")JsonNull else requireNotNull(approvedForm).content(snapshot)}
                         if(!declined){
-                            check(answers==snapshot){"填写内容已变化，请核对后重新提交"}
+                            check(answers==snapshot && preparedForm===approvedForm && suppliedResources===approvedResources){"填写内容或规则已变化，请核对后重新提交"}
                             decided=true
                             respond(buildJsonObject{put("action","accept");put("content",content);put("_meta",JsonNull)})
                         }
@@ -401,7 +428,7 @@ internal fun openOriginalLogin(context: android.content.Context, url: String) {
                     finally{formValidating=false}
                 }
             }
-        },enabled=!formValidating && !decided) { Text(if (params.string("mode") == "url") "已完成授权" else "提交表单") }
+        },enabled=!formLoading && !formValidating && !decided) { Text(if (params.string("mode") == "url") "已完成授权" else "提交表单") }
         else if (!elicitation) TextButton(onClick = {
             if(!decided){
             val result = if (question) buildJsonObject {

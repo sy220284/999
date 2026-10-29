@@ -8,15 +8,16 @@ import java.util.IdentityHashMap
 import com.google.re2j.Pattern
 
 /** 有界离线求值：不请求外部引用；不支持的词汇明确拒绝，而非跳过规则。 */
-class JsonSchemaFormValidator(private val root:JsonObject) {
-    private val annotations=setOf("\$schema","\$id","\$anchor","\$comment","title","description","default","examples","deprecated","readOnly","writeOnly","enumNames","contentEncoding","contentMediaType")
-    private val keywords=setOf("type","enum","const","properties","required","additionalProperties","patternProperties","propertyNames","dependentRequired","dependentSchemas","minProperties","maxProperties","items","prefixItems","additionalItems","contains","minContains","maxContains","minItems","maxItems","uniqueItems","minimum","maximum","exclusiveMinimum","exclusiveMaximum","multipleOf","minLength","maxLength","pattern","format","oneOf","anyOf","allOf","not","if","then","else","\$defs","definitions","\$ref","unevaluatedProperties","unevaluatedItems")
+class JsonSchemaFormValidator(private val root:JsonObject,private val suppliedResources:List<JsonObject> = emptyList()) {
+    private val annotations=setOf("\$schema","\$id","\$anchor","\$dynamicAnchor","\$vocabulary","\$comment","title","description","default","examples","deprecated","readOnly","writeOnly","enumNames","contentEncoding","contentMediaType")
+    private val keywords=setOf("type","enum","const","properties","required","additionalProperties","patternProperties","propertyNames","dependentRequired","dependentSchemas","minProperties","maxProperties","items","prefixItems","additionalItems","contains","minContains","maxContains","minItems","maxItems","uniqueItems","minimum","maximum","exclusiveMinimum","exclusiveMaximum","multipleOf","minLength","maxLength","pattern","format","oneOf","anyOf","allOf","not","if","then","else","\$defs","definitions","\$ref","\$dynamicRef","unevaluatedProperties","unevaluatedItems")
     private val formats=setOf("email","uri","uri-reference","date","date-time","time","duration","uuid","hostname","ipv4","ipv6","regex","json-pointer")
     private data class ResourceContext(val base:URI,val root:JsonElement)
     private class ResourceIndex {
         val contexts=IdentityHashMap<JsonElement,ResourceContext>()
         val documents=mutableMapOf<URI,JsonElement>()
         val anchors=mutableMapOf<Pair<URI,String>,JsonElement>()
+        val dynamicAnchors=mutableMapOf<Pair<URI,String>,JsonElement>()
     }
     private fun document(uri:URI)=URI(uri.toString().substringBefore('#')).normalize()
     private fun address(base:URI,ref:String):URI=(if(ref.startsWith('#'))URI(document(base).toString()+ref)else base.resolve(URI(ref))).normalize()
@@ -35,9 +36,11 @@ class JsonSchemaFormValidator(private val root:JsonObject) {
                     require(index.documents.putIfAbsent(base,schema)==null){"表单资源标识重复"}
                     context=ResourceContext(base,schema)
                 }
-                schema["\$anchor"]?.let{raw->
+                for(keyword in listOf("\$anchor","\$dynamicAnchor"))schema[keyword]?.let{raw->
                     require(raw is JsonPrimitive && raw.isString && raw.content.matches(Regex("[A-Za-z_][-A-Za-z0-9._]*")))
-                    require(index.anchors.putIfAbsent(context.base to raw.content,schema)==null){"表单资源锚点重复"}
+                    val key=context.base to raw.content
+                    require(index.anchors.putIfAbsent(key,schema)==null){"表单资源锚点重复"}
+                    if(keyword=="\$dynamicAnchor")index.dynamicAnchors[key]=schema
                 }
             }
             index.contexts[schema]=context
@@ -49,7 +52,10 @@ class JsonSchemaFormValidator(private val root:JsonObject) {
         }
         val initial=ResourceContext(URI("https://codex.invalid/schema-root"),root)
         if("\$id" !in root)index.documents[initial.base]=root
-        walk(root,initial,0);index
+        require(suppliedResources.size<=32 && root.toString().toByteArray().size+suppliedResources.sumOf{it.toString().toByteArray().size}<=256*1024){"表单资源超过预算"}
+        walk(root,initial,0)
+        suppliedResources.forEach{resource->val id=resource.string("\$id");require(id.isNotBlank() && URI(id).isAbsolute){"附加规则必须有绝对资源标识"};walk(resource,initial,0)}
+        index
     }
     private fun resolvedAddress(owner:JsonElement,ref:String):URI {
         val context=resources.contexts[owner] ?: throw IllegalArgumentException("引用目标不是已登记的规则位置")
@@ -84,7 +90,15 @@ class JsonSchemaFormValidator(private val root:JsonObject) {
         if(schema is JsonPrimitive)return schema.booleanOrNull!=null
         val obj=schema as? JsonObject ?: return false
         if(obj.keys.any{it !in keywords && it !in annotations})return false
-        obj["\$ref"]?.let{raw->
+        obj["\$schema"]?.let{if(it !is JsonPrimitive || !it.isString || it.content !in setOf("https://json-schema.org/draft/2020-12/schema","https://json-schema.org/draft/2020-12/schema#"))return false}
+        val dialect=resources.contexts[obj]?.root?.let{it as? JsonObject}?.string("\$schema").orEmpty()
+        if(dialect.isNotBlank() && (obj["items"] is JsonArray || "additionalItems" in obj))return false
+        obj["\$vocabulary"]?.let{raw->
+            if(raw !is JsonObject)return false
+            val known=setOf("core","applicator","validation","meta-data","unevaluated").map{"https://json-schema.org/draft/2020-12/vocab/$it"}.toSet()
+            if(raw.any{(key,value)->(value as? JsonPrimitive)?.booleanOrNull==null || value.jsonPrimitive.boolean && key !in known})return false
+        }
+        for(keyword in listOf("\$ref","\$dynamicRef"))obj[keyword]?.let{raw->
             if(raw !is JsonPrimitive || !raw.isString)return false
             val ref=raw.content
             val target=runCatching{reference(ref,obj)}.getOrElse{return false}
@@ -122,7 +136,7 @@ class JsonSchemaFormValidator(private val root:JsonObject) {
         fun merge(other:Marks){properties+=other.properties;items+=other.items}
     }
     private class BudgetFailure:IllegalArgumentException("表单求值超出预算或存在不前进的循环引用")
-    private class Budget(var steps:Int=0,var depth:Int=0,val active:IdentityHashMap<JsonElement,MutableSet<String>> = IdentityHashMap())
+    private class Budget(var steps:Int=0,var depth:Int=0,val active:IdentityHashMap<JsonElement,MutableSet<String>> = IdentityHashMap(),val scope:MutableList<URI> = mutableListOf())
     fun validate(value:JsonElement,schema:JsonElement=root,path:String="表单") {
         require(root.toString().toByteArray().size<=256*1024 && value.toString().toByteArray().size<=512*1024){"表单内容超出预算"}
         require(supported(schema)){"表单规则尚未支持，不能绕过验证"}
@@ -133,13 +147,23 @@ class JsonSchemaFormValidator(private val root:JsonObject) {
         if(++budget.steps>50000 || ++budget.depth>64)throw BudgetFailure()
         val paths=budget.active.getOrPut(schema){mutableSetOf()}
         if(!paths.add(path))throw BudgetFailure()
-        try{return evaluate(value,schema,path,budget)}finally{paths-=path;budget.depth--}
+        val base=resources.contexts[schema]?.base ?: throw IllegalArgumentException("规则位置未登记")
+        val pushed=budget.scope.lastOrNull()!=base
+        if(pushed)budget.scope+=base
+        try{return evaluate(value,schema,path,budget)}finally{if(pushed)budget.scope.removeAt(budget.scope.lastIndex);paths-=path;budget.depth--}
     }
     private fun evaluate(value:JsonElement,schema:JsonElement,path:String,budget:Budget):Marks {
         val marks=Marks()
         if(schema is JsonPrimitive){require(schema.booleanOrNull==true){"$path 不符合规则"};return marks}
         val s=schema.jsonObject
         (s["\$ref"] as? JsonPrimitive)?.takeIf{it.isString}?.content?.let{marks.merge(visit(value,reference(it,s),path,budget))}
+        (s["\$dynamicRef"] as? JsonPrimitive)?.takeIf{it.isString}?.content?.let{ref->
+            val address=resolvedAddress(s,ref);val fragment=address.fragment
+            val ordinary=reference(ref,s)
+            val dynamicTarget=fragment?.let{resources.dynamicAnchors[document(address) to it]}
+            val target=if(dynamicTarget===ordinary && dynamicTarget!=null)budget.scope.firstNotNullOfOrNull{base->resources.dynamicAnchors[base to requireNotNull(fragment)]} ?: ordinary else ordinary
+            marks.merge(visit(value,target,path,budget))
+        }
         (s["allOf"] as? JsonArray)?.forEach{marks.merge(visit(value,it,path,budget))}
         for(key in listOf("anyOf","oneOf"))(s[key] as? JsonArray)?.let{choices->
             val successes=choices.mapNotNull{match(value,it,path,budget)}

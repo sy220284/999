@@ -43,13 +43,16 @@ object NativeOriginalEngineFactory:OriginalEngineFactory {
             put("CODEX_CA_CERTIFICATE",trust.absolutePath)
         put("SSL_CERT_FILE",trust.absolutePath)
             remove("SSL_CERT_DIR")
-        remove("OPENAI_API_KEY")
+        remove("CODEX_ACCESS_TOKEN")
+                remove("OPENAI_API_KEY")
         remove("CODEX_API_KEY")
         remove("CODEX_ANDROID_API_KEY")
             remove("CODEX_ANDROID_VERIFICATION_SOCKET")
         remove("CODEX_ANDROID_VAULT_SOCKET")
         remove("CODEX_ANDROID_VAULT_HOST_PID")
-            remove("CODEX_ANDROID_DAEMON_PARENT_STDIN")
+            remove("CODEX_INTERNAL_APP_SERVER_REMOTE_CONTROL_DISABLED")
+                remove("CODEX_ANDROID_DEBUG_CONNECTION_FILE")
+                remove("CODEX_ANDROID_DAEMON_PARENT_STDIN")
         remove("CODEX_ANDROID_DAEMON_RECEIPT")
         }
         if(config.endpoint.trimEnd('/')!="https://api.openai.com/v1"){

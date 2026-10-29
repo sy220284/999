@@ -29,6 +29,7 @@ private data class CliConfirmation(val title:String,val body:String,val action:(
     var task by rememberSaveable{mutableStateOf("")};var attempt by rememberSaveable{mutableStateOf("1")}
     var confirmation by remember{mutableStateOf<CliConfirmation?>(null)};var error by remember{mutableStateOf<String?>(null)}
     var rules by rememberSaveable{mutableStateOf("[\"rules/local.rules\"]")};var command by rememberSaveable{mutableStateOf("[\"git\",\"status\"]")};var resolve by rememberSaveable{mutableStateOf(false)}
+    var sandboxCommand by rememberSaveable{mutableStateOf("")}
     var shell by rememberSaveable{mutableStateOf("bash")}
     val endpoints by (LocalContext.current.applicationContext as CodexApplication).nativeEndpoints.state.collectAsState()
     val daemonActive=endpoints[NativeEndpointKind.DAEMON]?.running==true
@@ -94,6 +95,12 @@ private data class CliConfirmation(val title:String,val body:String,val action:(
             Column(verticalArrangement=Arrangement.spacedBy(4.dp)){listOf("bash","zsh","fish","powershell","elvish").forEach{value->FilterChip(shell==value,{shell=value},label={Text(value)},enabled=idle)}}
             TextButton(onClick={host.cli.maintain(OriginalCliCommands.completion(shell))},enabled=idle){Text("生成终端补全脚本")}
         }
+        item{Text("受限项目命令",style=MaterialTheme.typography.titleMedium)
+            Text("条件式内核限制，仅在Landlock ABI6、系统策略和seccomp均允许时执行；不支持便拒绝，不切换为普通执行。只允许当前项目写入，系统和随包程序只读，网络被禁止。该入口尚未真机验收，普通模型任务并未因此获得沙箱。",style=MaterialTheme.typography.bodySmall)
+            TextButton(onClick={host.cli.maintain(OriginalCliCommands.sandboxProbe())},enabled=idle){Text("查询内核能力（不执行命令）")}
+            OutlinedTextField(sandboxCommand,{sandboxCommand=it},label={Text("在当前项目执行的命令")},enabled=idle,modifier=Modifier.fillMaxWidth())
+            TextButton(onClick={val command=sandboxCommand;confirmation=CliConfirmation("在受限执行入口运行？","项目：${host.commandWorkspace()}\n命令：$command\n会修改项目；网络不可用，Node/Python完整运行库暂未挂载。内核拒绝时不会执行普通替代命令。"){host.cli.maintain(OriginalCliCommands.sandbox(command))}},enabled=idle && sandboxCommand.isNotBlank()){Text("确认后受限执行")}
+        }
         item{Text("命令策略检查",style=MaterialTheme.typography.titleMedium);Text("只按规则评估参数，不执行这条命令。规则文件使用当前项目相对路径。",style=MaterialTheme.typography.bodySmall)
             OutlinedTextField(rules,{rules=it},label={Text("规则文件路径数组（JSON）")},enabled=idle,modifier=Modifier.fillMaxWidth())
             OutlinedTextField(command,{command=it},label={Text("命令参数数组（JSON）")},enabled=idle,modifier=Modifier.fillMaxWidth())
@@ -114,12 +121,23 @@ private data class CliConfirmation(val title:String,val body:String,val action:(
             OutlinedTextField(debugPrompt,{debugPrompt=it},label={Text("输入诊断提示或测试消息")},enabled=idle,modifier=Modifier.fillMaxWidth(),minLines=2)
             OutlinedTextField(images,{images=it},label={Text("项目图片路径数组（JSON，可选）")},enabled=idle,modifier=Modifier.fillMaxWidth())
             TextButton(onClick={action{val paths=Json.parseToJsonElement(images).jsonArray.map{require(it is JsonPrimitive && it.isString);it.jsonPrimitive.content};host.cli.maintain(OriginalCliCommands.promptInput(debugPrompt,paths))}},enabled=idle){Text("按原版配置查看输入")}
-            Text("原版send-message-v2测试客户端会另起核心子进程；其独立凭证授权尚未对齐，暂不能从此页发送。可返回工作区，通过正常核心连接发送诊断消息。",style=MaterialTheme.typography.bodySmall)
+            TextButton(onClick={val message=debugPrompt;confirmation=CliConfirmation("运行原版协议诊断并使用模型额度？","将启动专用核心发送：\n$message\n原版测试客户端会自动批准命令和文件修改；以本应用权限执行，没有项目沙箱。请只对已备份的可信项目使用。结束或取消将关闭本次专用核心。"){host.cli.maintain(OriginalCliCommands.debugMessage(message))}},enabled=idle && debugPrompt.isNotBlank()){Text("运行原版发送诊断")}
             OutlinedTextField(trace,{trace=it},label={Text("项目中的跟踪包目录")},enabled=idle,modifier=Modifier.fillMaxWidth())
             TextButton(onClick={action{val t=trace;OriginalCliCommands.traceReduce(t);confirmation=CliConfirmation("归约跟踪包？","输入：$t\n归约文件写入新导出目录。"){host.cli.maintain(OriginalCliCommands.traceReduce(t))}}},enabled=idle && trace.isNotBlank()){Text("归约跟踪包")}
             TextButton(onClick={confirmation=CliConfirmation("清除全部原版本地记忆？","将删除当前原版账号数据目录下的本地记忆状态，无法撤销；请先备份需要保留的内容。"){host.cli.maintain(OriginalCliCommands.clearMemories())}},enabled=idle){Text("清除原版本地记忆")}
             state.artifact?.let{path->SelectionContainer{Text("导出目录：$path")};TextButton(onClick={exportSource=path;exportLauncher.launch("codex-protocol.zip")},enabled=idle){Text("导出文件到系统目录")}}
             exportMessage?.let{Text(it)}
+        }
+        state.doctor?.let{report->
+            item{Text("诊断报告 · ${report.generatedAt}",style=MaterialTheme.typography.titleMedium);Text("原版版本：${report.version}；以下保留实际状态，未自动修复。")}
+            items(report.checks,key={"doctor:"+it.id}){check->
+                var expanded by remember(check.raw){mutableStateOf(false)}
+                OutlinedCard{Column(Modifier.fillMaxWidth().padding(16.dp),verticalArrangement=Arrangement.spacedBy(8.dp)){
+                    Text("${check.title} · ${check.statusLabel}",style=MaterialTheme.typography.titleMedium);Text(check.explanation,style=MaterialTheme.typography.bodySmall)
+                    TextButton(onClick={expanded=!expanded}){Text(if(expanded)"收起原版明细"else"查看原版说明与修复建议")}
+                    if(expanded)SelectionContainer{Text(check.raw.toString(),style=MaterialTheme.typography.bodySmall)}
+                }}
+            }
         }
         if(state.output.isNotEmpty())item{Text("命令返回（最多显示65536字符）",style=MaterialTheme.typography.titleMedium);SelectionContainer{Text(state.output,style=MaterialTheme.typography.bodySmall)}}
     }

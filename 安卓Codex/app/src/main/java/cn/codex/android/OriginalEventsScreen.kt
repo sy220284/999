@@ -61,14 +61,14 @@ private fun roleLabel(role: String) = when(role) { "assistant" -> "Codex";"user"
 @Composable fun OriginalDynamicToolDialog(host: OriginalCoreHost, request: ServerMessage.Request) {
     val state by host.state.collectAsState()
     val p = request.params as? JsonObject ?: buildJsonObject {}
-    val supported = p.toString().length <= 8192 && p.string("tool") in setOf("android_project_read","android_project_list") && (p["namespace"] == null || p["namespace"] == JsonNull)
+    val supported = host.androidToolRoot(request)!=null && p.toString().length <= 8192 && p.string("tool") in setOf("android_project_read","android_project_list") && (p["namespace"] == null || p["namespace"] == JsonNull)
     fun decline() { host.answer(request, OriginalAndroidTools.response(false,"用户拒绝此次工具调用")) }
     AlertDialog(onDismissRequest = { if(!state.toolBusy)decline() },title = { Text("允许手机读取项目？") },text = {
         Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
             Text("会话：${p.string("threadId")}\n工具：${p.string("tool")}")
             Text("参数：${p["arguments"].toString().take(8192)}")
             if(p.toString().length > 8192)Text("请求过长，无法完整核对，请拒绝后缩小范围。",color = MaterialTheme.colorScheme.error)
-            Text("读取根目录：${host.commandWorkspace()}\n读取结果会返回模型。每次调用单独确认。",style = MaterialTheme.typography.bodySmall)
+            Text("读取根目录：${host.androidToolRoot(request).orEmpty()}\n读取结果会返回模型。每次调用单独确认。",style = MaterialTheme.typography.bodySmall)
             if(!supported)Text("此工具没有注册本机执行器，可拒绝后继续。",color = MaterialTheme.colorScheme.error)
             if(state.toolBusy)LinearProgressIndicator(Modifier.fillMaxWidth())
         }

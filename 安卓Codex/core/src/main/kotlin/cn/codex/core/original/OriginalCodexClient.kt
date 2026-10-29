@@ -28,7 +28,7 @@ class OriginalCodexClient(val connection: AppServerConnection) {
         put("threadId", threadId); put("limit", 100); put("sortDirection", "desc"); cursor?.let { put("cursor", it) }
     })
     suspend fun read(threadId: String, includeTurns: Boolean = true) = call("thread/read", buildJsonObject { put("threadId", threadId); put("includeTurns", includeTurns) })
-    suspend fun fork(threadId: String) = call("thread/fork", buildJsonObject { put("threadId", threadId) })
+    suspend fun fork(threadId: String,cwd:String?=null) = call("thread/fork", buildJsonObject { put("threadId", threadId);cwd?.let{put("cwd",it)} })
     suspend fun archive(threadId: String, archived: Boolean) = call(if (archived) "thread/archive" else "thread/unarchive", id(threadId))
     suspend fun rename(threadId: String, title: String) = call("thread/name/set", buildJsonObject { put("threadId", threadId); put("name", title) })
     suspend fun compact(threadId: String) = call("thread/compact/start", id(threadId))

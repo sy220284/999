@@ -35,4 +35,11 @@ class NativeEndpointPlansTest {
         assertFalse(model.finish("old"));assertFalse(model.ready("old"));assertTrue(model.ready("new"));assertTrue(model.running)
         assertTrue(model.finish("new"));assertFalse(model.running)
     }
+    @Test fun disabledRemoteControlUsesTheOriginalScopedEnvironmentContract(){
+        val plan=NativeEndpointPlans.daemon("a".repeat(64),0,false,true)
+        assertEquals("1",plan.environment["CODEX_INTERNAL_APP_SERVER_REMOTE_CONTROL_DISABLED"])
+        assertFalse("--remote-control-disabled" in plan.arguments)
+        assertFailsWith<IllegalArgumentException>{NativeEndpointPlans.daemon("a".repeat(64),0,true,true)}
+    }
+
 }

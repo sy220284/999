@@ -9,12 +9,12 @@ data class OriginalCliResult(val exitCode:Int,val output:String,val artifact:Str
 /** 每次命令拥有自己的进程、凭证桥与退出状态；不经过shell，不自动重放。 */
 class OriginalCliRunner(private val context:Context,private val scope:CoroutineScope,private val workspace:File,private val home:File) {
     suspend fun execute(plan:OriginalCliPlan):OriginalCliResult=withContext(Dispatchers.IO){
-        check(plan.arguments.take(2)!=listOf("debug","app-server")){"原版调试客户端会另起核心子进程，其独立凭证授权尚未对齐；请使用工作区发送诊断消息"}
+        if(plan.arguments.firstOrNull()=="android-sandbox")return@withContext AndroidSandboxRunner(context,workspace).execute(plan.arguments)
         val binary=File(context.applicationInfo.nativeLibraryDir,"libcodex_cli.so")
         check(binary.isFile && binary.canExecute()){ "当前包没有原版CLI，请先生成并随包安装对应ABI产物" }
         val environment=System.getenv().toMutableMap()
         environment.putAll(AndroidLanguageRuntime.prepare(context));environment.putAll(AndroidToolPaths.environment(context))
-        val vault=OriginalVaultServer(context,scope);var process:NativeCoreProcess?=null;var expected:File?=null
+        val vault=OriginalVaultServer(context,scope);var process:NativeCoreProcess?=null;var expected:File?=null;var debug:AndroidDebugCore?=null
         try{
             val arguments=mutableListOf("-c","cli_auth_credentials_store=\"keyring\"","-c","mcp_oauth_credentials_store=\"keyring\"")
             var artifact:File?=null
@@ -54,6 +54,10 @@ class OriginalCliRunner(private val context:Context,private val scope:CoroutineS
             environment["PATH"]=(context.applicationContext as CodexApplication).toolPath
             environment["CODEX_ANDROID_VAULT_SOCKET"]=vault.path;environment["CODEX_ANDROID_VAULT_HOST_PID"]=android.os.Process.myPid().toString()
             for(key in listOf("OPENAI_API_KEY","CODEX_API_KEY","CODEX_ANDROID_API_KEY","CODEX_ANDROID_VERIFICATION_SOCKET","CODEX_ANDROID_DAEMON_PARENT_STDIN","CODEX_ANDROID_DAEMON_RECEIPT"))environment.remove(key)
+            environment.remove("CODEX_ANDROID_DEBUG_CONNECTION_FILE")
+            if(plan.arguments.take(3)==listOf("debug","app-server","send-message-v2")){
+                val helper=AndroidDebugCore(context,scope,workspace,home).also{debug=it};helper.start();environment.putAll(helper.environment)
+            }
             val child=NativeCoreProcess(binary,arguments,environment,workspace).also{process=it};vault.authorize(child.pid)
             coroutineScope{
                 val stdout=async(Dispatchers.IO){
@@ -69,6 +73,6 @@ class OriginalCliRunner(private val context:Context,private val scope:CoroutineS
                     }
                 }finally{withContext(NonCancellable+Dispatchers.IO){child.close()}}
             }
-        }finally{withContext(NonCancellable+Dispatchers.IO){process?.close();vault.close();expected?.delete()}}
+        }finally{withContext(NonCancellable+Dispatchers.IO){process?.close();debug?.close();vault.close();expected?.delete()}}
     }
 }

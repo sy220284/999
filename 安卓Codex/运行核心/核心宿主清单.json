@@ -470,6 +470,94 @@
         {
           "path": "codex-rs/tui/src/app/agents_overview_discovery.rs",
           "sha256": "c8a4d2765955a88a4a32dcfe864303241d3f89960c19b41903affe500fba5428"
+        },
+        {
+          "path": "codex-rs/app-server-test-client/src/lib.rs",
+          "sha256": "b6006b701fc200d9eb7934d148f1c309b96a65fbff022ce5fe91323736f6c335"
+        },
+        {
+          "path": "codex-rs/exec-server/src/remote.rs",
+          "sha256": "9cf1fc158e4ebf882ffb195573a986496ee9e25ce50bcc922953ad48833679e8"
+        },
+        {
+          "path": "codex-rs/exec-server/src/remote/direct.rs",
+          "sha256": "6c7a67a5501e74425b4293369c461a1f380e05b8f56723b3c2a21cbbb3954d66"
+        },
+        {
+          "path": "codex-rs/cli/src/exec_server_credential.rs",
+          "sha256": "7b377cb7aaca4465b7dbbace5f4b6ff2162420a28198cb4e6a82677d103fbfc9"
+        },
+        {
+          "path": "codex-rs/app-server-transport/src/transport/unix_socket.rs",
+          "sha256": "a2ff08a28cb52c8a11895bb4cff41401180fb0efd0491984b77af381e7efafe3"
+        },
+        {
+          "path": "codex-rs/app-server/src/request_processors/remote_control_processor.rs",
+          "sha256": "34a891caca1c163d253ba8cfafaed490e5ee63467c956e075e07443eaae459d0"
+        },
+        {
+          "path": "codex-rs/app-server-transport/src/transport/remote_control/mod.rs",
+          "sha256": "07146b098b5bd854d43673f343a237c3ec185d78f1e92409a173600a61cdd359"
+        },
+        {
+          "path": "codex-rs/login/src/auth/manager.rs",
+          "sha256": "9b24dcf505b09800ec9169aeee521f0c362b4ffa62fb20421e09d6a2ab73558e"
+        },
+        {
+          "path": "codex-rs/app-server/src/external_auth.rs",
+          "sha256": "06c20470609d680b0dcc17cc054bbff035b8db76f1afe32b6149492888db9227"
+        },
+        {
+          "path": "codex-rs/app-server/src/attestation.rs",
+          "sha256": "28f9776283803b3a691f3f5736df6df060b77f6dfe22002b38c4df2056a229ef"
+        }
+      ]
+    },
+    {
+      "name": "android-worktree",
+      "package": "固定codex-worktree + Android薄入口",
+      "binary": "codex-android-worktree",
+      "androidInstall": "nativeLibraryDir/libcodex_worktree.so",
+      "status": "源码接入，未构建/运行",
+      "ipc": "有限参数数组；原版分配/元数据/绑定/保守清理，未知结果保留目录",
+      "abi": [
+        "arm64-v8a",
+        "x86_64"
+      ],
+      "refs": [
+        {
+          "path": "codex-rs/worktree/src/lib.rs",
+          "sha256": "5dfcf53cec2ec258a81959a0907fcf47d609e934ac8ae36e91f144c870e74aa4"
+        },
+        {
+          "path": "codex-rs/worktree/src/settings.rs",
+          "sha256": "a0f081cdc35d96191e40c442f04e7907e5c528ee8a212a07bd7d56dfae901890"
+        },
+        {
+          "path": "codex-rs/worktree/src/git.rs",
+          "sha256": "631acdbf12cb9b2dc36829308f28f82bd9eabea84430582fa6b7245e186398d6"
+        }
+      ]
+    },
+    {
+      "name": "android-project-sandbox",
+      "package": "Android条件式Landlock/seccomp适配，非原版Linux沙箱二进制",
+      "binary": "android_project_sandbox.c",
+      "androidInstall": "nativeLibraryDir/libcodex_sandbox.so",
+      "status": "源码接入，未构建/内核验证；普通模型未接入",
+      "ipc": "ABI6/规则全部建立后才exec；失败无普通执行替代，仅专用命令入口",
+      "abi": [
+        "arm64-v8a",
+        "x86_64"
+      ],
+      "kernel_sources": [
+        "https://docs.kernel.org/userspace-api/landlock.html",
+        "https://docs.kernel.org/userspace-api/seccomp_filter.html"
+      ],
+      "refs": [
+        {
+          "path": "codex-rs/cli/src/main.rs",
+          "sha256": "ac51c153916132c0be2c37ea1136562685b832957bc2e43e53d71608d0b28a4a"
         }
       ]
     }

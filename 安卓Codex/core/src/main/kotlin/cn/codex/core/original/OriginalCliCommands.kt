@@ -4,6 +4,8 @@ package cn.codex.core.original
 data class OriginalCliPlan(val title:String,val arguments:List<String>,val mutating:Boolean=false,val input:String="",val expectedDiff:String?=null,val timeoutMs:Long=120_000)
 object OriginalCliCommands {
     private fun identity(value:String):String{require(value.isNotBlank() && !value.startsWith('-') && value.length<=8192 && value.none{it=='\u0000' || it=='\n' || it=='\r'}){"标识不能为空、过长或包含控制字符/选项前缀"};return value}
+    fun sandboxProbe()=OriginalCliPlan("读取受限执行内核能力",listOf("android-sandbox","probe"))
+    fun sandbox(command:String):OriginalCliPlan{require(command.isNotBlank() && command.toByteArray().size<=65536 && '\u0000' !in command);return OriginalCliPlan("运行受限项目命令",listOf("android-sandbox","run",command),true)}
     fun cloudEnvironments()=OriginalCliPlan("读取可用云端环境",listOf("cloud","environments"))
     fun cloudList(environment:String?,cursor:String?=null)=OriginalCliPlan("读取云任务",buildList{addAll(listOf("cloud","list","--json","--limit","20"));environment?.takeIf{it.isNotBlank()}?.let{addAll(listOf("--env",identity(it)))};cursor?.let{addAll(listOf("--cursor",identity(it)))}})
     fun cloudCreate(environment:String,prompt:String,branch:String?,attempts:Int):OriginalCliPlan {

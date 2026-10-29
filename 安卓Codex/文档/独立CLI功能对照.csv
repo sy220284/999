@@ -1,5 +1,5 @@
 variant,status,detail,source,validation
-Agents,部分业务路径,共享核心已加载任务/交互及执行来源历史分页、子代理/父会话/状态和切换；原CLI全部置顶/工作树/停止等总览动作仍未逐项等价,codex-rs/cli/src/main.rs,未运行验证；业务替代不代表CLI逐参数兼容
+Agents,部分业务路径,总览来源/分页/状态、改名/置顶/分叉/隐藏/归档/删除/指定回合核查停止/用量；原版工作树库创建绑定与切换、关联文件根同步及核查清理；完整TUI分组/置顶发现排序/设置继承等仍需对齐,codex-rs/cli/src/main.rs,未运行验证；业务替代不代表CLI逐参数兼容
 TcpTunnel,业务路径已有源码,原版HTTP/3 CONNECT前台服务；精确批准来源/目标、元数据和stdin凭证、真实LISTENING就绪、AUTH_UPDATED更新及独立停止；本机其他应用可使用监听端口,codex-rs/cli/src/main.rs,未运行验证；业务替代不代表CLI逐参数兼容
 Exec,业务路径已有源码,原版任务/回合发送与独立命令，未交付原CLI的全部参数/JSON退出语义,codex-rs/cli/src/main.rs,未运行验证；业务替代不代表CLI逐参数兼容
 Review,业务路径已有源码,审查页及review/start,codex-rs/cli/src/main.rs,未运行验证；业务替代不代表CLI逐参数兼容
@@ -7,14 +7,14 @@ Login,业务路径已有源码,账号登录页及核心登录,codex-rs/cli/src/m
 Logout,业务路径已有源码,核心退出登录,codex-rs/cli/src/main.rs,未运行验证；业务替代不代表CLI逐参数兼容
 Mcp,业务路径已有源码,MCP配置/工具/资源/OAuth管理,codex-rs/cli/src/main.rs,未运行验证；业务替代不代表CLI逐参数兼容
 Plugin,业务路径已有源码,市场/插件安装和配置,codex-rs/cli/src/main.rs,未运行验证；业务替代不代表CLI逐参数兼容
-AppServer,部分业务路径,原版stdio与手机前台共享WebSocket核心；能力密钥/就绪PID/主界面连接/停止与按设置重启；TS/JSON/内部Schema导出ZIP；桌面bootstrap/Unix控制代理/包托管并未等价移植,codex-rs/cli/src/main.rs,未运行验证；业务替代不代表CLI逐参数兼容
-RemoteControl,部分业务路径,已有配置/配对/撤销；前台共享核心启用本次remote-control及重启；桌面守护包托管和未来启动持久管理语义未等价,codex-rs/cli/src/main.rs,未运行验证；业务替代不代表CLI逐参数兼容
+AppServer,部分业务路径,stdio、前台共享WS或私有Unix核心与原版app-server proxy，确切PID就绪、停止/重启、协议ZIP导出；桌面托管/自启/包钉选不适用，版本/Prettier等管理子项仍待补齐,codex-rs/cli/src/main.rs,未运行验证；业务替代不代表CLI逐参数兼容
+RemoteControl,业务路径已有源码,本次/持久启停、配对/撤销；读取原版settings.json供下一次主动启动使用，禁用走原版内部环境标记并在启动时消费；桌面自启/包托管由手机前台生命周期与签名APK替代,codex-rs/cli/src/main.rs,未运行验证；业务替代不代表CLI逐参数兼容
 App,桌面专用,原版只在macOS/Windows编译桌面启动器,codex-rs/cli/src/main.rs,未运行验证；业务替代不代表CLI逐参数兼容
 Completion,业务路径已有源码,五种shell补全脚本生成与查看,codex-rs/cli/src/main.rs,未运行验证；业务替代不代表CLI逐参数兼容
 Update,业务路径已有源码,固定999正式发布/摘要APK下载与本地导入；包名/较新版本/同当前签名/ABI核心/系统要求复核→用户打开系统安装器；暂无构建/发布或安装结果，证书轮换与拆分包未支持,codex-rs/cli/src/main.rs,未运行验证；业务替代不代表CLI逐参数兼容
-Doctor,部分业务路径,原版JSON/人类摘要/全条目/ASCII/无色/反馈采集选项；源码平台检查的安卓解释及实际结果仍需核对；隐藏文件系统探针保留内部用途,codex-rs/cli/src/main.rs,未运行验证；业务替代不代表CLI逐参数兼容
-Sandbox,未提供独立路径,没有桌面等价项目执行沙箱,codex-rs/cli/src/main.rs,未运行验证；业务替代不代表CLI逐参数兼容
-Debug,部分业务路径,原版models内置/刷新、prompt-input及图片、trace-reduce独立产物、clear-memories确认已有入口；send-message-v2另起子核心的确切PID凭证授权未对齐，入口阻止执行并说明,codex-rs/cli/src/main.rs,未运行验证；业务替代不代表CLI逐参数兼容
+Doctor,业务路径已有源码,JSON及人类显示选项、25类原始检查ID中文解释；实际失败/未知状态保留，非零退出也展示脱敏报告；不自动修复，不把桌面检查当手机已通过,codex-rs/cli/src/main.rs,未运行验证；业务替代不代表CLI逐参数兼容
+Sandbox,部分业务路径,新增条件式Landlock ABI6与seccomp项目命令：建立失败拒绝执行、项目写/系统程序读/禁网络及跨域信号/子进程继承；未构建/内核验证，普通模型任务仍同UID，未等价全部桌面沙箱,codex-rs/cli/src/main.rs,未运行验证；业务替代不代表CLI逐参数兼容
+Debug,业务路径已有源码,models/prompt-input/trace-reduce/clear-memories与原版send-message-v2；宿主直接持有专用核心并分别授权确切PID，原版测试客户端通过私有能力文件连接，取消回收；测试客户端自动批准工具必须明确确认,codex-rs/cli/src/main.rs,未运行验证；业务替代不代表CLI逐参数兼容
 Execpolicy,业务路径已有源码,项目规则文件/参数数组/主机名解析评估，不执行被检查命令,codex-rs/cli/src/main.rs,未运行验证；业务替代不代表CLI逐参数兼容
 Apply,业务路径已有源码,原版apply最新代理差异预览→冻结完整字节/SHA256→再次读取逐字节复核后真正应用；独立于cloud尝试编号,codex-rs/cli/src/main.rs,未运行验证；业务替代不代表CLI逐参数兼容
 Resume,业务路径已有源码,会话恢复,codex-rs/cli/src/main.rs,未运行验证；业务替代不代表CLI逐参数兼容
@@ -28,5 +28,5 @@ Fork,业务路径已有源码,会话分叉,codex-rs/cli/src/main.rs,未运行验
 Cloud,业务路径已有源码,环境发现/分页、exec/status/list/diff/apply专用页面与固定CLI；应用前校对已批准差异,codex-rs/cli/src/main.rs,未运行验证；业务替代不代表CLI逐参数兼容
 ResponsesApiProxy,业务路径已有源码,原版Responses代理前台服务；上游密钥管道、本机随机独立能力密钥、Origin拒绝/恒时比较、16MiB请求上限、PID就绪凭据及退出回收,codex-rs/cli/src/main.rs,未运行验证；业务替代不代表CLI逐参数兼容
 StdioToUds,业务路径已有源码,MCP配置新增本机Unix服务，固定CLI中继按参数数组连接socket，由原版MCP托管协议/生命周期,codex-rs/cli/src/main.rs,未运行验证；业务替代不代表CLI逐参数兼容
-ExecServer,部分业务路径,原版仅本机WebSocket能力密钥监听、实际地址/就绪/父stdin寿命/停止；远程Noise/Direct与云身份认证管理未完整移植,codex-rs/cli/src/main.rs,未运行验证；业务替代不代表CLI逐参数兼容
+ExecServer,部分业务路径,本机能力认证服务及远程Noise/Direct注册；原版账号/Agent Identity/AWS SigV4/作用域stdin凭证、真实连接事件和顺序更新确认；forward分支及全部远端/Android沙箱策略仍待核查,codex-rs/cli/src/main.rs,未运行验证；业务替代不代表CLI逐参数兼容
 Features,业务路径已有源码,实验功能读取/设置,codex-rs/cli/src/main.rs,未运行验证；业务替代不代表CLI逐参数兼容

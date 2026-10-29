@@ -1,0 +1,21 @@
+{
+  "source_commit": "970111f6cb62cc02fe36a82ea7d71b37a2889c97",
+  "patch_sha256": "3a582ff85d54f8bdf876e7038f9549166db0104265316ca6ff57f7468e3fc2e8",
+  "files": [
+    {
+      "path": "codex-rs/exec-server/src/remote.rs",
+      "before": "9cf1fc158e4ebf882ffb195573a986496ee9e25ce50bcc922953ad48833679e8",
+      "after": "b0c44bff4a1533c380b4dac1ce8088bde7ce30bfe201ac9874a922fc0861b6fa"
+    },
+    {
+      "path": "codex-rs/exec-server/src/remote/direct.rs",
+      "before": "6c7a67a5501e74425b4293369c461a1f380e05b8f56723b3c2a21cbbb3954d66",
+      "after": "a2644c4fe16ab7ea102f7fe4ef091cb0f22d6090306f05064814eaab802e5e85"
+    },
+    {
+      "path": "codex-rs/cli/src/exec_server_credential.rs",
+      "before": "7b377cb7aaca4465b7dbbace5f4b6ff2162420a28198cb4e6a82677d103fbfc9",
+      "after": "08e740e60523607b556f45dca768b5a0f14ba148e611b6c1b39f6e9e8079f900"
+    }
+  ]
+}

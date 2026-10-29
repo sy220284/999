@@ -2,8 +2,8 @@ package cn.codex.core.original
 import java.net.URI
 import java.util.Locale
 import kotlinx.serialization.json.*
-enum class NativeEndpointKind(val title:String){PROXY("本机模型代理"),TUNNEL("HTTP/3连接隧道"),EXECUTOR("本机执行服务"),DAEMON("共享核心服务")}
-data class NativeEndpointPlan(val kind:NativeEndpointKind,val arguments:List<String>)
+enum class NativeEndpointKind(val title:String){PROXY("本机模型代理"),TUNNEL("HTTP/3连接隧道"),EXECUTOR("本机执行服务"),DAEMON("共享核心服务"),REMOTE_EXECUTOR("远程执行注册")}
+data class NativeEndpointPlan(val kind:NativeEndpointKind,val arguments:List<String>,val environment:Map<String,String> = emptyMap())
 /** 身份贯穿启动/就绪/停止，晚到事件不能复活或覆盖另一轮服务。 */
 class NativeEndpointGeneration {
     private var id:String?=null
@@ -36,7 +36,12 @@ object NativeEndpointPlans {
         return NativeEndpointPlan(NativeEndpointKind.TUNNEL,listOf("tcp-tunnel","--proxy-url",trusted,"--proxy-origins-file",origins,"--target",target,"--listen-addr","127.0.0.1:$listen","--auth-token-stdin","--auth-token-updates-stdin","--connect-headers-stdin","--diagnostics-json"))
     }
     fun executor(tokenHash:String,listen:Int):NativeEndpointPlan{port(listen);require(tokenHash.matches(Regex("[a-f0-9]{64}")));return NativeEndpointPlan(NativeEndpointKind.EXECUTOR,listOf("exec-server","--listen","ws://127.0.0.1:$listen","--ws-auth","capability-token","--ws-token-sha256",tokenHash,"--exit-on-stdin-close"))}
-    fun daemon(tokenHash:String,listen:Int,remote:Boolean):NativeEndpointPlan{port(listen);require(tokenHash.matches(Regex("[a-f0-9]{64}")));return NativeEndpointPlan(NativeEndpointKind.DAEMON,listOf("app-server","--listen","ws://127.0.0.1:$listen","--ws-auth","capability-token","--ws-token-sha256",tokenHash,"--managed-daemon")+if(remote)listOf("--remote-control")else emptyList())}
+    fun daemon(tokenHash:String,listen:Int,remote:Boolean,disable:Boolean=false):NativeEndpointPlan{require(!remote || !disable);port(listen);require(tokenHash.matches(Regex("[a-f0-9]{64}")));return NativeEndpointPlan(NativeEndpointKind.DAEMON,listOf("app-server","--listen","ws://127.0.0.1:$listen","--ws-auth","capability-token","--ws-token-sha256",tokenHash,"--managed-daemon")+(if(remote)listOf("--remote-control")else emptyList()),if(disable)mapOf("CODEX_INTERNAL_APP_SERVER_REMOTE_CONTROL_DISABLED" to "1")else emptyMap())}
+    fun unixDaemon(socket:String,remote:Boolean,disable:Boolean=false):NativeEndpointPlan{
+        require(socket.startsWith('/') && socket.toByteArray().size<108 && socket.none{it=='\u0000' || it=='\n' || it=='\r'} && (!remote || !disable))
+        return NativeEndpointPlan(NativeEndpointKind.DAEMON,listOf("app-server","--listen","unix://$socket","--managed-daemon")+(if(remote)listOf("--remote-control")else emptyList()),if(disable)mapOf("CODEX_INTERNAL_APP_SERVER_REMOTE_CONTROL_DISABLED" to "1")else emptyMap())
+    }
+    fun unixProxy(socket:String):List<String>{require(socket.startsWith('/') && socket.toByteArray().size<108 && '\u0000' !in socket);return listOf("app-server","proxy","--sock",socket)}
     fun readyLine(kind:NativeEndpointKind,line:String):String?{
         if(kind !in setOf(NativeEndpointKind.TUNNEL,NativeEndpointKind.EXECUTOR))return null
         val raw=if(kind==NativeEndpointKind.TUNNEL)line.takeIf{it.startsWith("LISTENING ")}?.removePrefix("LISTENING ")else line.takeIf{it.startsWith("ws://")}
