@@ -19,6 +19,12 @@ import androidx.compose.ui.unit.dp
 import cn.codex.core.*
 import cn.codex.core.original.*
 import kotlinx.serialization.json.*
+import kotlinx.coroutines.*
+
+internal class OriginalRequestKey(private val request:ServerMessage.Request) {
+    override fun equals(other:Any?)=other is OriginalRequestKey && request===other.request
+    override fun hashCode()=System.identityHashCode(request)
+}
 
 @Composable fun OriginalCoreScreen(host: OriginalCoreHost) {
     val state by host.state.collectAsState()
@@ -30,6 +36,7 @@ import kotlinx.serialization.json.*
     val servicesStatus by host.services.operations.state.collectAsState()
     val migrationStatus by host.migration.operations.state.collectAsState()
     val queueStatus by host.queue.operations.state.collectAsState()
+    val cliStatus by host.cli.state.collectAsState()
     val sshStatus by host.sshTrust.state.collectAsState()
     val projectsStatus by host.projects.operations.state.collectAsState()
     val historyStatus by host.history.operations.state.collectAsState()
@@ -37,7 +44,7 @@ import kotlinx.serialization.json.*
     val connectionsStatus by host.connections.operations.state.collectAsState()
     val searchStatus by host.search.state.collectAsState()
     val realtimeStatus by host.realtime.state.collectAsState()
-    val managedBusy = sshStatus.working || projectsStatus.mutating || historyStatus.mutating || advancedStatus.mutating || connectionsStatus.mutating || queueStatus.busy || realtimeStatus.running || libraryStatus.mutating || servicesStatus.mutating || migrationStatus.mutating
+    val managedBusy = cliStatus.busy || sshStatus.working || projectsStatus.mutating || historyStatus.mutating || advancedStatus.mutating || connectionsStatus.mutating || queueStatus.busy || realtimeStatus.running || libraryStatus.mutating || servicesStatus.mutating || migrationStatus.mutating
     val configurationRecords by host.configurationJournal.records.collectAsState()
     val configurationReadError by host.configurationJournal.readError.collectAsState()
     val activeConfiguration by host.configurationJournal.active.collectAsState()
@@ -61,7 +68,7 @@ import kotlinx.serialization.json.*
     var draft by remember { mutableStateOf("") }
     var renamed by remember { mutableStateOf<String?>(null) }
     val context = LocalContext.current
-    state.requests.firstOrNull()?.let { request -> key(state.connectionEpoch, request.id) { if(request.method == "item/tool/call") OriginalDynamicToolDialog(host,request) else OriginalRequestDialog(request, state.items, { host.answer(request, it) },onVerify={host.verifyElicitation(request)},verifying=state.verifyingElicitation===request,verificationError=state.verificationError) } }
+    state.requests.firstOrNull()?.let { request -> key(state.connectionEpoch, OriginalRequestKey(request)) { if(request.method == "item/tool/call") OriginalDynamicToolDialog(host,request) else OriginalRequestDialog(request, state.items, { host.answer(request, it) },onVerify={host.verifyElicitation(request)},verifying=state.verifyingElicitation===request,verificationError=state.verificationError) } }
     OriginalSkillPreview(host.extensions)
     if (state.agent != null) {
         val agent = state.agent!!
@@ -79,6 +86,7 @@ import kotlinx.serialization.json.*
     advancedManager?.let { page ->
         val allow = !state.working && state.turnId == null && !state.loading && !extensionState.mutating && !mcpState.mutating && !settingsState.mutating && !filesState.mutating && !fullTerminalState.running && !networkGit.running && !commandState.running && !managedBusy
         when (page) {
+            "云任务与本机维护" -> OriginalCliScreen(host) { advancedManager = null }
             "SSH主机校验" -> OriginalSshScreen(host.sshTrust,java.io.File(AndroidSshTrust.directory(LocalContext.current),"id_ed25519").absolutePath,allow) { advancedManager = null }
             "项目管理" -> OriginalProjectsScreen(host) { advancedManager = null }
             "搜索与会话记录" -> OriginalHistoryScreen(host,onOpen={id->host.openThread(id);advancedManager=null}) { advancedManager = null }
@@ -130,9 +138,10 @@ import kotlinx.serialization.json.*
                     }
                 }
             }
+            item { OutlinedButton(onClick={advancedManager="云任务与本机维护"},enabled=!state.loading && !state.closing){Text("云任务与本机维护")} }
             if (!state.connected) item {
                 Text("此入口使用随应用安装的原版核心，连接原版会话与账号。缺少运行核心时会提示具体原因。", style = MaterialTheme.typography.bodyMedium)
-                Button(onClick = { consent = true }, enabled = !state.loading && !state.closing) { Text(if (state.loading) "正在启动" else "启动原版核心") }
+                Button(onClick = { consent = true }, enabled = !state.loading && !state.closing && !cliStatus.busy) { Text(if (state.loading) "正在启动" else "启动原版核心") }
             }
             if(queueStatus.error!=null) item {
                 Surface(shape=RoundedCornerShape(14.dp),color=MaterialTheme.colorScheme.errorContainer){Column(Modifier.fillMaxWidth().padding(14.dp)){
@@ -301,14 +310,25 @@ internal fun openOriginalLogin(context: android.content.Context, url: String) {
     val question = request.method == "item/tool/requestUserInput"
     val elicitation = request.method == "mcpServer/elicitation/request"
     val context = LocalContext.current
-    val form = remember(request) { runCatching{(params["requestedSchema"] as? JsonObject)?.let(::ElicitationForm)}.getOrNull() }
-    LaunchedEffect(request, form) { if (elicitation && form != null) answers = form.initialValues }
+    val formScope=rememberCoroutineScope()
+    var preparedForm by remember(request){mutableStateOf<ElicitationForm?>(null)}
+    var formLoading by remember(request){mutableStateOf(params["requestedSchema"] is JsonObject)}
+    var formValidating by remember(request){mutableStateOf(false)}
+    var declined by remember(request){mutableStateOf(false)}
+    var decided by remember(request){mutableStateOf(false)}
+    var validationJob by remember(request){mutableStateOf<Job?>(null)}
+    val form=preparedForm
+    LaunchedEffect(request){
+        val prepared=withContext(Dispatchers.Default){runCatching{(params["requestedSchema"] as? JsonObject)?.let(::ElicitationForm)}.getOrNull()}
+        preparedForm=prepared;formLoading=false
+        if(elicitation && prepared!=null)answers=prepared.initialValues
+    }
     var formError by remember(request) { mutableStateOf("") }
     val reviewedItem = items.firstOrNull { it.id == params.string("itemId") }
     val canReview = if (request.method.contains("fileChange")) reviewedItem?.type == "fileChange" && (reviewedItem.data["changes"] as? JsonArray)?.isNotEmpty() == true && reviewedItem.text.length <= 100_000 else params.string("command").isNotBlank() || reviewedItem?.type == "commandExecution"
     val questions = (params["questions"] as? JsonArray).orEmpty().mapNotNull { it as? JsonObject }
     fun decision(allow: Boolean) = buildJsonObject { put("decision", if (allow) "accept" else "decline") }
-    fun decline() { respond(when { question -> buildJsonObject { put("answers", buildJsonObject {}) }; elicitation -> buildJsonObject { put("action", "decline"); put("content", JsonNull); put("_meta", JsonNull) }; else -> decision(false) }) }
+    fun decline() { if(decided)return;decided=true;declined=true;validationJob?.cancel();respond(when { question -> buildJsonObject { put("answers", buildJsonObject {}) }; elicitation -> buildJsonObject { put("action", "decline"); put("content", JsonNull); put("_meta", JsonNull) }; else -> decision(false) }) }
     AlertDialog(onDismissRequest = ::decline, title = { Text(when { question -> "Codex 需要你的选择"; elicitation -> "工具服务请求信息"; request.method.contains("fileChange") -> "确认文件修改"; else -> "确认执行命令" }) }, text = {
         Column(Modifier.heightIn(max = 480.dp).verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(10.dp)) {
             if (question) questions.forEach { q ->
@@ -330,7 +350,7 @@ internal fun openOriginalLogin(context: android.content.Context, url: String) {
                     Text(params.string("url"), style = MaterialTheme.typography.bodySmall)
                     OutlinedButton(onClick = { openOriginalLogin(context, params.string("url")) }) { Text("打开授权页面") }
                     Text("完成服务页面的授权后，再确认返回工具。", style = MaterialTheme.typography.bodySmall)
-                } else if (form?.supported == true) {
+                } else if(formLoading){LinearProgressIndicator(Modifier.fillMaxWidth());Text("正在准备表单规则…")} else if (form?.supported == true) {
                     if (form.rawInput) OutlinedTextField(answers["__form_json"].orEmpty(), { answers = answers + ("__form_json" to it) }, label = { Text("表单内容（JSON）") }, modifier = Modifier.fillMaxWidth())
                     else form.fields.forEach { field ->
                         Text(field.title + if (field.required) " *" else "")
@@ -347,6 +367,7 @@ internal fun openOriginalLogin(context: android.content.Context, url: String) {
                         } else OutlinedTextField(answers[field.name].orEmpty(), { answers = answers + (field.name to it) }, label = { Text(if (field.type in setOf("json", "object", "array")) "${field.title}（JSON）" else field.title) }, modifier = Modifier.fillMaxWidth())
                     }
                 } else Text("此表单包含无法离线解析的引用或验证规则，可拒绝后继续其他任务。", style = MaterialTheme.typography.bodySmall)
+                if(formValidating){LinearProgressIndicator(Modifier.fillMaxWidth());Text("正在核对填写内容…")}
                 if (formError.isNotBlank()) Text(formError, color = MaterialTheme.colorScheme.error)
             } else {
                 val item = items.firstOrNull { it.id == params.string("itemId") }
@@ -358,13 +379,25 @@ internal fun openOriginalLogin(context: android.content.Context, url: String) {
             }
         }
     }, confirmButton = {
-        if(elicitation && params.string("mode")=="openai/userVerification")TextButton(onClick=onVerify,enabled=!verifying){Text(if(verifying)"正在系统验证" else "验证并同意")}
+        if(elicitation && params.string("mode")=="openai/userVerification")TextButton(onClick=onVerify,enabled=!verifying && !decided){Text(if(verifying)"正在系统验证" else "验证并同意")}
         else if (elicitation && (params.string("mode") == "url" || form?.supported == true)) TextButton(onClick = {
-            runCatching { if (params.string("mode") == "url") JsonNull else requireNotNull(form).content(answers) }
-                .onSuccess { content -> respond(buildJsonObject { put("action", "accept"); put("content", content); put("_meta", JsonNull) }) }
-                .onFailure { formError = it.message ?: "请检查填写内容" }
-        }) { Text(if (params.string("mode") == "url") "已完成授权" else "提交表单") }
+            if(!formValidating && !decided){
+                val snapshot=answers;formValidating=true;formError=""
+                validationJob=formScope.launch{
+                    try{
+                        val content=withContext(Dispatchers.Default){if(params.string("mode")=="url")JsonNull else requireNotNull(form).content(snapshot)}
+                        if(!declined){
+                            check(answers==snapshot){"填写内容已变化，请核对后重新提交"}
+                            decided=true
+                            respond(buildJsonObject{put("action","accept");put("content",content);put("_meta",JsonNull)})
+                        }
+                    }catch(cancelled:CancellationException){throw cancelled}catch(failure:Exception){if(!declined)formError=failure.message ?: "请检查填写内容"}
+                    finally{formValidating=false}
+                }
+            }
+        },enabled=!formValidating && !decided) { Text(if (params.string("mode") == "url") "已完成授权" else "提交表单") }
         else if (!elicitation) TextButton(onClick = {
+            if(!decided){
             val result = if (question) buildJsonObject {
                 put("answers", buildJsonObject {
                     questions.forEach { q ->
@@ -374,8 +407,9 @@ internal fun openOriginalLogin(context: android.content.Context, url: String) {
                     }
                 })
             } else decision(true)
-            respond(result)
-        }, enabled = if (question) questions.all { !answers[it.string("id")].isNullOrBlank() } else canReview) { Text(if (question) "提交回答" else "允许此次操作") }
+            decided=true;respond(result)
+            }
+        }, enabled = !decided && (if (question) questions.all { !answers[it.string("id")].isNullOrBlank() } else canReview)) { Text(if (question) "提交回答" else "允许此次操作") }
     }, dismissButton = { TextButton(onClick = ::decline) { Text(if (question) "暂不回答" else "拒绝") } })
 }
 

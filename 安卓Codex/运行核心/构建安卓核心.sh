@@ -11,8 +11,9 @@ abi="${1:-arm64-v8a}"
 component="${2:-engine}"
 case "$component" in
   engine) package=codex-app-server; program=codex-app-server; library=libcodex_engine.so ;;
+  cli) package=codex-cli; program=codex; library=libcodex_cli.so ;;
   code-mode) package=codex-code-mode-host; program=codex-code-mode-host; library=libcodex_code_mode_host.so ;;
-  *) echo '第二参数支持 engine 或 code-mode；code-mode 需要真实 Android V8 工具链，不能用空库替代。' >&2; exit 2 ;;
+  *) echo '第二参数支持 engine、cli 或 code-mode；code-mode 需要真实 Android V8 工具链，不能用空库替代。' >&2; exit 2 ;;
 esac
 case "$abi" in
   arm64-v8a) target=aarch64-linux-android; cc=aarch64-linux-android35-clang ;;
@@ -72,6 +73,7 @@ if [[ -f "$source_root/codex-rs/user-verification/src/platform_android.rs" ]] &&
   exit 2
 fi
 install -m 644 "$script_dir/补充源码/android_user_verification.rs" "$source_root/codex-rs/user-verification/src/platform_android.rs"
+python3 "$script_dir/应用CLI补丁.py" --source "$source_root"
 if [[ "$v8_mode" == source ]]; then
   # local patch 只改变 v8 来源；其他包版本和校验和沿用固定上游锁文件。
   python3 - "$source_root/codex-rs/Cargo.lock" <<'PYLOCK'

@@ -1,6 +1,6 @@
 {
   "upstream_commit": "970111f6cb62cc02fe36a82ea7d71b37a2889c97",
-  "evidence": "固定上游提交的 12 项条目、27 份唯一源码证据；仅静态接线记录，无构建/运行结果",
+  "evidence": "固定上游提交的13项条目、37份唯一源码证据；无构建/运行结果",
   "entries": [
     {
       "name": "app-server",
@@ -380,6 +380,64 @@
         {
           "path": "codex-rs/voice-host/src/transport.rs",
           "sha256": "1ef0696b7c61083b37d6536c58df98e22bc00ba8918a815370698f7c987886a8"
+        }
+      ]
+    },
+    {
+      "name": "android-cli",
+      "package": "codex-cli",
+      "binary": "codex",
+      "androidInstall": "nativeLibraryDir/libcodex_cli.so",
+      "args": [
+        "固定业务命令参数数组，不经过shell"
+      ],
+      "ipc": "原版CLI/stdin/stdout/退出码；凭证桥只授权确切PID",
+      "stop": "取消/超时回收拥有的进程树，waitid WNOWAIT保留直接子进程身份直到close",
+      "status": "源码接入，未构建/运行",
+      "abi": [
+        "arm64-v8a",
+        "x86_64"
+      ],
+      "refs": [
+        {
+          "path": "codex-rs/cli/Cargo.toml",
+          "sha256": "a643fde880971aa23902bd8e2f0d838beea2efe41153b0e4d09b5ad78890f796"
+        },
+        {
+          "path": "codex-rs/cli/src/main.rs",
+          "sha256": "ac51c153916132c0be2c37ea1136562685b832957bc2e43e53d71608d0b28a4a"
+        },
+        {
+          "path": "codex-rs/cloud-tasks/src/cli.rs",
+          "sha256": "9ffbf4e43e12986a3ade28f05bc3d70e80d2860314f32ace7b3060148bc2fbaa"
+        },
+        {
+          "path": "codex-rs/cloud-tasks/src/lib.rs",
+          "sha256": "1bf8b6ce1d24dabe0653ebdb4aa6bc0db72cf657dfd58227db429c3f5f0672ab"
+        },
+        {
+          "path": "codex-rs/cloud-tasks/src/env_detect.rs",
+          "sha256": "bec745603121226f7edd770e0132a3cea1a78906b1425df6dcbbd54c61e22ce2"
+        },
+        {
+          "path": "codex-rs/cli/src/migrate_rollouts.rs",
+          "sha256": "3cffc54e387fddd1d35af76f37ee6d70af15dce728c78d7680c11469267a38c8"
+        },
+        {
+          "path": "codex-rs/cli/src/migrate_nfs_db.rs",
+          "sha256": "766324e829832af905a83debedc3cdba5806354843bf3fea1297599ddf8a0b42"
+        },
+        {
+          "path": "codex-rs/cli/src/doctor.rs",
+          "sha256": "9904c0f108d05c8d76b3f9a9b2d076bc5970bc99118b3e4f2aa3128ce3ca6ec6"
+        },
+        {
+          "path": "codex-rs/execpolicy/src/execpolicycheck.rs",
+          "sha256": "ca0fd263be42e0ee7dab450912c409b8874dd2ec5f74e2650ba5de2deb8b1955"
+        },
+        {
+          "path": "codex-rs/stdio-to-uds/src/lib.rs",
+          "sha256": "f6d45cd733992f9882af62478245a0b8c98010b0dde0626f422d297d5751a050"
         }
       ]
     }

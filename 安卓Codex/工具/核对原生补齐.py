@@ -3,21 +3,24 @@
 import argparse,ast,csv,hashlib,json,re,subprocess,sys
 from pathlib import Path
 import xml.etree.ElementTree as ET
-p=argparse.ArgumentParser();p.add_argument('--source',type=Path,required=True);p.add_argument('--parser-path',required=True);a=p.parse_args()
+p=argparse.ArgumentParser();p.add_argument('--source',type=Path,required=True);p.add_argument('--parser-path',required=True);p.add_argument('--base',default='5ec1392431c8554b6915b30165cef3b8dd4fa2d2');a=p.parse_args()
 r=Path(__file__).resolve().parents[1];repo=r.parent
 sys.path.insert(0,a.parser_path)
 from tree_sitter import Language,Parser
 import tree_sitter_kotlin,tree_sitter_rust,tree_sitter_c
 parsers={'.kt':Parser(Language(tree_sitter_kotlin.language())),'.rs':Parser(Language(tree_sitter_rust.language())),'.c':Parser(Language(tree_sitter_c.language()))}
-tracked=subprocess.check_output(['git','diff','--name-only','-z','5ec1392431c8554b6915b30165cef3b8dd4fa2d2','--','安卓Codex'],cwd=repo).decode().split('\0')
+tracked=subprocess.check_output(['git','diff','--name-only','-z',a.base,'--','安卓Codex'],cwd=repo).decode().split('\0')
 untracked=subprocess.check_output(['git','ls-files','-z','--others','--exclude-standard','--','安卓Codex'],cwd=repo).decode().split('\0')
 counts={suffix:0 for suffix in parsers}
 for name in sorted(set(tracked+untracked)-{''}):
  path=repo/name
  if path.suffix in parsers:
-  assert not parsers[path.suffix].parse(path.read_bytes()).root_node.has_error,name+' 语法错误'
+  data=path.read_bytes()
+  if path.suffix=='.c':data=re.sub(rb'\b(?:JNIEXPORT|JNICALL)\b',b' ',data) # 标准JNI声明宏，语法解析不展开头文件
+  assert not parsers[path.suffix].parse(data).root_node.has_error,name+' 语法错误'
   counts[path.suffix]+=1
-assert counts['.kt']>=30 and counts['.rs']>=1 and counts['.c']>=2,'变更语法扫描范围为空或不足'
+assert counts['.kt']>=1,'变更语法扫描范围为空'
+if a.base=='5ec1392431c8554b6915b30165cef3b8dd4fa2d2':assert counts['.kt']>=30 and counts['.rs']>=1 and counts['.c']>=2
 for path in (r/'工具').glob('*.py'):ast.parse(path.read_text(),filename=str(path))
 for path in (r/'运行核心').glob('*.py'):ast.parse(path.read_text(),filename=str(path))
 for name in ['构建安卓核心.sh','构建安卓Git.sh','构建安卓语言环境.sh','构建安卓网络工具.sh']:

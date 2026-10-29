@@ -10,23 +10,23 @@ Plugin,业务路径已有源码,市场/插件安装和配置,codex-rs/cli/src/ma
 AppServer,部分业务路径,已有stdio宿主；生成绑定/Schema等CLI子工具未提供安卓入口,codex-rs/cli/src/main.rs,未运行验证；业务替代不代表CLI逐参数兼容
 RemoteControl,部分业务路径,已有配置/配对/撤销；独立守护进程安装管理不等价,codex-rs/cli/src/main.rs,未运行验证；业务替代不代表CLI逐参数兼容
 App,桌面专用,原版只在macOS/Windows编译桌面启动器,codex-rs/cli/src/main.rs,未运行验证；业务替代不代表CLI逐参数兼容
-Completion,未提供独立路径,终端shell补全脚本生成器未提供,codex-rs/cli/src/main.rs,未运行验证；业务替代不代表CLI逐参数兼容
+Completion,业务路径已有源码,五种shell补全脚本生成与查看,codex-rs/cli/src/main.rs,未运行验证；业务替代不代表CLI逐参数兼容
 Update,未提供独立路径,固定源码不自动升级；独立CLI更新器未移植，Android签名包更新另行交付,codex-rs/cli/src/main.rs,未运行验证；业务替代不代表CLI逐参数兼容
-Doctor,部分业务路径,已有服务诊断；完整安装/运行环境健康检查尚未对齐,codex-rs/cli/src/main.rs,未运行验证；业务替代不代表CLI逐参数兼容
+Doctor,部分业务路径,原版doctor --json检查已有手机入口；全部平台检查解释和其他CLI选项仍需对齐/验证,codex-rs/cli/src/main.rs,未运行验证；业务替代不代表CLI逐参数兼容
 Sandbox,未提供独立路径,没有桌面等价项目执行沙箱,codex-rs/cli/src/main.rs,未运行验证；业务替代不代表CLI逐参数兼容
 Debug,部分业务路径,已有模型/诊断；prompt-input、trace-reduce等开发子工具未对齐,codex-rs/cli/src/main.rs,未运行验证；业务替代不代表CLI逐参数兼容
-Execpolicy,未提供独立路径,独立命令策略诊断工具未提供，不等同于UI审批,codex-rs/cli/src/main.rs,未运行验证；业务替代不代表CLI逐参数兼容
+Execpolicy,业务路径已有源码,项目规则文件/参数数组/主机名解析评估，不执行被检查命令,codex-rs/cli/src/main.rs,未运行验证；业务替代不代表CLI逐参数兼容
 Apply,部分业务路径,已有差异审批/文件操作；独立CLI最新云/代理差异选择与应用未等价,codex-rs/cli/src/main.rs,未运行验证；业务替代不代表CLI逐参数兼容
 Resume,业务路径已有源码,会话恢复,codex-rs/cli/src/main.rs,未运行验证；业务替代不代表CLI逐参数兼容
 Queue,业务路径已有源码,待办队列六接口与续跑托管,codex-rs/cli/src/main.rs,未运行验证；业务替代不代表CLI逐参数兼容
 Archive,业务路径已有源码,会话归档,codex-rs/cli/src/main.rs,未运行验证；业务替代不代表CLI逐参数兼容
 Delete,业务路径已有源码,会话删除,codex-rs/cli/src/main.rs,未运行验证；业务替代不代表CLI逐参数兼容
-MigrateRollouts,未提供独立路径,本地旧rollout历史迁移工具未提供，不等同于外部代理导入,codex-rs/cli/src/main.rs,未运行验证；业务替代不代表CLI逐参数兼容
-MigrateNfsDb,未提供独立路径,SQLite DELETE模式迁移工具未提供,codex-rs/cli/src/main.rs,未运行验证；业务替代不代表CLI逐参数兼容
+MigrateRollouts,业务路径已有源码,旧历史检查→确认发布→结果，重新连接核心后检查凭据失效,codex-rs/cli/src/main.rs,未运行验证；业务替代不代表CLI逐参数兼容
+MigrateNfsDb,业务路径已有源码,显式确认停止访问客户端，执行原版备份/DELETE迁移及退出核查,codex-rs/cli/src/main.rs,未运行验证；业务替代不代表CLI逐参数兼容
 Unarchive,业务路径已有源码,恢复归档,codex-rs/cli/src/main.rs,未运行验证；业务替代不代表CLI逐参数兼容
 Fork,业务路径已有源码,会话分叉,codex-rs/cli/src/main.rs,未运行验证；业务替代不代表CLI逐参数兼容
-Cloud,未提供独立路径,云任务exec/status/list/apply/diff没有完整安卓调用路径,codex-rs/cli/src/main.rs,未运行验证；业务替代不代表CLI逐参数兼容
+Cloud,业务路径已有源码,环境发现/分页、exec/status/list/diff/apply专用页面与固定CLI；应用前校对已批准差异,codex-rs/cli/src/main.rs,未运行验证；业务替代不代表CLI逐参数兼容
 ResponsesApiProxy,未提供独立路径,内部Responses代理程序未作为手机程序交付,codex-rs/cli/src/main.rs,未运行验证；业务替代不代表CLI逐参数兼容
-StdioToUds,未提供独立路径,独立stdio/UDS中继未作为手机程序交付,codex-rs/cli/src/main.rs,未运行验证；业务替代不代表CLI逐参数兼容
+StdioToUds,业务路径已有源码,MCP配置新增本机Unix服务，固定CLI中继按参数数组连接socket，由原版MCP托管协议/生命周期,codex-rs/cli/src/main.rs,未运行验证；业务替代不代表CLI逐参数兼容
 ExecServer,未提供独立路径,独立exec-server服务/认证管理未提供，不能与app-server内执行助手混为一谈,codex-rs/cli/src/main.rs,未运行验证；业务替代不代表CLI逐参数兼容
 Features,业务路径已有源码,实验功能读取/设置,codex-rs/cli/src/main.rs,未运行验证；业务替代不代表CLI逐参数兼容

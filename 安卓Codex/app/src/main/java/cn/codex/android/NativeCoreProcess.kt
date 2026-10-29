@@ -14,6 +14,10 @@ class NativeCoreProcess(executable: File, arguments: List<String>, environment: 
     val output = ParcelFileDescriptor.AutoCloseOutputStream(ParcelFileDescriptor.adoptFd(handles[1]))
     val errors = ParcelFileDescriptor.AutoCloseInputStream(ParcelFileDescriptor.adoptFd(handles[3]))
     private val closed = AtomicBoolean()
+    @Synchronized fun pollExit():Int? {
+        check(!closed.get()){ "进程资源已关闭" }
+        return NativeCoreBridge.poll(pid).takeUnless{it==Int.MIN_VALUE}
+    }
     @Synchronized override fun close() {
         if (!closed.compareAndSet(false, true)) return
         NativeCoreBridge.terminate(pid)
@@ -24,5 +28,6 @@ class NativeCoreProcess(executable: File, arguments: List<String>, environment: 
 private object NativeCoreBridge {
     init { System.loadLibrary("codex_process") }
     external fun spawn(argv: Array<ByteArray>, env: Array<ByteArray>, cwd: ByteArray): IntArray
+    external fun poll(pid:Int):Int
     external fun terminate(pid: Int)
 }

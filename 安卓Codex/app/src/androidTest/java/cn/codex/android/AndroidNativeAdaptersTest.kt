@@ -37,4 +37,12 @@ class AndroidNativeAdaptersTest {
         assertFalse(OriginalSvgPreviewPolicy.allowed("<svg>"+"<g>".repeat(20)+"</g>".repeat(20)+"</svg>"))
     }
 
+    @Test fun reusedProtocolIdStartsWithANewApprovalUiIdentity() {
+        val first=cn.codex.core.original.ServerMessage.Request(kotlinx.serialization.json.JsonPrimitive("same"),"mcpServer/elicitation/request",kotlinx.serialization.json.buildJsonObject{})
+        val second=first.copy()
+        assertEquals(first,second)
+        assertEquals(OriginalRequestKey(first),OriginalRequestKey(first))
+        assertNotEquals(OriginalRequestKey(first),OriginalRequestKey(second))
+    }
+
 }

@@ -29,7 +29,7 @@ import kotlinx.serialization.json.*
         item { Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
             Text("本包工具", style = MaterialTheme.typography.titleMedium)
             Text(runtime.message);runtime.error?.let{Text(it,color=MaterialTheme.colorScheme.error)}
-            listOf("原版核心" to "libcodex_engine.so", "代码模式" to "libcodex_code_mode_host.so", "搜索 rg" to "libcodex_rg.so", "Git 命令" to "libcodex_git.so", "Git HTTPS传输" to "libcodex_git_remote_http.so", "SSH客户端" to "libcodex_ssh.so", "Node" to "libcodex_node.so", "Python" to "libcodex_python.so", "npm/npx" to "libcodex_npm.so").forEach { (name, library) ->
+            listOf("原版核心" to "libcodex_engine.so", "原版CLI" to "libcodex_cli.so", "代码模式" to "libcodex_code_mode_host.so", "搜索 rg" to "libcodex_rg.so", "Git 命令" to "libcodex_git.so", "Git HTTPS传输" to "libcodex_git_remote_http.so", "SSH客户端" to "libcodex_ssh.so", "Node" to "libcodex_node.so", "Python" to "libcodex_python.so", "npm/npx" to "libcodex_npm.so").forEach { (name, library) ->
                 Text("$name：${if (AndroidToolPaths.installed(context, library)) "已随包安装，仍需验证执行" else "当前包未包含"}")
             }
             Text("Git 页面通过JGit连接HTTPS；Git命令网络需要随包传输助手，SSH还需你核对主机公钥。没有Perl扩展和完整桌面软件生态。", style = MaterialTheme.typography.bodySmall)

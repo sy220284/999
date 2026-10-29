@@ -173,6 +173,11 @@ private data class McpConfirmation(val entry: OriginalMcpEntry, val snapshot: Or
 @Composable private fun OriginalMcpEditorSheet(editor: OriginalMcpEditor, busy: Boolean, enabled: Boolean, error: String?,
     dismiss: () -> Unit, save: (String, JsonObject) -> Unit) {
     val original = editor.original
+    val localContext=LocalContext.current
+    val originalArgs=(original["args"] as? JsonArray).orEmpty()
+    var unix by remember(editor){mutableStateOf(original.string("command").substringAfterLast('/') in setOf("codex","libcodex_cli.so") && originalArgs.firstOrNull()?.jsonPrimitive?.contentOrNull=="stdio-to-uds")}
+    var socket by remember(editor){mutableStateOf(if(unix)originalArgs.getOrNull(1)?.jsonPrimitive?.content.orEmpty()else "")}
+
     var name by remember(editor) { mutableStateOf(editor.name ?: editor.suggestedName) }
     var http by remember(editor) { mutableStateOf(!original.containsKey("command")) }
     var url by remember(editor) { mutableStateOf(original.string("url")) }
@@ -196,14 +201,19 @@ private data class McpConfirmation(val entry: OriginalMcpEntry, val snapshot: Or
             original.string("environment_id").takeIf { it.isNotBlank() && it != "local" }?.let { Text("原配置执行环境：$it；此处编辑会保留该归属。", style = MaterialTheme.typography.bodySmall) }
             OutlinedTextField(name, { name = it }, enabled = !busy && editor.name == null, singleLine = true, label = { Text("服务标识") }, modifier = Modifier.fillMaxWidth())
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                FilterChip(http, { http = true }, enabled = !busy, label = { Text("远程服务") })
-                FilterChip(!http, { http = false }, enabled = !busy, label = { Text("手机上的程序") })
+                FilterChip(http, { http = true;unix=false }, enabled = !busy, label = { Text("远程服务") })
+                FilterChip(!http && !unix, { http = false;unix=false }, enabled = !busy, label = { Text("手机上的程序") })
+                FilterChip(!http && unix,{http=false;unix=true},enabled=!busy,label={Text("本机Unix服务")})
             }
             if (http) {
                 OutlinedTextField(url, { url = it }, enabled = !busy, label = { Text("服务地址") }, placeholder = { Text("https://example.com/mcp") }, singleLine = true, modifier = Modifier.fillMaxWidth())
                 OutlinedTextField(bearer, { bearer = it }, enabled = !busy, label = { Text("令牌环境变量名（可选）") }, singleLine = true, modifier = Modifier.fillMaxWidth())
                 OutlinedTextField(scopes, { scopes = it }, enabled = !busy, label = { Text("授权范围（每行一项，可选）") }, modifier = Modifier.fillMaxWidth())
                 Text("需要账号授权时，保存后点击服务卡片的“账号授权”。", style = MaterialTheme.typography.bodySmall)
+            } else if(unix){
+                Text("连接已经运行、使用MCP消息的本机Unix服务。原版中继只转发字节，不会创建服务或把其他协议转换成MCP。",style=MaterialTheme.typography.bodySmall)
+                OutlinedTextField(socket,{socket=it},enabled=!busy,label={Text("Unix socket绝对路径")},singleLine=true,modifier=Modifier.fillMaxWidth())
+                Text("需要随包CLI；连接生命周期由原版MCP管理，断开核心时一并回收。",style=MaterialTheme.typography.bodySmall)
             } else {
                 Text("程序需要已安装在手机可执行的位置。Node/Python/npm需要实际随包解释器与数据；填写命令不会自动安装，先在能力页核查。", style = MaterialTheme.typography.bodySmall)
                 OutlinedTextField(command, { command = it }, enabled = !busy, label = { Text("程序路径") }, singleLine = true, modifier = Modifier.fillMaxWidth())
@@ -218,7 +228,9 @@ private data class McpConfirmation(val entry: OriginalMcpEntry, val snapshot: Or
             (formError ?: error)?.let { Text(it, color = MaterialTheme.colorScheme.error) }
             Button(onClick = {
                 try {
-                    val config = OriginalMcpConfig.form(original, url, command, args, cwd, env, bearer, scopes, startup, timeout, active, http)
+                    val executable=if(unix)java.io.File(localContext.applicationInfo.nativeLibraryDir,"libcodex_cli.so").absolutePath else command
+                    val arguments=if(unix)OriginalCliCommands.stdioToUds(socket).joinToString("\n")else args
+                    val config = OriginalMcpConfig.form(original, url, executable, arguments, cwd, env, bearer, scopes, startup, timeout, active, http)
                     OriginalMcpConfig.edit(name, config)
                     formError = null; save(name, config)
                 } catch (failure: IllegalArgumentException) { formError = failure.message }

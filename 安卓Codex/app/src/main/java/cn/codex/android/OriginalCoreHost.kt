@@ -102,13 +102,14 @@ class OriginalCoreHost(
     val history=OriginalHistoryController(scope,{state.value.threadId},{completionBusy()},configurationJournal.lifecycle("会话记录与后台终端"))
     val advanced=OriginalAdvancedController(scope,{state.value.threadId},workspace.absolutePath,{completionBusy()},configurationJournal.lifecycle("会话设置、记忆与采样"))
     val connections=OriginalConnectionsController(scope,{state.value.threadId},{completionBusy()},configurationJournal.lifecycle("环境、远控与服务认证"))
+    val cli=OriginalCliController(scope,{state.value.connected || completionBusy()},configurationJournal.lifecycle("云任务与本机维护"),OriginalCliRunner(context,scope,workspace,engineHome)::execute)
     val search=OriginalSearchController(scope,workspace.absolutePath)
     val webRtc:OriginalWebRtcAudio=OriginalWebRtcAudio(context,scope){realtime.stop()}
     val realtime:OriginalRealtimeController=OriginalRealtimeController(scope,{state.value.working || state.value.turnId!=null || state.value.loading || state.value.closing || otherTaskRunning() || configurationChanging},configurationJournal.lifecycle("实时会话"))
     val microphone=OriginalRealtimeMicrophone(context,scope){bytes -> realtime.sendAudio(bytes)}
     init {scope.launch{realtime.state.map{it.running}.distinctUntilChanged().collect{running->if(!running)webRtc.close()}}}
     fun commandWorkspace() = workspace.absolutePath
-    val managedChanging get() = sshTrust.state.value.working || projects.operations.state.value.mutating || history.operations.state.value.mutating || advanced.operations.state.value.mutating || connections.operations.state.value.mutating || queue.operations.state.value.mutating || realtime.state.value.running || library.operations.state.value.mutating || services.operations.state.value.mutating || migration.operations.state.value.mutating
+    val managedChanging get() = cli.state.value.busy || sshTrust.state.value.working || projects.operations.state.value.mutating || history.operations.state.value.mutating || advanced.operations.state.value.mutating || connections.operations.state.value.mutating || queue.operations.state.value.mutating || realtime.state.value.running || library.operations.state.value.mutating || services.operations.state.value.mutating || migration.operations.state.value.mutating
     val configurationChanging get() = state.value.toolBusy || (context.applicationContext as CodexApplication).gitOperations.state.value.running || (context.applicationContext as CodexApplication).fullTerminal.state.value.running || commands.state.value.running || extensions.state.value.mutating || mcp.state.value.mutating || settings.state.value.mutating || files.state.value.mutating || managedChanging
     fun mcpImports() = McpTools(context).connections().map { it.name to it.url }
     private fun error(error: Throwable) { mutable.update { it.copy(error = error.message ?: "原版核心操作失败") } }
@@ -128,7 +129,8 @@ class OriginalCoreHost(
     private fun ensureCurrent(epoch: Long, rpc: AppServerConnection) { check(current(epoch, rpc)) { "原版连接已变更，已丢弃旧操作结果" } }
     private fun syncLifecycle() { val value = lifecycle.state; mutable.update { it.copy(threadId = value.threadId, turnId = value.turnId) } }
     fun connect(): Job? {
-        if (state.value.loading || state.value.connected || state.value.closing) return null
+        if (state.value.loading || state.value.connected || state.value.closing || cli.state.value.busy) return null
+        cli.invalidateMaintenance()
         val epoch = lifecycle.beginConnection()
         mutable.update { it.copy(connectionEpoch = epoch, loading = true, error = null) }
         return scope.launch {

@@ -277,6 +277,18 @@ static void core_kill_tree(pid_t pid) {
     } else { kill(-pid, SIGKILL); kill(pid, SIGKILL); }
     free(nodes);
 }
+// WNOWAIT保留直接子进程身份到close；轮询退出后PID不会被复用后再误杀。
+JNIEXPORT jint JNICALL Java_cn_codex_android_NativeCoreBridge_poll(JNIEnv *env, jclass cls, jint pid) {
+    (void)cls; siginfo_t info = {0}; int result;
+    do { result = waitid(P_PID, (id_t)pid, &info, WEXITED | WNOHANG | WNOWAIT); } while (result < 0 && errno == EINTR);
+    if (result < 0) {
+        jclass error = (*env)->FindClass(env, "java/io/IOException");
+        if (error) (*env)->ThrowNew(env, error, "Cannot observe owned child process");
+        return (-2147483647 - 1);
+    }
+    if (!info.si_pid) return (-2147483647 - 1);
+    return info.si_code == CLD_EXITED ? info.si_status : 128 + info.si_status;
+}
 JNIEXPORT void JNICALL Java_cn_codex_android_NativeCoreBridge_terminate(JNIEnv *env, jclass cls, jint pid) {
     (void)env; (void)cls;
     core_kill_tree(pid);

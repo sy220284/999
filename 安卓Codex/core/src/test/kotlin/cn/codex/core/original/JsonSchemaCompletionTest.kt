@@ -47,8 +47,8 @@ class JsonSchemaCompletionTest {
         assertTrue(form.supported)
         form.content(mapOf("value" to """{"type":"openai/imagePicker","items":[]}"""))
     }
-    @Test fun resourceIdsAreNotSilentlyTreatedAsTheRootDocument() {
-        assertFalse(validator("""{"${'$'}id":"https://example.invalid/other","type":"object"}""").supported())
+    @Test fun resourceIdsWithoutRemoteReferencesRemainOffline() {
+        assertTrue(validator("""{"${'$'}id":"https://example.invalid/other","type":"object"}""").supported())
     }
     @Test fun genericArrayChoicesDoNotPretendToBePrimitiveMultiSelectors() {
         val form=ElicitationForm(value("""{"type":"object","properties":{"value":{"type":"array","items":{"anyOf":[{"type":"object"},{"type":"string"}]}}}}""").jsonObject)
