@@ -17,6 +17,7 @@ import java.util.UUID
 data class OriginalState(
     val connectionEpoch: Long = 0, val connected: Boolean = false, val closing: Boolean = false, val loading: Boolean = false, val working: Boolean = false,
     val threadId: String? = null, val turnId: String? = null,
+    val agentsOverview:List<JsonObject> = emptyList(),val agentsCursor:String?=null,val agentsSource:String="loaded",val agentsReadFailures:Int=0,
     val threads: List<JsonObject> = emptyList(), val nextCursor: String? = null, val archived: Boolean = false,
     val items: List<OriginalItem> = emptyList(), val requests: List<ServerMessage.Request> = emptyList(),
     val account: String = "尚未读取账号", val error: String? = null, val status: String = "未启动原版核心",
@@ -42,7 +43,7 @@ data class OriginalState(
 )
 class OriginalCoreHost(
     private val context: Context,
-    private val engineFactory: OriginalEngineFactory = NativeOriginalEngineFactory,
+    private val engineFactory: OriginalEngineFactory = AndroidOriginalEngineFactory,
     private val configLoader: suspend () -> ApiConfig = { withContext(Dispatchers.IO) { SecureSettings(context).load() } },
     private val startupTimeoutMs: Long = 60_000,
     private val scope: CoroutineScope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate),
@@ -102,7 +103,7 @@ class OriginalCoreHost(
     val history=OriginalHistoryController(scope,{state.value.threadId},{completionBusy()},configurationJournal.lifecycle("会话记录与后台终端"))
     val advanced=OriginalAdvancedController(scope,{state.value.threadId},workspace.absolutePath,{completionBusy()},configurationJournal.lifecycle("会话设置、记忆与采样"))
     val connections=OriginalConnectionsController(scope,{state.value.threadId},{completionBusy()},configurationJournal.lifecycle("环境、远控与服务认证"))
-    val cli=OriginalCliController(scope,{state.value.connected || completionBusy()},configurationJournal.lifecycle("云任务与本机维护"),OriginalCliRunner(context,scope,workspace,engineHome)::execute)
+    val cli=OriginalCliController(scope,{state.value.connected || (context.applicationContext as CodexApplication).nativeEndpoints.daemonRunning || completionBusy()},configurationJournal.lifecycle("云任务与本机维护"),OriginalCliRunner(context,scope,workspace,engineHome)::execute)
     val search=OriginalSearchController(scope,workspace.absolutePath)
     val webRtc:OriginalWebRtcAudio=OriginalWebRtcAudio(context,scope){realtime.stop()}
     val realtime:OriginalRealtimeController=OriginalRealtimeController(scope,{state.value.working || state.value.turnId!=null || state.value.loading || state.value.closing || otherTaskRunning() || configurationChanging},configurationJournal.lifecycle("实时会话"))
@@ -270,6 +271,28 @@ class OriginalCoreHost(
             mutable.update { it.copy(threadGitInfo = thread["gitInfo"] as? JsonObject, status = "已保存会话 Git 资料") }
             confirmed = true
         } finally { tracking.finish(ticket, confirmed) }
+    }
+    /** 已加载列表跨本次共享核心客户端；历史按原版来源分页，子代理不混作根任务。 */
+    fun readAgents(source:String="loaded",more:Boolean=false)=operation { api->
+        require(source in setOf("loaded","interactive","exec"))
+        val epoch=lifecycle.state.connectionEpoch
+        val cursor=if(more){check(state.value.agentsSource==source);state.value.agentsCursor ?: return@operation}else null
+        val observedStatuses=state.value.threadStatuses
+        val rows:List<JsonObject>;val page:JsonObject;var failures=0
+        if(source=="loaded"){
+            page=api.loadedThreads(cursor).jsonObject
+            val ids=page.getValue("data").jsonArray.map{it.jsonPrimitive.content};require(ids.size<=30 && ids.distinct().size==ids.size)
+            val found=mutableListOf<JsonObject>()
+            for(id in ids){try{val thread=api.read(id,false).jsonObject.getValue("thread").jsonObject;require(thread.string("id")==id);found+=thread}catch(cancelled:CancellationException){throw cancelled}catch(_:Exception){failures++};ensureCurrent(epoch,api.connection)}
+            rows=found
+        }else{
+            page=api.call("thread/list",buildJsonObject{put("limit",30);put("archived",false);put("useStateDbOnly",true);put("sortKey","recency_at");put("sourceKinds",JsonArray((if(source=="exec")listOf("exec","appServer")else listOf("cli","vscode")).map(::JsonPrimitive)));cursor?.let{put("cursor",it)}}).jsonObject
+            rows=page.getValue("data").jsonArray.map{it.jsonObject};require(rows.size<=30)
+        }
+        ensureCurrent(epoch,api.connection)
+        val next=page.string("nextCursor").ifBlank{null};require(next==null || next!=cursor && next.length<=8192)
+        val combined=((if(more)state.value.agentsOverview else emptyList())+rows).distinctBy{it.string("id")};require(combined.size<=200){"总览最多保留200项，请按来源缩小范围"}
+        mutable.update{current->val refreshed=rows.map{it.string("id")}.toSet();current.copy(agentsOverview=combined,agentsCursor=next,agentsSource=source,agentsReadFailures=failures,threadStatuses=current.threadStatuses.filter{(id,value)->id !in refreshed || value!==observedStatuses[id]})}
     }
     fun inspectAgent(threadId: String) = operation { api ->
         val thread = api.read(threadId).jsonObject.getValue("thread").jsonObject

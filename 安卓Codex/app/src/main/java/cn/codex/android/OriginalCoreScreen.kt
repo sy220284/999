@@ -86,6 +86,9 @@ internal class OriginalRequestKey(private val request:ServerMessage.Request) {
     advancedManager?.let { page ->
         val allow = !state.working && state.turnId == null && !state.loading && !extensionState.mutating && !mcpState.mutating && !settingsState.mutating && !filesState.mutating && !fullTerminalState.running && !networkGit.running && !commandState.running && !managedBusy
         when (page) {
+            "代理总览" -> OriginalAgentsScreen(host) { advancedManager = null }
+            "应用更新" -> AndroidUpdateScreen { advancedManager = null }
+            "本机连接服务" -> NativeEndpointsScreen(host) { advancedManager = null }
             "云任务与本机维护" -> OriginalCliScreen(host) { advancedManager = null }
             "SSH主机校验" -> OriginalSshScreen(host.sshTrust,java.io.File(AndroidSshTrust.directory(LocalContext.current),"id_ed25519").absolutePath,allow) { advancedManager = null }
             "项目管理" -> OriginalProjectsScreen(host) { advancedManager = null }
@@ -138,6 +141,9 @@ internal class OriginalRequestKey(private val request:ServerMessage.Request) {
                     }
                 }
             }
+            item { OutlinedButton(onClick={advancedManager="代理总览"},enabled=state.connected){Text("共享核心代理总览")} }
+            item { TextButton(onClick={advancedManager="应用更新"}){Text("应用更新与签名包校验")} }
+            item { OutlinedButton(onClick={advancedManager="本机连接服务"}){Text("本机代理、隧道与共享核心")} }
             item { OutlinedButton(onClick={advancedManager="云任务与本机维护"},enabled=!state.loading && !state.closing){Text("云任务与本机维护")} }
             if (!state.connected) item {
                 Text("此入口使用随应用安装的原版核心，连接原版会话与账号。缺少运行核心时会提示具体原因。", style = MaterialTheme.typography.bodyMedium)

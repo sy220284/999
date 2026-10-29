@@ -45,4 +45,16 @@ class OriginalCliControllerTest {
         }finally{scope.cancel();dispatcher.close()}
     }
 
+    @Test fun latestTaskApplyDoesNotUseCloudAttemptAndClearsPreviewOnlyAfterSuccess()=runBlocking {
+        val dispatcher=Executors.newSingleThreadExecutor().asCoroutineDispatcher();val scope=CoroutineScope(SupervisorJob()+dispatcher)
+        val plans=mutableListOf<OriginalCliPlan>()
+        val controller=OriginalCliController(scope,{false},OriginalMutationLifecycle.None){plan->plans+=plan;OriginalCliResult(0,if("--preview" in plan.arguments)"diff --git a/a b/a\n"else"applied")}
+        try{
+            withContext(dispatcher){controller.latestDiff("task")};withTimeout(3000){controller.state.first{!it.busy}}
+            val preview=requireNotNull(controller.state.value.preview);assertTrue(preview.latest)
+            withContext(dispatcher){controller.apply(preview)};withTimeout(3000){controller.state.first{!it.busy}}
+            assertEquals(listOf("apply","task"),plans.last().arguments);assertEquals(preview.text,plans.last().expectedDiff);assertNull(controller.state.value.preview)
+        }finally{scope.cancel();dispatcher.close()}
+    }
+
 }

@@ -41,4 +41,27 @@ class OriginalCliCommandsTest {
         assertFailsWith<IllegalArgumentException>{OriginalCliCommands.stdioToUds("/socket\n--help")}
     }
 
+    @Test fun latestApplyFreezesReviewedBytesAndPreviewDoesNotWrite(){
+        val preview=OriginalCliCommands.latestDiff("task")
+        assertFalse(preview.mutating);assertEquals(listOf("apply","--preview","--","task"),preview.arguments)
+        val apply=OriginalCliCommands.latestApply("task","diff\n")
+        assertTrue(apply.mutating);assertEquals("diff\n",apply.expectedDiff)
+    }
+    @Test fun diagnosticMessageCannotBecomeOptionsOrShellCode(){
+        val message="--help; $(echo token)"
+        val plan=OriginalCliCommands.debugMessage(message)
+        assertEquals(listOf("--",message),plan.arguments.takeLast(2));assertTrue(plan.mutating)
+        assertFalse(OriginalCliCommands.promptInput(message,emptyList()).mutating)
+    }
+    @Test fun schemaExportsUseFreshHostOwnedPathsAndInternalSchemaRejectsExperimental(){
+        val plan=OriginalCliCommands.schema("generate-ts",true)
+        assertTrue("--experimental" in plan.arguments);assertEquals("@ANDROID_EXPORT@",plan.arguments[3])
+        assertFailsWith<IllegalArgumentException>{OriginalCliCommands.schema("generate-internal-json-schema",true)}
+        assertFailsWith<IllegalArgumentException>{OriginalCliCommands.schema("daemon",false)}
+    }
+    @Test fun humanDoctorFlagsDoNotAccidentallyMixWithJson(){
+        assertFailsWith<IllegalArgumentException>{OriginalCliCommands.doctor(json=true,summary=true)}
+        assertEquals(setOf("doctor","--summary","--all","--ascii","--feedback","--no-color"),OriginalCliCommands.doctor(false,true,true,true,true).arguments.toSet())
+    }
+
 }

@@ -74,6 +74,7 @@ if [[ -f "$source_root/codex-rs/user-verification/src/platform_android.rs" ]] &&
 fi
 install -m 644 "$script_dir/补充源码/android_user_verification.rs" "$source_root/codex-rs/user-verification/src/platform_android.rs"
 python3 "$script_dir/应用CLI补丁.py" --source "$source_root"
+python3 "$script_dir/应用CLI补丁.py" --source "$source_root" --patch "$script_dir/安卓本机服务.patch" --manifest "$script_dir/安卓服务补丁来源.json"
 if [[ "$v8_mode" == source ]]; then
   # local patch 只改变 v8 来源；其他包版本和校验和沿用固定上游锁文件。
   python3 - "$source_root/codex-rs/Cargo.lock" <<'PYLOCK'

@@ -17,6 +17,8 @@ class CodexApplication: Application() {
     val configurationJournal by lazy { ConfigurationJournal(this) }
     val gitOperations by lazy { GitNetworkController(this) }
     val fullTerminal by lazy { FullTerminalController(this) }
+    val updates by lazy { AndroidAppUpdates(this) }
+    val nativeEndpoints by lazy { NativeEndpoints(this) }
     val originalCore by lazy { OriginalCoreHost(this) }
     val controller by lazy { RuntimeController(this) }
 }

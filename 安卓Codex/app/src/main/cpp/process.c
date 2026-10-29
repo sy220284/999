@@ -278,6 +278,12 @@ static void core_kill_tree(pid_t pid) {
     free(nodes);
 }
 // WNOWAIT保留直接子进程身份到close；轮询退出后PID不会被复用后再误杀。
+JNIEXPORT void JNICALL Java_cn_codex_android_NativeCoreBridge_requestTermination(JNIEnv *env, jclass cls, jint pid) {
+    (void)env; (void)cls;
+    siginfo_t info = {0};
+    // 只有仍属于本进程且未回收的子进程才可接收停止信号。
+    if (waitid(P_PID, (id_t)pid, &info, WEXITED | WNOHANG | WNOWAIT) == 0 && !info.si_pid) kill(pid, SIGTERM);
+}
 JNIEXPORT jint JNICALL Java_cn_codex_android_NativeCoreBridge_poll(JNIEnv *env, jclass cls, jint pid) {
     (void)cls; siginfo_t info = {0}; int result;
     do { result = waitid(P_PID, (id_t)pid, &info, WEXITED | WNOHANG | WNOWAIT); } while (result < 0 && errno == EINTR);

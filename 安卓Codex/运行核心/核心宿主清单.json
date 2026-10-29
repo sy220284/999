@@ -391,7 +391,7 @@
       "args": [
         "固定业务命令参数数组，不经过shell"
       ],
-      "ipc": "原版CLI/stdin/stdout/退出码；凭证桥只授权确切PID",
+      "ipc": "短命CLI按业务参数数组执行；四类服务由独立前台租约持有。共享核心WS使用本次能力密钥，代理另隔离上游密钥，隧道stdin轮换与ACK。",
       "stop": "取消/超时回收拥有的进程树，waitid WNOWAIT保留直接子进程身份直到close",
       "status": "源码接入，未构建/运行",
       "abi": [
@@ -438,6 +438,38 @@
         {
           "path": "codex-rs/stdio-to-uds/src/lib.rs",
           "sha256": "f6d45cd733992f9882af62478245a0b8c98010b0dde0626f422d297d5751a050"
+        },
+        {
+          "path": "codex-rs/responses-api-proxy/src/lib.rs",
+          "sha256": "e080ce9ef9b8e858ceee145842ad8b84ce3b38056c892e3f2115d5caeae71b71"
+        },
+        {
+          "path": "codex-rs/tcp-tunnel/src/lib.rs",
+          "sha256": "dce17073d5dd228af24386ef720df0b56aa3e1204e5c6297e1c43a4068291ea0"
+        },
+        {
+          "path": "codex-rs/tcp-tunnel/src/control.rs",
+          "sha256": "42811a1dd77c172c47da820b042abb2d51ec374205a4dfb472dfa0225d9bffaf"
+        },
+        {
+          "path": "codex-rs/cli/src/exec_server_command.rs",
+          "sha256": "29f5c9a229c824d2f3ccbe85f27c6f2e17e44a3939532320295b4cdc51e018fc"
+        },
+        {
+          "path": "codex-rs/exec-server/src/server/transport.rs",
+          "sha256": "44d0c5309e66fa5740543b08467bcea7e23dcb900ac3a116b2146173fe730276"
+        },
+        {
+          "path": "codex-rs/app-server-transport/src/transport/websocket.rs",
+          "sha256": "38cb8c3e8e3fb77da1849644d1230814828973f19ec94eb8f6bba40dd62995cc"
+        },
+        {
+          "path": "codex-rs/chatgpt/src/apply_command.rs",
+          "sha256": "3dd0f72d3bfa12eb4310c4428c4cd7ad4e0002b15f884002e3fb14d2e01725a8"
+        },
+        {
+          "path": "codex-rs/tui/src/app/agents_overview_discovery.rs",
+          "sha256": "c8a4d2765955a88a4a32dcfe864303241d3f89960c19b41903affe500fba5428"
         }
       ]
     }

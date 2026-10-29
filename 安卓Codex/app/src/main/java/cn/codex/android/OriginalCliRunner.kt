@@ -5,10 +5,11 @@ import kotlinx.coroutines.*
 import java.io.*
 import java.util.UUID
 
-data class OriginalCliResult(val exitCode:Int,val output:String)
+data class OriginalCliResult(val exitCode:Int,val output:String,val artifact:String?=null)
 /** 每次命令拥有自己的进程、凭证桥与退出状态；不经过shell，不自动重放。 */
 class OriginalCliRunner(private val context:Context,private val scope:CoroutineScope,private val workspace:File,private val home:File) {
     suspend fun execute(plan:OriginalCliPlan):OriginalCliResult=withContext(Dispatchers.IO){
+        check(plan.arguments.take(2)!=listOf("debug","app-server")){"原版调试客户端会另起核心子进程，其独立凭证授权尚未对齐；请使用工作区发送诊断消息"}
         val binary=File(context.applicationInfo.nativeLibraryDir,"libcodex_cli.so")
         check(binary.isFile && binary.canExecute()){ "当前包没有原版CLI，请先生成并随包安装对应ABI产物" }
         val environment=System.getenv().toMutableMap()
@@ -16,7 +17,25 @@ class OriginalCliRunner(private val context:Context,private val scope:CoroutineS
         val vault=OriginalVaultServer(context,scope);var process:NativeCoreProcess?=null;var expected:File?=null
         try{
             val arguments=mutableListOf("-c","cli_auth_credentials_store=\"keyring\"","-c","mcp_oauth_credentials_store=\"keyring\"")
-            arguments+=plan.arguments
+            var artifact:File?=null
+            val exportToken="@ANDROID_EXPORT@"
+            if(plan.arguments.any{it.startsWith(exportToken)}){
+                require(plan.arguments.take(2) in listOf(listOf("app-server","generate-ts"),listOf("app-server","generate-json-schema"),listOf("app-server","generate-internal-json-schema"),listOf("debug","trace-reduce")))
+                val root=File(context.filesDir,"导出").apply{check(isDirectory || mkdirs())}
+                artifact=File(root,UUID.randomUUID().toString()).apply{check(mkdir())}
+            }
+            arguments+=plan.arguments.map{if(it.startsWith(exportToken))it.replace(exportToken,requireNotNull(artifact).absolutePath)else it}
+            fun projectInput(raw:String,directory:Boolean):File{
+                require(!File(raw).isAbsolute){"输入文件需填写当前项目相对路径"}
+                val path=File(workspace,raw).canonicalFile
+                require(path.path.startsWith(workspace.canonicalPath+File.separator) && if(directory)path.isDirectory else path.isFile && path.length()<=20L*1024*1024){"输入不在项目内、不存在或超过20MiB"}
+                return path
+            }
+            if(plan.arguments.take(2)==listOf("debug","trace-reduce")){val path=projectInput(plan.arguments[2],true);arguments[arguments.indexOf("trace-reduce")+1]=path.absolutePath}
+            if(plan.arguments.take(2)==listOf("debug","prompt-input")){
+                val end=plan.arguments.indexOf("--").let{if(it<0)plan.arguments.size else it}
+                for(i in 2 until end)if(plan.arguments[i]=="--image")projectInput(plan.arguments[i+1],false)
+            }
             if(plan.arguments.firstOrNull()=="execpolicy"){
                 for(index in 0 until plan.arguments.indexOf("--"))if(plan.arguments[index]=="-r"){
                     val relative=plan.arguments[index+1];require(!File(relative).isAbsolute){"规则文件请填写当前项目相对路径"}
@@ -34,7 +53,7 @@ class OriginalCliRunner(private val context:Context,private val scope:CoroutineS
             environment["CODEX_CA_CERTIFICATE"]=requireNotNull(environment["SSL_CERT_FILE"]);environment.remove("SSL_CERT_DIR")
             environment["PATH"]=(context.applicationContext as CodexApplication).toolPath
             environment["CODEX_ANDROID_VAULT_SOCKET"]=vault.path;environment["CODEX_ANDROID_VAULT_HOST_PID"]=android.os.Process.myPid().toString()
-            for(key in listOf("OPENAI_API_KEY","CODEX_API_KEY","CODEX_ANDROID_API_KEY","CODEX_ANDROID_VERIFICATION_SOCKET"))environment.remove(key)
+            for(key in listOf("OPENAI_API_KEY","CODEX_API_KEY","CODEX_ANDROID_API_KEY","CODEX_ANDROID_VERIFICATION_SOCKET","CODEX_ANDROID_DAEMON_PARENT_STDIN","CODEX_ANDROID_DAEMON_RECEIPT"))environment.remove(key)
             val child=NativeCoreProcess(binary,arguments,environment,workspace).also{process=it};vault.authorize(child.pid)
             coroutineScope{
                 val stdout=async(Dispatchers.IO){
@@ -46,7 +65,7 @@ class OriginalCliRunner(private val context:Context,private val scope:CoroutineS
                     withTimeout(plan.timeoutMs){
                         child.output.use{it.write(plan.input.toByteArray(Charsets.UTF_8));it.flush()}
                         var code=child.pollExit();while(code==null){delay(25);code=child.pollExit()}
-                        OriginalCliResult(requireNotNull(code),stdout.await()).also{stderr.join()}
+                        OriginalCliResult(requireNotNull(code),stdout.await(),artifact?.absolutePath).also{stderr.join()}
                     }
                 }finally{withContext(NonCancellable+Dispatchers.IO){child.close()}}
             }
