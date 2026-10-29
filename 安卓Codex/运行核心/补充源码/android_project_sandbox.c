@@ -72,7 +72,8 @@ int main(int argc,char **argv) {
     for(int fd=3;fd<(int)descriptors.rlim_cur;fd++)close(fd);
     int abi=(int)syscall(__NR_landlock_create_ruleset,NULL,0,1);
     if(argc==2 && !strcmp(argv[1],"probe")) { printf("{\"landlockAbi\":%d,\"minimumAbi\":6,\"established\":false}\n",abi);return abi>=6 ? 0 : 78; }
-    int mediated=argc>=7 && !strcmp(argv[1],"exec") && !strcmp(argv[5],"--");
+    int extended=argc>=9 && (!strcmp(argv[1],"exec") || !strcmp(argv[1],"run-extended")) && !strcmp(argv[7],"--");
+    int mediated=extended || (argc>=7 && !strcmp(argv[1],"exec") && !strcmp(argv[5],"--"));
     if(!mediated && (argc<6 || strcmp(argv[1],"run") || strcmp(argv[4],"--")))return fail("invalid command");
     if(abi<6)return fail("Landlock ABI6 unavailable; command was not executed");
     char *project=realpath(argv[2],NULL),*programs=realpath(argv[3],NULL);
@@ -88,10 +89,13 @@ int main(int argc,char **argv) {
     if(path(rules,project,WRITE_TREE,0) || path(rules,programs,READ_EXEC,0) ||
        path(rules,"/system",READ_EXEC,0) || path(rules,"/apex",READ_EXEC,0) || path(rules,"/vendor",READ_EXEC,1) ||
        path(rules,"/dev/null",(1ULL<<1)|(1ULL<<2),0) || path(rules,"/dev/urandom",1ULL<<2,0))return fail("path policy failed");
+    if(extended){
+        for(int i=5;i<=6;i++){char *resource=realpath(argv[i],NULL);if(!resource || !strcmp(resource,"/") || path(rules,resource,READ_EXEC,0))return fail("runtime read policy failed");free(resource);}
+    }
     if(chdir(cwd) || syscall(__NR_landlock_restrict_self,rules,0))return fail("filesystem restriction failed");
     close(rules);free(project);free(programs);free(cwd);
     if(filter())return fail("syscall policy failed");
-    if(!mediated){puts("{\"sandboxReady\":true,\"network\":\"denied\",\"projectWrite\":true}");fflush(stdout);}
-    int command=mediated ? 6 : 5;
+    if(strcmp(argv[1],"exec")){puts("{\"sandboxReady\":true,\"network\":\"denied\",\"projectWrite\":true}");fflush(stdout);}
+    int command=extended ? 8 : mediated ? 6 : 5;
     execvp(argv[command],&argv[command]);return fail("program could not start");
 }

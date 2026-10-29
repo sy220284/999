@@ -45,14 +45,14 @@
 +
 +    #[cfg(target_os = "android")]
 +    if let Some(spawned) = android_restricted_spawn(&request).await? { return Ok(finish_spawn(spawned)); }
-@@ -142,0 +146,81 @@
+@@ -142,0 +146,94 @@
 +
 +/// Android命令附加限制只在宿主冻结策略存在时启用；不把它报告为原版Linux沙箱。
 +#[cfg(target_os = "android")]
-+struct AndroidCommandPolicy { version: u32, project: String, program: String }
++struct AndroidCommandPolicy { version: u32, project: String, program: String, runtime: Option<String>, tools: Option<String> }
 +
 +#[cfg(target_os = "android")]
-+fn android_command_environment(source: &HashMap<String, String>, root: &Path, native: &Path) -> HashMap<String, String> {
++fn android_command_environment(source: &HashMap<String, String>, root: &Path, native: &Path, runtime: Option<&Path>, tools: Option<&Path>) -> HashMap<String, String> {
 +    let mut output: HashMap<String,String> = source.iter().filter(|(key, _)| matches!(key.as_str(),
 +        "PATH" | "LANG" | "LC_ALL" | "LC_CTYPE" | "TZ" | "TERM" | "COLORTERM" | "ANDROID_ROOT" | "ANDROID_DATA"))
 +        .map(|(key,value)|(key.clone(),value.clone())).collect();
@@ -60,6 +60,14 @@
 +    output.insert("TMPDIR".into(),root.to_string_lossy().into_owned());
 +    output.insert("SHELL".into(),"/system/bin/sh".into());
 +    output.insert("LD_LIBRARY_PATH".into(),native.to_string_lossy().into_owned());
++    for key in ["CODEX_ANDROID_PYTHON_HOME","CODEX_ANDROID_NODE_HOME","GIT_TEMPLATE_DIR","GIT_EXEC_PATH"] {
++        if let Some(value)=source.get(key) {
++            if let Ok(path)=std::fs::canonicalize(value) {
++                if runtime.is_some_and(|root|path.starts_with(root)) || tools.is_some_and(|root|path.starts_with(root)) { output.insert(key.to_owned(),path.to_string_lossy().into_owned()); }
++            }
++        }
++    }
++    output.insert("npm_config_script_shell".into(),"/system/bin/sh".into());
 +    output
 +}
 +
@@ -82,18 +90,23 @@
 +    anyhow::ensure!(document.len() <= 8192, "Android command policy exceeds budget");
 +    let value:serde_json::Value=serde_json::from_str(document).context("Android command policy is invalid")?;
 +    let object=value.as_object().context("Android command policy must be an object")?;
-+    anyhow::ensure!(object.len()==3 && object.keys().all(|x| ["version","project","program"].contains(&x.as_str())), "unknown Android command policy fields");
++    anyhow::ensure!((3..=5).contains(&object.len()) && object.keys().all(|x| ["version","project","program","runtime","tools"].contains(&x.as_str())), "unknown Android command policy fields");
 +    let version=object.get("version").and_then(|x|x.as_u64()).context("missing Android command policy version")?;
 +    anyhow::ensure!(version==1, "unknown Android command policy version");
-+    let policy=AndroidCommandPolicy{version:1,project:object.get("project").and_then(|x|x.as_str()).context("missing Android project")?.to_owned(),program:object.get("program").and_then(|x|x.as_str()).context("missing Android command helper")?.to_owned()};
++    let policy=AndroidCommandPolicy{version:1,project:object.get("project").and_then(|x|x.as_str()).context("missing Android project")?.to_owned(),program:object.get("program").and_then(|x|x.as_str()).context("missing Android command helper")?.to_owned(),runtime:object.get("runtime").map(|x|x.as_str().context("invalid runtime path").map(str::to_owned)).transpose()?,tools:object.get("tools").map(|x|x.as_str().context("invalid tools path").map(str::to_owned)).transpose()?};
 +    // 无法保留更严格原版策略、额外fd或特殊argv0语义时拒绝，不能静默变成普通执行。
 +    anyhow::ensure!(request.sandbox == SandboxType::None, "Android command restriction cannot replace another requested sandbox");
 +    anyhow::ensure!(request.inherited_fds.as_slice().is_empty() && request.arg0.is_none(), "Android restricted command cannot inherit descriptors or override argv0");
 +    anyhow::ensure!(!request.command.is_empty(), "missing Android restricted command");
 +    let(root,cwd,program)=android_command_paths(&policy,request.cwd)?;
 +    let native=program.parent().context("missing Android native program directory")?;
-+    let environment=android_command_environment(request.env,&root,native);
++    let runtime=policy.runtime.as_ref().map(std::fs::canonicalize).transpose().context("Android runtime root is unavailable")?;
++    let tools=policy.tools.as_ref().map(std::fs::canonicalize).transpose().context("Android tools root is unavailable")?;
++    anyhow::ensure!(runtime.is_some()==tools.is_some(), "Android runtime and tool roots must be provided together");
++    for path in [&runtime,&tools].into_iter().flatten() { anyhow::ensure!(path.parent().is_some() && path.is_dir(), "invalid Android read-only runtime root"); }
++    let environment=android_command_environment(request.env,&root,native,runtime.as_deref(),tools.as_deref());
 +    let mut args=vec!["exec".to_owned(),root.to_string_lossy().into_owned(),native.to_string_lossy().into_owned(),cwd.to_string_lossy().into_owned(),"--".to_owned()];
++    if let(Some(runtime),Some(tools))=(&runtime,&tools){args.insert(4,runtime.to_string_lossy().into_owned());args.insert(5,tools.to_string_lossy().into_owned());}
 +    args.extend_from_slice(request.command);
 +    let no_arg0=None;
 +    let spawned=if request.tty {
@@ -112,7 +125,7 @@
 +    #[test]
 +    fn environment_never_copies_identity_or_vault_credentials() {
 +        let source=HashMap::from([("PATH".to_owned(),"/system/bin".to_owned()),("CODEX_ACCESS_TOKEN".to_owned(),"secret".to_owned()),("CODEX_ANDROID_VAULT_SOCKET".to_owned(),"bridge".to_owned()),("AWS_SECRET_ACCESS_KEY".to_owned(),"aws".to_owned())]);
-+        let env=android_command_environment(&source,Path::new("/project"),Path::new("/native"));
++        let env=android_command_environment(&source,Path::new("/project"),Path::new("/native"),None,None);
 +        assert_eq!(env.get("PATH").unwrap(),"/system/bin");
 +        assert!(!env.values().any(|x| ["secret","bridge","aws"].contains(&x.as_str())));
 +        assert_eq!(env.get("HOME").unwrap(),"/project");
@@ -123,7 +136,7 @@
 +        std::fs::create_dir(&root).unwrap();std::fs::create_dir(&other).unwrap();
 +        let program=temp.path().join("libcodex_sandbox.so");std::fs::write(&program,b"not executed").unwrap();
 +        std::os::unix::fs::symlink(&other,root.join("escape")).unwrap();
-+        let policy=AndroidCommandPolicy{version:1,project:root.display().to_string(),program:program.display().to_string()};
++        let policy=AndroidCommandPolicy{version:1,project:root.display().to_string(),program:program.display().to_string(),runtime:None,tools:None};
 +        assert!(android_command_paths(&policy,&root).is_ok());assert!(android_command_paths(&policy,&root.join("escape")).is_err());
 +    }
 +}

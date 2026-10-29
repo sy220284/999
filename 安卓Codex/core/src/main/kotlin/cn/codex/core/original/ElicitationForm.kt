@@ -4,9 +4,12 @@ import cn.codex.core.string
 import kotlinx.serialization.json.*
 
 /** 普通字段使用原生控件；嵌套对象/数组使用 JSON 内容并执行同一份结构校验。 */
-class ElicitationForm(val schema: JsonObject,suppliedResources:List<JsonObject> = emptyList()) {
+class ElicitationForm(val schema: JsonObject,suppliedResources:List<JsonObject> = emptyList(),val requiresStandardValidation:Boolean=false) {
     private val normalized=runCatching{normalize(schema,0)}.getOrNull() as? JsonObject
-    private val validator=normalized?.let{JsonSchemaFormValidator(it,suppliedResources.map{resource->normalize(resource,0).jsonObject})}
+    val normalizedResources=suppliedResources.map{resource->normalize(resource,0).jsonObject}
+    val normalizedSchema get()=requireNotNull(normalized)
+    private val validator=normalized?.let{JsonSchemaFormValidator(it,normalizedResources)}
+    private val legacySupported=validator?.supported()==true
     data class Field(val name: String, val schema: JsonObject, val required: Boolean) {
         val type get() = if(schema.string("type")=="openai/imagePicker")"string"else (schema["type"] as? JsonPrimitive)?.contentOrNull ?: if (options?.firstOrNull() is JsonPrimitive && options!!.first().jsonPrimitive.isString) "string" else "json"
         val title get() = schema.string("title", name)
@@ -21,10 +24,10 @@ class ElicitationForm(val schema: JsonObject,suppliedResources:List<JsonObject> 
     }
     private val required = (schema["required"] as? JsonArray).orEmpty().mapNotNull { (it as? JsonPrimitive)?.takeIf{part->part.isString}?.content }.toSet()
     val fields = (schema["properties"] as? JsonObject).orEmpty().entries.take(128).map { (name, raw) -> Field(name, raw as? JsonObject ?: buildJsonObject {}, name in required) }
-    val rawInput = schema.keys.any { it in setOf("oneOf", "anyOf", "allOf", "\$ref", "\$dynamicRef", "if") }
-    val supported = schema.toString().toByteArray().size<=256*1024 && (schema["properties"] as? JsonObject).orEmpty().size<=128 && (schema["type"] as? JsonPrimitive)?.content == "object" && validator?.supported()==true
+    val rawInput = requiresStandardValidation && (!legacySupported || (schema["properties"] as? JsonObject).orEmpty().size>128) || schema.keys.any { it in setOf("oneOf", "anyOf", "allOf", "\$ref", "\$dynamicRef", "if") }
+    val supported = schema.toString().toByteArray().size<=256*1024 && (requiresStandardValidation || (schema["properties"] as? JsonObject).orEmpty().size<=128) && (schema["type"] as? JsonPrimitive)?.content == "object" && (requiresStandardValidation || legacySupported)
     val initialValues = if (rawInput) mapOf("__form_json" to (schema["default"] ?: buildJsonObject {}).toString()) else fields.mapNotNull { field -> field.schema["default"]?.let { field.name to if (it is JsonPrimitive && it.isString) it.content else it.toString() } }.toMap()
-    fun content(values: Map<String, String>): JsonObject {
+    fun draft(values:Map<String,String>):JsonObject {
         require(supported) { "表单包含无法本地解析的引用或验证规则" }
         val result = if (rawInput) Json.parseToJsonElement(values["__form_json"].orEmpty()).jsonObject else buildJsonObject {
             fields.forEach { field -> values[field.name]?.let { text ->
@@ -32,8 +35,11 @@ class ElicitationForm(val schema: JsonObject,suppliedResources:List<JsonObject> 
                 put(field.name, value)
             } }
         }
-        requireNotNull(validator).validate(result)
         return result
+    }
+    fun content(values:Map<String,String>):JsonObject{
+        require(!requiresStandardValidation){"此表单必须先完成标准校验，不能绕过验证提交"}
+        return draft(values).also{requireNotNull(validator).validate(it)}
     }
     private fun normalize(value:JsonElement,depth:Int):JsonElement {
         require(depth<=64)

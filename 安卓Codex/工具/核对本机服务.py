@@ -9,7 +9,7 @@ import tree_sitter_rust
 rust=Parser(Language(tree_sitter_rust.language()))
 spec=importlib.util.spec_from_file_location('cli_patch',native/'应用CLI补丁.py');patch=importlib.util.module_from_spec(spec);spec.loader.exec_module(patch)
 manifest=json.loads((native/'安卓服务补丁来源.json').read_text())
-patches=[native/x for x in ['安卓依赖适配.patch','安卓用户验证.patch','安卓CLI差异确认.patch','安卓本机服务.patch','安卓诊断连接.patch','安卓远程执行状态.patch','安卓Unix共享核心.patch','安卓执行链补齐.patch']]
+patches=[native/x for x in ['安卓依赖适配.patch','安卓用户验证.patch','安卓CLI差异确认.patch','安卓本机服务.patch','安卓诊断连接.patch','安卓远程执行状态.patch','安卓Unix共享核心.patch','安卓执行链补齐.patch','安卓MCP凭证注销.patch','安卓登录事件.patch']]
 paths={'codex-rs/Cargo.lock'}
 for item in patches:
  paths.update(re.findall(r'^\+\+\+ b/(.+)$',item.read_text(),re.M))
@@ -21,7 +21,7 @@ with tempfile.TemporaryDirectory() as temporary:
  assert patch.apply(root)=='applied'
  assert patch.apply(root,native/'安卓本机服务.patch',native/'安卓服务补丁来源.json')=='applied'
  assert patch.apply(root,native/'安卓本机服务.patch',native/'安卓服务补丁来源.json')=='already_applied'
- for diff,record in [('安卓诊断连接.patch','安卓诊断补丁来源.json'),('安卓远程执行状态.patch','安卓远程执行补丁来源.json'),('安卓Unix共享核心.patch','安卓Unix补丁来源.json'),('安卓执行链补齐.patch','安卓执行链补丁来源.json')]:
+ for diff,record in [('安卓诊断连接.patch','安卓诊断补丁来源.json'),('安卓远程执行状态.patch','安卓远程执行补丁来源.json'),('安卓Unix共享核心.patch','安卓Unix补丁来源.json'),('安卓执行链补齐.patch','安卓执行链补丁来源.json'),('安卓MCP凭证注销.patch','安卓MCP注销补丁来源.json'),('安卓登录事件.patch','安卓登录补丁来源.json')]:
   assert patch.apply(root,native/diff,native/record)=='applied'
   assert patch.apply(root,native/diff,native/record)=='already_applied'
  parsed=0
@@ -39,7 +39,7 @@ with tempfile.TemporaryDirectory() as temporary:
  lock=tomllib.loads((root/'codex-rs/Cargo.lock').read_text())
  package=next(x for x in lock['package']if x['name']=='codex-responses-api-proxy');assert 'subtle' in package['dependencies']
  assert next(x for x in lock['package']if x['name']=='subtle')['version']=='2.6.1'
- print(f'组合八份补丁通过；{parsed}份Rust语法、TOML/Cargo.lock解析及现有依赖增量一致。')
+ print(f'组合十份补丁通过；{parsed}份Rust语法、TOML/Cargo.lock解析及现有依赖增量一致。')
 def read(name):return (r/name).read_text()
 manager=read('app/src/main/java/cn/codex/android/NativeEndpoints.kt')
 for term in ['CoroutineStart.LAZY','startReserved','stopOwned','lease.owner==owner','lease.id','AUTH_UPDATED','process.pollExit()','v.authorize(process.pid)','verification?.authorize(process.pid)','cleanupProcess(lease)','lease.payload.fill(0)','lease.localToken.fill(0)','daemonConnection(config:ApiConfig)']:

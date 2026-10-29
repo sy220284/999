@@ -12,9 +12,9 @@ import cn.codex.core.original.OriginalCommandController
 
 @Composable fun OriginalCommandScreen(controller: OriginalCommandController, defaultCwd: String, onBack: () -> Unit) {
     val state by controller.state.collectAsState()
-    var command by remember { mutableStateOf("") }; var cwd by remember { mutableStateOf(defaultCwd) }
+    var command by remember { mutableStateOf("") }; var cwd by remember(defaultCwd) { mutableStateOf(defaultCwd) }
     var experimental by remember { mutableStateOf(false) }
-    var tty by remember { mutableStateOf(false) }; var consent by remember { mutableStateOf(false) }
+    var tty by remember { mutableStateOf(false) }; var consent by remember(defaultCwd) { mutableStateOf(false) }
     var input by remember { mutableStateOf("") }; var timeout by remember { mutableStateOf("60000") }
     var rows by remember { mutableStateOf("24") }; var cols by remember { mutableStateOf("80") }
     BackHandler(onBack = onBack)

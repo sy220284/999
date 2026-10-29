@@ -1,0 +1,11 @@
+{
+  "source_commit": "970111f6cb62cc02fe36a82ea7d71b37a2889c97",
+  "patch_sha256": "7f3ce29cddbfb17f4433626f95019c421c52896d64edd46396a31783cd9203ee",
+  "files": [
+    {
+      "path": "codex-rs/login/src/device_code_auth.rs",
+      "before": "075c3f83cbc2612dde7b50f118b7a3c1ef3b7641ce6acfcca99aff5dd7454012",
+      "after": "64b4c8f8bfbf0d7b28092557c19ed4abb06de7ec6c3a3582f579c3b68a4df048"
+    }
+  ]
+}

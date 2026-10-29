@@ -1,0 +1,12 @@
+--- a/codex-rs/login/src/device_code_auth.rs
++++ b/codex-rs/login/src/device_code_auth.rs
+@@ -160,0 +161,9 @@
++    #[cfg(target_os = "android")]
++    if std::env::var_os("CODEX_ANDROID_LOGIN_EVENTS").as_deref() == Some(std::ffi::OsStr::new("1")) {
++        use std::io::Write;
++        let value=serde_json::json!({"androidDeviceCode":1,"verificationUrl":verification_url,"userCode":code});
++        let mut output=std::io::stdout().lock();
++        let _=writeln!(output,"{value}");let _=output.flush();
++        return;
++    }
++

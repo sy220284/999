@@ -1,6 +1,6 @@
 {
   "upstream_commit": "970111f6cb62cc02fe36a82ea7d71b37a2889c97",
-  "evidence": "固定上游提交的13项条目、37份唯一源码证据；无构建/运行结果",
+  "evidence": "固定上游提交的15项条目、67份唯一源码证据；无构建/运行结果",
   "entries": [
     {
       "name": "app-server",
@@ -522,6 +522,26 @@
         {
           "path": "codex-rs/app-server-protocol/src/protocol/v2/thread.rs",
           "sha256": "3532f87c9e55c9e539ed3c48c74701a14f4b9e401564b5cbafe624941302755c"
+        },
+        {
+          "path": "codex-rs/exec/src/cli.rs",
+          "sha256": "66643e8b3d5964b70cb8f231fb309312376272fb3ea87bcb6849f44cf112f8f6"
+        },
+        {
+          "path": "codex-rs/exec/src/lib.rs",
+          "sha256": "4229c67ec7a4d9aa21f26c500f1206660f7ccb3a6c047843a3fa7295938a0848"
+        },
+        {
+          "path": "codex-rs/utils/cli/src/shared_options.rs",
+          "sha256": "6eefb5fcf0545fca54ffa1f80a6d3630c8d9b61ec449466d5834ac9c489f76d8"
+        },
+        {
+          "path": "codex-rs/cli/src/mcp_cmd.rs",
+          "sha256": "a56092bf786df732f3685a1942c47ef4877552e01d4f9fc65c2fb393d1d5eeff"
+        },
+        {
+          "path": "codex-rs/login/src/device_code_auth.rs",
+          "sha256": "075c3f83cbc2612dde7b50f118b7a3c1ef3b7641ce6acfcca99aff5dd7454012"
         }
       ]
     },

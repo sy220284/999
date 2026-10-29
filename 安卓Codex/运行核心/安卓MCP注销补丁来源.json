@@ -1,0 +1,11 @@
+{
+  "source_commit": "970111f6cb62cc02fe36a82ea7d71b37a2889c97",
+  "patch_sha256": "acc7823cc100a8d213c17f197afc292b3a60b89ebaa4dd7d794f28f92d6aba47",
+  "files": [
+    {
+      "path": "codex-rs/cli/src/mcp_cmd.rs",
+      "before": "a56092bf786df732f3685a1942c47ef4877552e01d4f9fc65c2fb393d1d5eeff",
+      "after": "45bc6e41975525d1f966e8bfb7d10a40551e3637683b2a70488b58207b9d7041"
+    }
+  ]
+}

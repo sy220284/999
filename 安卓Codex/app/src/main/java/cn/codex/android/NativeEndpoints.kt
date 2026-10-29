@@ -168,10 +168,10 @@ class NativeEndpoints(private val context:Context,private val scope:CoroutineSco
         NativeEndpointPlans.tunnel(trusted,target,port,File(dir,"origins").absolutePath)}
         }catch(error:Exception){reject(NativeEndpointKind.TUNNEL,error.message ?: "隧道配置无效")}
     }
-    fun startExecutor(port:Int){try{NativeEndpointPlans.executor("a".repeat(64),port)
-        reserve(NativeEndpointKind.EXECUTOR,ByteArray(0)){_,token->NativeEndpointPlans.executor(sha(token),port)}}catch(error:Exception){reject(NativeEndpointKind.EXECUTOR,error.message ?: "执行服务配置无效")}}
-    fun startDaemon(port:Int,remote:Boolean,unix:Boolean=false){try{NativeEndpointPlans.daemon("a".repeat(64),port,remote)
-        reserve(NativeEndpointKind.DAEMON,ByteArray(0)){dir,token->val saved=if(remote)null else savedRemotePreference();if(unix)NativeEndpointPlans.unixDaemon(daemonSocket(dir.name).absolutePath,remote || saved==true,!remote && saved==false)else NativeEndpointPlans.daemon(sha(token),port,remote || saved==true,!remote && saved==false)}}catch(error:Exception){reject(NativeEndpointKind.DAEMON,error.message ?: "共享核心配置无效")}}
+    fun startExecutor(port:Int,concurrent:Int=1,strict:Boolean=false,pidNamespace:String="isolate",proxyPrivate:Boolean=false){try{NativeEndpointPlans.executor("a".repeat(64),port,concurrent,strict,pidNamespace,proxyPrivate)
+        reserve(NativeEndpointKind.EXECUTOR,ByteArray(0)){_,token->NativeEndpointPlans.executor(sha(token),port,concurrent,strict,pidNamespace,proxyPrivate)}}catch(error:Exception){reject(NativeEndpointKind.EXECUTOR,error.message ?: "执行服务配置无效")}}
+    fun startDaemon(port:Int,remote:Boolean,unix:Boolean=false,strict:Boolean=false){try{NativeEndpointPlans.daemon("a".repeat(64),port,remote)
+        reserve(NativeEndpointKind.DAEMON,ByteArray(0)){dir,token->val saved=if(remote)null else savedRemotePreference();if(unix)NativeEndpointPlans.unixDaemon(daemonSocket(dir.name).absolutePath,remote || saved==true,!remote && saved==false,strict)else NativeEndpointPlans.daemon(sha(token),port,remote || saved==true,!remote && saved==false,strict)}}catch(error:Exception){reject(NativeEndpointKind.DAEMON,error.message ?: "共享核心配置无效")}}
     fun savedRemotePreference():Boolean?{
         val file=File(context.filesDir,"原版核心数据/app-server-daemon/settings.json")
         if(!file.isFile)return null
@@ -179,10 +179,10 @@ class NativeEndpoints(private val context:Context,private val scope:CoroutineSco
         val value=Json.parseToJsonElement(bytes.toString(Charsets.UTF_8)).jsonObject["remoteControlEnabled"] ?: return null
         return requireNotNull((value as? JsonPrimitive)?.booleanOrNull){"远控持久设置损坏，请核查原版配置"}
     }
-    fun startRemoteExecutor(url:String,environment:String,name:String,auth:RemoteExecutorAuth,token:String,expires:Long,profile:String,region:String,service:String,forward:Boolean=false,concurrent:Int=1,strict:Boolean=false){
+    fun startRemoteExecutor(url:String,environment:String,name:String,auth:RemoteExecutorAuth,token:String,expires:Long,profile:String,region:String,service:String,forward:Boolean=false,concurrent:Int=1,strict:Boolean=false,pidNamespace:String="isolate",proxyPrivate:Boolean=false){
         try{
             val owned=if(forward)state.value[NativeEndpointKind.EXECUTOR]?.takeIf{it.ready && it.running && !it.stopping} ?: error("请先启动本次已认证本机执行器")else null
-            val plan=RemoteExecutorPlan.build(url,environment,name,auth,profile,region,service,owned?.address,concurrent,strict)
+            val plan=RemoteExecutorPlan.build(url,environment,name,auth,profile,region,service,owned?.address,concurrent,strict,pidNamespace,proxyPrivate)
             val payload=if(auth==RemoteExecutorAuth.SCOPED)RemoteExecutorPlan.credential(environment,token,expires)else ByteArray(0)
             val extra=mutableMapOf<String,String>()
             if(auth==RemoteExecutorAuth.AGENT_IDENTITY){NativeEndpointPlans.credential(token,65536).fill(0);extra["CODEX_ACCESS_TOKEN"]=token}

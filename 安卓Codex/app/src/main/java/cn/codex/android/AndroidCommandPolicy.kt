@@ -15,6 +15,6 @@ object AndroidCommandPolicy {
         val project=File(context.filesDir,"工作区/原版项目").apply{mkdirs()}.canonicalFile
         val helper=File(context.applicationInfo.nativeLibraryDir,"libcodex_sandbox.so").canonicalFile
         check(helper.isFile && helper.canExecute()){"受限命令模式所需程序缺失，请安装含对应产物的包；不会降级执行"}
-        return mapOf(AndroidCommandPolicyDocument.ENV to AndroidCommandPolicyDocument.create(project.path,helper.path).toString())
+        return mapOf(AndroidCommandPolicyDocument.ENV to AndroidCommandPolicyDocument.create(project.path,helper.path,File(context.filesDir,"内置运行环境").apply{mkdirs()}.canonicalPath,File(context.filesDir,"原版工具").apply{mkdirs()}.canonicalPath).toString())
     }
 }

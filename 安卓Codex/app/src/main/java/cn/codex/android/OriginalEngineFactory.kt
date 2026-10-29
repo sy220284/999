@@ -53,6 +53,8 @@ object NativeOriginalEngineFactory:OriginalEngineFactory {
             remove("CODEX_INTERNAL_APP_SERVER_REMOTE_CONTROL_DISABLED")
                 remove("CODEX_ANDROID_DEBUG_CONNECTION_FILE")
                 remove("CODEX_ANDROID_FORWARD_AUTH")
+                remove("CODEX_ANDROID_LOGIN_EVENTS")
+                remove("CODEX_ANDROID_PRETTIER_SCRIPT")
                 remove("CODEX_ANDROID_COMMAND_SANDBOX")
                 remove("CODEX_ANDROID_EXECUTOR_EVENTS")
                 remove("CODEX_ANDROID_DAEMON_PARENT_STDIN")

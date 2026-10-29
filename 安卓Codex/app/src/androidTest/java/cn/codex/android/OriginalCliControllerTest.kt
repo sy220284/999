@@ -5,6 +5,7 @@ import kotlinx.coroutines.flow.first
 import org.junit.Test
 import org.junit.Assert.*
 import java.util.concurrent.Executors
+import kotlinx.serialization.json.*
 class OriginalCliControllerTest {
     @Test fun applyingCloudChangesUsesTheExactApprovedPreviewAndRejectsOldPreview()=runBlocking {
         val dispatcher=Executors.newSingleThreadExecutor().asCoroutineDispatcher();val scope=CoroutineScope(SupervisorJob()+dispatcher)
@@ -64,4 +65,25 @@ class OriginalCliControllerTest {
         try{withContext(dispatcher){controller.maintain(OriginalCliCommands.doctor())};withTimeout(3000){controller.state.first{!it.busy}};assertEquals("fail",controller.state.value.doctor?.checks?.single()?.status);assertNotNull(controller.state.value.error)}finally{scope.cancel();dispatcher.close()}
     }
 
+    @Test fun mcpLogoutUsesOnlyTheCurrentPreviewAndKeepsTheExpectedCredentialTarget()=runBlocking{
+        val dispatcher=Executors.newSingleThreadExecutor().asCoroutineDispatcher();val scope=CoroutineScope(SupervisorJob()+dispatcher);val plans=mutableListOf<OriginalCliPlan>()
+        val controller=OriginalCliController(scope,{false},OriginalMutationLifecycle.None){plan->plans+=plan;OriginalCliResult(0,if("--preview" in plan.arguments)"""{"name":"server","sharedEnterprise":true,"sha256":"${"a".repeat(64)}"}""" else "done")}
+        try{
+            withContext(dispatcher){controller.previewMcpLogout("server")};withTimeout(3000){controller.state.first{!it.busy}};val old=requireNotNull(controller.state.value.mcpLogout)
+            withContext(dispatcher){controller.dismissMcpLogout();controller.logoutMcp(old)};assertEquals(1,plans.size)
+            withContext(dispatcher){controller.previewMcpLogout("server")};withTimeout(3000){controller.state.first{!it.busy}};val current=requireNotNull(controller.state.value.mcpLogout)
+            withContext(dispatcher){controller.logoutMcp(current)};withTimeout(3000){controller.state.first{!it.busy}}
+            assertEquals("a".repeat(64),plans.last().arguments.last());assertTrue("--expected-sha256" in plans.last().arguments);assertNull(controller.state.value.mcpLogout)
+        }finally{scope.cancel();dispatcher.close()}
+    }
+    @Test fun deviceCodeProgressIsTransientAndLateEventsCannotReviveIt()=runBlocking{
+        val dispatcher=Executors.newSingleThreadExecutor().asCoroutineDispatcher();val scope=CoroutineScope(SupervisorJob()+dispatcher);val finish=CompletableDeferred<Unit>();var progress:((String)->Unit)?=null
+        val event="""{"androidDeviceCode":1,"verificationUrl":"https://issuer.invalid/codex/device","userCode":"ABCD-EFGH"}"""
+        val controller=OriginalCliController(scope,{false},OriginalMutationLifecycle.None){plan->progress=plan.progress;plan.progress?.invoke(event);finish.await();OriginalCliResult(0,event)}
+        try{
+            withContext(dispatcher){controller.maintain(OriginalStandaloneCommands.loginDevice("",""))};withTimeout(3000){controller.state.first{it.deviceCode!=null}};assertEquals("ABCD-EFGH",controller.state.value.deviceCode?.get("userCode")?.jsonPrimitive?.content)
+            finish.complete(Unit);withTimeout(3000){controller.state.first{!it.busy}};assertNull(controller.state.value.deviceCode);assertFalse(controller.state.value.output.contains("ABCD-EFGH"))
+            progress?.invoke(event);assertNull(controller.state.value.deviceCode)
+        }finally{scope.cancel();dispatcher.close()}
+    }
 }

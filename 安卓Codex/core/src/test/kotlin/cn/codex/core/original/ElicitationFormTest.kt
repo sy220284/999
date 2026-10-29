@@ -64,4 +64,12 @@ class ElicitationFormTest {
         assertTrue(schema("""{"type":"array","items":{"type":"integer"}}""").supported)
     }
 
+    @Test fun standardValidationCannotBeBypassedByContent() {
+        val rules=Json.parseToJsonElement("""{"type":"object","properties":{"name":{"type":"string"}}}""").jsonObject
+        val form=ElicitationForm(rules,requiresStandardValidation=true)
+        assertTrue(form.supported)
+        assertEquals("甲",form.draft(mapOf("name" to "甲")).getValue("name").jsonPrimitive.content)
+        assertFailsWith<IllegalArgumentException>{form.content(mapOf("name" to "甲"))}
+    }
+
 }

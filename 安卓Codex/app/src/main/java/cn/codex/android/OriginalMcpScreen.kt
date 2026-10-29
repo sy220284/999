@@ -23,10 +23,12 @@ private data class McpConfirmation(val entry: OriginalMcpEntry, val snapshot: Or
 
 @Composable fun OriginalMcpScreen(controller: OriginalMcpController, allowChanges: Boolean, imports: List<Pair<String, String>>,
     authorizationUrl: String?, authorizationName: String?, hostError: String?, onDismissHostError: () -> Unit,
-    onLogin: (String) -> Unit, onDismissAuthorization: () -> Unit, onBack: () -> Unit) {
+    onLogin: (String,McpLoginOptions) -> Unit, onDismissAuthorization: () -> Unit, onBack: () -> Unit) {
     val state by controller.state.collectAsState()
     val context = LocalContext.current
     val motion = LocalMotionEnabled.current
+    var loginScopes by remember{mutableStateOf("")};var registration by remember{mutableStateOf("auto")};var loginTimeout by remember{mutableStateOf("180")}
+    var loginError by remember{mutableStateOf<String?>(null)}
     var search by remember { mutableStateOf("") }
     var confirmation by remember { mutableStateOf<McpConfirmation?>(null) }
     var toolCall by remember { mutableStateOf<Triple<String, String, JsonObject>?>(null) }
@@ -51,6 +53,12 @@ private data class McpConfirmation(val entry: OriginalMcpEntry, val snapshot: Or
                     TextButton(onClick = controller::reconnect, enabled = state.connected && !state.busy && allowChanges) { Text("重新连接") }
                     FilledTonalButton(onClick = { controller.edit() }, enabled = state.snapshot != null && !state.busy && allowChanges) { Text("添加服务") }
                 }
+                Text("本次OAuth登录选项",style=MaterialTheme.typography.titleSmall)
+                Row{listOf("auto" to "自动发现","cimd" to "CIMD","dcr" to "动态注册").forEach{(key,label)->FilterChip(registration==key,{registration=key},label={Text(label)},enabled=!state.busy && authorizationUrl==null)}}
+                OutlinedTextField(loginScopes,{loginScopes=it},label={Text("本次授权范围（每行一项，可选）")},enabled=!state.busy && authorizationUrl==null,modifier=Modifier.fillMaxWidth())
+                OutlinedTextField(loginTimeout,{loginTimeout=it},label={Text("授权等待秒数（1–3600）")},enabled=!state.busy && authorizationUrl==null)
+                Text("只影响下一次授权，不修改服务持久配置。注销已有服务凭证请先断开核心，在“云任务与本机维护”中预览并确认注销。",style=MaterialTheme.typography.bodySmall)
+                loginError?.let{Text(it,color=MaterialTheme.colorScheme.error)}
                 if (imports.isNotEmpty()) TextButton(onClick = { showImports = true }, enabled = state.snapshot != null && !state.busy && allowChanges) { Text("从连接设置导入") }
                 if (state.snapshot == null && state.connected) Text("没有可写的用户配置版本，当前只能查看；可刷新后重试。", style = MaterialTheme.typography.bodySmall)
             }
@@ -111,7 +119,7 @@ private data class McpConfirmation(val entry: OriginalMcpEntry, val snapshot: Or
                             TextButton(onClick = { controller.edit(entry.name, advanced = true) }, enabled = editable) { Text("高级配置") }
                             TextButton(onClick = { confirmation = McpConfirmation(entry, state.snapshot!!, false) }, enabled = editable) { Text(if (entry.enabled) "停用" else "启用") }
                             TextButton(onClick = { confirmation = McpConfirmation(entry, state.snapshot!!, true) }, enabled = editable) { Text("删除") }
-                            if (runtime?.string("authStatus") in setOf("notLoggedIn", "oAuth")) TextButton(onClick = { onLogin(entry.name) }, enabled = state.connected && !state.busy && allowChanges && authorizationUrl == null) { Text("账号授权") }
+                            if (runtime?.string("authStatus") in setOf("notLoggedIn", "oAuth")) TextButton(onClick = { try{val options=McpLoginOptions(loginScopes.lineSequence().filter{it.isNotBlank()}.toList(),registration,requireNotNull(loginTimeout.toIntOrNull()));options.params(entry.name,null);loginError=null;onLogin(entry.name,options)}catch(_:Exception){loginError="请检查授权范围、注册方式和等待秒数"} }, enabled = state.connected && !state.busy && allowChanges && authorizationUrl == null) { Text("账号授权") }
                         }
                         if (!entry.editable) Text("请在对应项目配置或插件入口修改此服务。", style = MaterialTheme.typography.bodySmall)
                     }

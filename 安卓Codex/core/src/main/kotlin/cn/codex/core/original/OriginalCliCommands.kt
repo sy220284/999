@@ -1,9 +1,13 @@
 package cn.codex.core.original
 
 /** 固定原版CLI的明确业务命令；参数按数组传递，不经shell。 */
-data class OriginalCliPlan(val title:String,val arguments:List<String>,val mutating:Boolean=false,val input:String="",val expectedDiff:String?=null,val timeoutMs:Long=120_000)
+data class OriginalCliPlan(val title:String,val arguments:List<String>,val mutating:Boolean=false,val input:String="",val expectedDiff:String?=null,val timeoutMs:Long=120_000,val progress:((String)->Unit)?=null,val formatterScript:String?=null){
+    override fun toString()="OriginalCliPlan(title=$title,mutating=$mutating,redacted)"
+}
 object OriginalCliCommands {
     private fun identity(value:String):String{require(value.isNotBlank() && !value.startsWith('-') && value.length<=8192 && value.none{it=='\u0000' || it=='\n' || it=='\r'}){"标识不能为空、过长或包含控制字符/选项前缀"};return value}
+    fun mcpLogoutPreview(name:String)=OriginalCliPlan("核对MCP凭证注销目标",listOf("mcp","logout",identity(name),"--preview"))
+    fun mcpLogout(name:String,sha256:String):OriginalCliPlan{require(sha256.matches(Regex("[a-f0-9]{64}")));return OriginalCliPlan("注销已核对的MCP凭证",listOf("mcp","logout",identity(name),"--expected-sha256",sha256),true)}
     fun sandboxProbe()=OriginalCliPlan("读取受限执行内核能力",listOf("android-sandbox","probe"))
     fun sandbox(command:String):OriginalCliPlan{require(command.isNotBlank() && command.toByteArray().size<=65536 && '\u0000' !in command);return OriginalCliPlan("运行受限项目命令",listOf("android-sandbox","run",command),true)}
     fun cloudEnvironments()=OriginalCliPlan("读取可用云端环境",listOf("cloud","environments"))
@@ -29,9 +33,10 @@ object OriginalCliCommands {
     fun traceReduce(bundle:String)=OriginalCliPlan("归约会话跟踪",listOf("debug","trace-reduce",identity(bundle),"--output","@ANDROID_EXPORT@/state.json"),true)
     fun clearMemories()=OriginalCliPlan("清除原版本地记忆",listOf("debug","clear-memories"),true)
     fun debugMessage(message:String):OriginalCliPlan{require(message.isNotBlank() && message.toByteArray().size<=65536 && '\u0000' !in message);return OriginalCliPlan("发送原版协议诊断消息",listOf("debug","app-server","send-message-v2","--",message),true,timeoutMs=600_000)}
-    fun schema(kind:String,experimental:Boolean):OriginalCliPlan{
+    fun schema(kind:String,experimental:Boolean,prettierScript:String?=null):OriginalCliPlan{
         require(kind in setOf("generate-ts","generate-json-schema","generate-internal-json-schema") && (kind!="generate-internal-json-schema" || !experimental))
-        return OriginalCliPlan("导出原版协议文件",listOf("app-server",kind,"--out","@ANDROID_EXPORT@")+if(experimental)listOf("--experimental")else emptyList(),true)
+        require(prettierScript==null || kind=="generate-ts" && prettierScript.isNotBlank() && prettierScript.length<=8192 && !java.io.File(prettierScript).isAbsolute && prettierScript.none{it.isISOControl()}){"格式化脚本必须是当前项目相对路径，仅用于TypeScript导出"}
+        return OriginalCliPlan("导出原版协议文件",listOf("app-server",kind,"--out","@ANDROID_EXPORT@")+(if(experimental)listOf("--experimental")else emptyList())+(if(prettierScript!=null)listOf("--prettier","@ANDROID_PRETTIER@")else emptyList()),true,formatterScript=prettierScript)
     }
     fun rollouts(apply:Boolean)=OriginalCliPlan(if(apply)"迁移旧会话历史"else"检查旧会话历史",listOf("migrate-rollouts","--json")+if(apply)listOf("--apply")else emptyList(),apply,timeoutMs=600_000)
     fun nfsMigration()=OriginalCliPlan("迁移数据库至DELETE模式",listOf("migrate-nfs-db"),true,input="y\n",timeoutMs=600_000)

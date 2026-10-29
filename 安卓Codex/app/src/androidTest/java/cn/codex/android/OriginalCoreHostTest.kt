@@ -28,6 +28,7 @@ class OriginalCoreHostTest {
         val received = Channel<JsonObject>(Channel.UNLIMITED)
         var initializeReplies = true
         var failClose = false
+        var threadCwd=File(InstrumentationRegistry.getInstrumentation().targetContext.filesDir,"工作区/原版项目").apply{mkdirs()}
         var resumedTurn: String? = null
         var holdResume = false
         var turn: suspend (FakeSession, JsonObject) -> Unit = { _, _ -> }
@@ -51,12 +52,12 @@ class OriginalCoreHostTest {
                         "initialize" -> if (initializeReplies) reply(request, buildJsonObject {})
                         "account/read" -> reply(request, buildJsonObject { put("account", JsonNull) })
                         "thread/list" -> reply(request, buildJsonObject { put("data", buildJsonArray {}) })
-                        "thread/start", "thread/resume" -> if (!holdResume || request.string("method") == "thread/start") reply(request, thread(resumedTurn))
+                        "thread/start", "thread/resume" -> if (!holdResume || request.string("method") == "thread/start") reply(request, thread(resumedTurn,threadCwd))
                         "thread/queue/list" -> if(queueImplemented)reply(request,buildJsonObject{put("data",JsonArray(queueRows.toList()));put("nextCursor",JsonNull)}) else emit(buildJsonObject{put("id",request.getValue("id"));put("error",buildJsonObject{put("code",-32601);put("message","queue unsupported in fake")})})
                         "userVerification/verify" -> verify(this@FakeSession,request)
                         "userVerification/cancel" -> reply(request,buildJsonObject{})
                         "thread/queue/start" -> queueStart(this@FakeSession,request)
-                        "thread/read" -> reply(request,buildJsonObject{put("thread",JsonObject(thread(runtimeTurn).getValue("thread").jsonObject + ("status" to buildJsonObject{put("type",if(runtimeTurn==null)"idle"else "active");put("activeFlags",buildJsonArray{})})))})
+                        "thread/read" -> reply(request,buildJsonObject{put("thread",JsonObject(thread(runtimeTurn,threadCwd).getValue("thread").jsonObject + ("status" to buildJsonObject{put("type",if(runtimeTurn==null)"idle"else "active");put("activeFlags",buildJsonArray{})})))})
                         "turn/start" -> { turnStarts.incrementAndGet(); turn(this@FakeSession, request) }
                         "review/start" -> review(this@FakeSession, request)
                         "thread/shellCommand" -> shell(this@FakeSession, request)
@@ -75,9 +76,9 @@ class OriginalCoreHostTest {
         override fun close() { closed.incrementAndGet(); if (!deferClose) dispose(); if (failClose) throw IOException("test close failure") }
         fun dispose() { if (disposed.compareAndSet(false, true)) { connection.close(); loop.cancel(); runCatching { reader.close() } } }
         companion object {
-            fun thread(active: String? = null) = buildJsonObject {
+            fun thread(active: String? = null,cwd:File=File(InstrumentationRegistry.getInstrumentation().targetContext.filesDir,"工作区/原版项目")) = buildJsonObject {
                 put("thread", buildJsonObject {
-                    put("id", "thread"); put("model", "test-model")
+                    put("id", "thread"); put("model", "test-model");put("cwd",cwd.absolutePath)
                     put("turns", buildJsonArray { if (active != null) add(buildJsonObject { put("id", active); put("status", "inProgress"); put("items", buildJsonArray {}) }) })
                 })
             }
@@ -91,6 +92,23 @@ class OriginalCoreHostTest {
             configLoader = { ApiConfig(model = "test-model") }, startupTimeoutMs = timeout, scope = scope,
             startTask = { text -> scope.launch { host.runReserved(text) }; Unit }, otherTaskRunning = { false })
         return host
+    }
+    @Test fun projectSelectionRebindsSearchConfigurationFilesAndCliWithoutOldResults()=runBlocking{
+        val scope=CoroutineScope(SupervisorJob()+Dispatchers.Main.immediate);val peer=FakeSession(scope)
+        val folder=File(peer.threadCwd,"project-context-${java.util.UUID.randomUUID()}").apply{mkdirs()};peer.threadCwd=folder
+        val host=host(scope,OriginalEngineFactory{peer})
+        try{
+            host.connect();ready(host);val oldSearch=host.search;val oldMcp=host.mcp
+            host.openThread("thread")?.join()
+            assertEquals(folder.canonicalPath,host.commandWorkspace());assertEquals(folder.canonicalFile,host.files.root.canonicalFile)
+            assertNotSame(oldSearch,host.search);assertNotSame(oldMcp,host.mcp);assertFalse(oldMcp.state.value.connected)
+            host.search.search("marker")
+            val search=withTimeout(5000){var next=peer.received.receive();while(next.string("method")!="fuzzyFileSearch/sessionStart")next=peer.received.receive();next}
+            assertEquals(folder.absolutePath,search.getValue("params").jsonObject.getValue("roots").jsonArray.first().jsonPrimitive.content)
+            host.mcp.refresh()
+            val config=withTimeout(5000){var next=peer.received.receive();while(next.string("method")!="config/read")next=peer.received.receive();next}
+            assertEquals(folder.absolutePath,config.getValue("params").jsonObject.getValue("cwd").jsonPrimitive.content)
+        }finally{host.close();scope.cancel();peer.dispose();folder.deleteRecursively()}
     }
     @Test fun startupTimeoutClosesOneCreatedSession() = runBlocking {
         val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)

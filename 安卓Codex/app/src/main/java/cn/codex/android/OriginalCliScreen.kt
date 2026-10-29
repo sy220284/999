@@ -15,6 +15,7 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.text.input.PasswordVisualTransformation
 import cn.codex.core.original.*
 import cn.codex.core.string
 import kotlinx.serialization.json.*
@@ -23,7 +24,10 @@ private data class CliConfirmation(val title:String,val body:String,val action:(
 
 @Composable fun OriginalCliScreen(host:OriginalCoreHost,onBack:()->Unit){
     val context=LocalContext.current;val scope=rememberCoroutineScope()
-    val state by host.cli.state.collectAsState();val core by host.state.collectAsState()
+    val state by host.cli.state.collectAsState()
+    var execPrompt by remember{mutableStateOf("")};var execOptions by remember{mutableStateOf("{\"json\":true,\"sandbox\":\"danger-full-access\",\"output-last-message\":true}")}
+    var execAction by rememberSaveable{mutableStateOf("start")};var execSession by rememberSaveable{mutableStateOf("")};var issuer by remember{mutableStateOf("")};var clientId by remember{mutableStateOf("")};var loginToken by remember{mutableStateOf("")};var apiToken by remember{mutableStateOf(false)}
+    var logoutName by remember{mutableStateOf("")};val core by host.state.collectAsState()
     var environment by rememberSaveable{mutableStateOf("")};var prompt by rememberSaveable{mutableStateOf("")};var branch by rememberSaveable{mutableStateOf("")}
     var attempts by rememberSaveable{mutableStateOf("1")}
     var task by rememberSaveable{mutableStateOf("")};var attempt by rememberSaveable{mutableStateOf("1")}
@@ -35,6 +39,7 @@ private data class CliConfirmation(val title:String,val body:String,val action:(
     val daemonActive=endpoints[NativeEndpointKind.DAEMON]?.running==true
     var doctorJson by rememberSaveable{mutableStateOf(true)};var doctorSummary by rememberSaveable{mutableStateOf(false)};var doctorAll by rememberSaveable{mutableStateOf(false)};var doctorAscii by rememberSaveable{mutableStateOf(false)};var doctorFeedback by rememberSaveable{mutableStateOf(false)}
     var bundled by rememberSaveable{mutableStateOf(true)};var debugPrompt by rememberSaveable{mutableStateOf("")};var images by rememberSaveable{mutableStateOf("[]")};var trace by rememberSaveable{mutableStateOf("")}
+    var prettierScript by remember{mutableStateOf("")}
     var schemaKind by rememberSaveable{mutableStateOf("generate-json-schema")};var experimental by rememberSaveable{mutableStateOf(false)}
     var exporting by remember{mutableStateOf(false)};var exportSource by remember{mutableStateOf<String?>(null)};var exportMessage by remember{mutableStateOf<String?>(null)}
     val exportLauncher=rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("application/zip")){uri->
@@ -52,6 +57,7 @@ private data class CliConfirmation(val title:String,val body:String,val action:(
             if(core.connected)TextButton(onClick={host.close()},enabled=!core.working && core.turnId==null && !core.loading){Text("断开原版连接，准备工具")}
             Text(state.title,color=MaterialTheme.colorScheme.primary);if(state.busy)LinearProgressIndicator(Modifier.fillMaxWidth())
             (error ?: state.error)?.let{Text(it,color=MaterialTheme.colorScheme.error)}
+            state.exitCode?.let{Text("原版进程返回码：$it",style=MaterialTheme.typography.bodySmall)}
             if(state.busy)TextButton(onClick={confirmation=CliConfirmation("停止当前操作？","停止本机等待不会撤销已经创建的云任务或文件变更。"){host.cli.stop()}}){Text("停止当前操作")}
         }
         item{TextButton(onClick={host.cli.environments()},enabled=idle){Text("读取可用云端环境")}
@@ -78,6 +84,38 @@ private data class CliConfirmation(val title:String,val body:String,val action:(
             Button(onClick={action{val e=environment;val p=prompt;val b=branch;val n=attempts.toInt();OriginalCliCommands.cloudCreate(e,p,b,n)
                 confirmation=CliConfirmation("创建云任务并使用服务额度？","环境：$e\n分支：${b.ifBlank{"原版默认"}}\n方案数量：$n\n$p"){host.cli.create(e,p,b,n)}}},enabled=idle && prompt.isNotBlank() && environment.isNotBlank()){Text("创建云任务")}
         }
+        item{Text("原版独立执行",style=MaterialTheme.typography.titleMedium)
+            Text("实际运行原版exec，保留stdin、JSONL及退出状态；不以普通会话替代。以当前项目运行，输出文件写入独立导出目录。命令和文件操作可能生效并消耗额度；非受限模式可访问应用数据。",style=MaterialTheme.typography.bodySmall)
+            listOf("start" to "新任务","resume" to "继续指定会话","resume-last" to "继续最近会话","fork" to "分叉","review-uncommitted" to "审查未提交","review-base" to "审查分支差异","review-commit" to "审查提交","review-custom" to "自定审查").forEach{(key,label)->FilterChip(execAction==key,{execAction=key},label={Text(label)},enabled=idle)}
+            if(execAction in setOf("resume","fork","review-base","review-commit"))OutlinedTextField(execSession,{execSession=it},label={Text("会话、基准分支或提交标识")},enabled=idle,modifier=Modifier.fillMaxWidth())
+            OutlinedTextField(execPrompt,{execPrompt=it},label={Text("任务或自定审查要求")},enabled=idle,modifier=Modifier.fillMaxWidth())
+            OutlinedTextField(execOptions,{execOptions=it},label={Text("原版高级选项JSON")},enabled=idle,modifier=Modifier.fillMaxWidth(),minLines=4)
+            Text("可选：model/profile、json、ephemeral、ignore-user-config、ignore-rules、strict-config、output-schema（项目文件）、image/add-dir数组、thread-source、cyber-access-program、worktree等；继续会话可用all=true，提交审查可用review-title。output-last-message=true导出最后回复。沙箱/自动审批冲突按原版拒绝；不支持的手机策略不会假装成功。",style=MaterialTheme.typography.bodySmall)
+            TextButton(onClick={action{val request=OriginalStandaloneCommands.exec(execPrompt.ifBlank{if(execAction.startsWith("review-"))"审查项目"else""},Json.parseToJsonElement(execOptions).jsonObject,execAction,execSession)
+                confirmation=CliConfirmation("运行原版独立任务并使用额度？","项目：${host.commandWorkspace()}\n${request.arguments.joinToString(" ")}\n${request.input}\n可能修改项目和执行命令。跳过审批/Hook信任选项会扩大访问权限；取消不会撤销已有变更。"){host.cli.maintain(request)}}},enabled=idle){Text("核对参数后执行")}
+            core.coreIdentity?.let{identity->Text("上次核心握手：${identity.string("userAgent")}\n平台：${identity.string("platformOs")}，${core.coreIdentityAt?.let{java.util.Date(it).toString()}.orEmpty()}。这是上次连接记录，不代表核心仍在运行。",style=MaterialTheme.typography.bodySmall)}
+            TextButton(onClick={host.cli.maintain(OriginalStandaloneCommands.version())},enabled=idle){Text("读取随包CLI版本")}
+        }
+        item{Text("导入原版登录凭证",style=MaterialTheme.typography.titleMedium)
+            Text("凭证只通过stdin交给原版登录流程，写入同一Keystore后端，不放入启动参数；运行前请断开核心。访问令牌需真实服务颁发，不是本机生成的连接密钥。",style=MaterialTheme.typography.bodySmall)
+            Row{Checkbox(apiToken,{apiToken=it},enabled=idle);Text("导入API密钥（不勾选则导入访问令牌）",Modifier.padding(top=12.dp))}
+            OutlinedTextField(issuer,{issuer=it},label={Text("设备码OAuth签发方HTTPS地址（高级，可选）")},enabled=idle,modifier=Modifier.fillMaxWidth())
+            OutlinedTextField(clientId,{clientId=it},label={Text("设备码OAuth客户端ID（高级，可选）")},enabled=idle,modifier=Modifier.fillMaxWidth())
+            TextButton(onClick={action{val request=OriginalStandaloneCommands.loginDevice(issuer,clientId);confirmation=CliConfirmation("开始原版设备码登录？","签发方：${issuer.ifBlank{"原版默认"}}\n客户端：${clientId.ifBlank{"原版默认"}}\n请只使用可信签发方。原版会先清除旧登录，取消不恢复旧账号；设备码只在本次页面显示。"){host.cli.maintain(request)}}},enabled=idle){Text("开始设备码登录")}
+            state.deviceCode?.let{event->SelectionContainer{Text("授权地址：${event.string("verificationUrl")}\n设备码：${event.string("userCode")}")};TextButton(onClick={openOriginalLogin(context,event.string("verificationUrl"))}){Text("打开授权页面")}}
+            OutlinedTextField(loginToken,{loginToken=it},label={Text("登录凭证")},visualTransformation=PasswordVisualTransformation(),enabled=idle,modifier=Modifier.fillMaxWidth())
+            TextButton(onClick={action{val request=OriginalStandaloneCommands.loginToken(loginToken,apiToken);confirmation=CliConfirmation("替换原版登录身份？","将使用原版${if(apiToken)"API密钥"else"访问令牌"}登录流程，可能替换当前账号。结束后请重新连接并读取真实账号状态。"){loginToken="";host.cli.maintain(request)}}},enabled=idle && loginToken.isNotBlank()){Text("确认后导入凭证")}
+        }
+        item{Text("注销MCP服务凭证",style=MaterialTheme.typography.titleMedium)
+            Text("请先关闭核心和其他使用该凭证的客户端。只删除授权凭证，不删除服务配置；企业共享授权会影响使用同一身份的其他EMA服务。",style=MaterialTheme.typography.bodySmall)
+            OutlinedTextField(logoutName,{logoutName=it},label={Text("服务配置名称")},enabled=idle,modifier=Modifier.fillMaxWidth())
+            TextButton(onClick={action{host.cli.previewMcpLogout(logoutName.trim())}},enabled=idle && logoutName.isNotBlank()){Text("读取实际注销范围")}
+        }
+        state.mcpLogout?.let{approved->item{OutlinedCard{Column(Modifier.padding(16.dp)){
+            Text("服务：${approved.string("name")}");Text(if(approved["sharedEnterprise"]?.jsonPrimitive?.booleanOrNull==true)"将删除共享企业授权，影响其他使用同一企业身份的MCP服务。"else"将删除此服务所使用的OAuth凭证；共享同一凭证名的服务也可能需要重新授权。")
+            TextButton(onClick={confirmation=CliConfirmation("确认注销授权？","服务：${approved.string("name")}\n${if(approved["sharedEnterprise"]?.jsonPrimitive?.booleanOrNull==true)"范围：共享企业授权"else"范围：此服务的凭证键"}\n账号、URL或凭证目标变化将拒绝。注销后需重新授权。"){host.cli.logoutMcp(approved)}},enabled=idle){Text("确认后注销凭证")}
+            TextButton(onClick=host.cli::dismissMcpLogout,enabled=idle){Text("取消本次注销")}
+        }}}}
         item{Text("本机维护",style=MaterialTheme.typography.titleMedium)
             Text("迁移前停止所有使用该数据目录的客户端。数据库迁移会保留原版备份，仍需核查存储空间和并发访问。",style=MaterialTheme.typography.bodySmall)
             Row{Checkbox(doctorJson,{doctorJson=it},enabled=idle);Text("JSON诊断报告",Modifier.padding(top=12.dp))}
@@ -99,7 +137,7 @@ private data class CliConfirmation(val title:String,val body:String,val action:(
             Text("条件式内核限制，仅在Landlock ABI6、系统策略和seccomp均允许时执行；不支持便拒绝，不切换为普通执行。只允许当前项目写入，系统和随包程序只读，网络被禁止。该入口尚未真机验收，普通模型任务并未因此获得沙箱。",style=MaterialTheme.typography.bodySmall)
             TextButton(onClick={host.cli.maintain(OriginalCliCommands.sandboxProbe())},enabled=idle){Text("查询内核能力（不执行命令）")}
             OutlinedTextField(sandboxCommand,{sandboxCommand=it},label={Text("在当前项目执行的命令")},enabled=idle,modifier=Modifier.fillMaxWidth())
-            TextButton(onClick={val command=sandboxCommand;confirmation=CliConfirmation("在受限执行入口运行？","项目：${host.commandWorkspace()}\n命令：$command\n会修改项目；网络不可用，Node/Python完整运行库暂未挂载。内核拒绝时不会执行普通替代命令。"){host.cli.maintain(OriginalCliCommands.sandbox(command))}},enabled=idle && sandboxCommand.isNotBlank()){Text("确认后受限执行")}
+            TextButton(onClick={val command=sandboxCommand;confirmation=CliConfirmation("在受限执行入口运行？","项目：${host.commandWorkspace()}\n命令：$command\n会修改项目；网络不可用，随包语言数据只读；第三方扩展与项目启动脚本仍需适配。内核拒绝时不会执行普通替代命令。"){host.cli.maintain(OriginalCliCommands.sandbox(command))}},enabled=idle && sandboxCommand.isNotBlank()){Text("确认后受限执行")}
         }
         item{Text("命令策略检查",style=MaterialTheme.typography.titleMedium);Text("只按规则评估参数，不执行这条命令。规则文件使用当前项目相对路径。",style=MaterialTheme.typography.bodySmall)
             OutlinedTextField(rules,{rules=it},label={Text("规则文件路径数组（JSON）")},enabled=idle,modifier=Modifier.fillMaxWidth())
@@ -113,8 +151,9 @@ private data class CliConfirmation(val title:String,val body:String,val action:(
         item{Text("协议与诊断工具",style=MaterialTheme.typography.titleMedium)
             Text("输出文件写入应用的独立导出目录，不覆盖项目文件。完成后可导出ZIP到系统文件；实验协议需与当前核心版本匹配。",style=MaterialTheme.typography.bodySmall)
             listOf("generate-ts" to "TypeScript绑定","generate-json-schema" to "JSON Schema","generate-internal-json-schema" to "内部JSON Schema").forEach{(value,label)->FilterChip(schemaKind==value,{schemaKind=value;if(value=="generate-internal-json-schema")experimental=false},label={Text(label)},enabled=idle)}
+            if(schemaKind=="generate-ts")OutlinedTextField(prettierScript,{prettierScript=it},label={Text("可信Prettier JS入口（项目相对路径，可选）")},enabled=idle,modifier=Modifier.fillMaxWidth())
             Row{Checkbox(experimental,{experimental=it},enabled=idle && schemaKind!="generate-internal-json-schema");Text("包含实验协议",Modifier.padding(top=12.dp))}
-            TextButton(onClick={val k=schemaKind;val x=experimental;confirmation=CliConfirmation("导出原版协议文件？","格式：$k\n包含实验内容：$x\n将新建独立目录。"){host.cli.maintain(OriginalCliCommands.schema(k,x))}},enabled=idle){Text("生成协议文件")}
+            TextButton(onClick={val k=schemaKind;val x=experimental;val formatter=prettierScript.takeIf{k=="generate-ts" && it.isNotBlank()};confirmation=CliConfirmation("导出原版协议文件？","格式：$k\n包含实验内容：$x\n格式化：${formatter ?: "不调用外部格式化"}\n将新建独立目录。你选择的JS及其插件会以应用身份执行，请仅使用可信项目依赖。"){host.cli.maintain(OriginalCliCommands.schema(k,x,formatter))}},enabled=idle){Text("生成协议文件")}
             Row{Checkbox(bundled,{bundled=it},enabled=idle);Text("只读取内置模型目录",Modifier.padding(top=12.dp))}
             TextButton(onClick={host.cli.maintain(OriginalCliCommands.models(bundled))},enabled=idle){Text("读取模型目录")}
             Text("输入诊断按原版配置生成，不代表当前对话最终发送的完整请求。",style=MaterialTheme.typography.bodySmall)

@@ -29,6 +29,7 @@ python_source="$(python3 "$script_dir/准备开发环境.py" fetch "python-$abi"
 )
 output="$app_root/app/src/main/jniLibs/$abi"
 assets="$app_root/app/src/main/assets/runtimes"
+python3 "$script_dir/准备表单标准库.py" --cache "$work/schema-packages" --output "$app_root/app/src/main/assets/schema-validator/modules.json" --licenses "$app_root/app/src/main/assets/licenses/schema-validator"
 mkdir -p "$output" "$assets"
 install -m 755 "$node_source/out/Release/node" "$output/libcodex_node.so"
 # 版本化官方Android嵌入包的prefix，不能使用桌面Linux Python。
@@ -38,6 +39,7 @@ find -L "$prefix/lib" -maxdepth 1 -type f \( -name 'libpython*.so' -o -name 'lib
 "$CC" -O2 -fPIE -pie -Wl,-z,max-page-size=16384 '-Wl,-rpath,$ORIGIN' \
  -I"$prefix/include/python3.14" "$script_dir/补充源码/python_main.c" -L"$prefix/lib" -lpython3.14 -ldl -lm -llog -o "$output/libcodex_python.so"
 "$CC" -O2 -fPIE -pie -Wl,-z,max-page-size=16384 "$script_dir/补充源码/npm_main.c" -o "$output/libcodex_npm.so"
+"$CC" -O2 -fPIE -pie -Wl,-z,max-page-size=16384 "$script_dir/补充源码/prettier_main.c" -o "$output/libcodex_prettier.so"
 # Node可能链接NDK C++共享运行库，使用同批NDK版本，不引入桌面库。
 install -m 755 "$ANDROID_NDK_ROOT/toolchains/llvm/prebuilt/linux-x86_64/sysroot/usr/lib/$target/libc++_shared.so" "$output/libc++_shared.so"
 python3 - "$node_source" "$prefix" "$assets" "$abi" "$script_dir" <<'PYBUNDLE'
@@ -64,7 +66,7 @@ for entry in source.rglob('*'):
 if not count:raise ValueError('官方Android包没有找到许可文件，不能继续交付')
 PYLICENSE
 cp "$script_dir/开发环境来源.json" "$licenses/来源.json"
-for name in libcodex_node.so libcodex_python.so libcodex_npm.so libpython3.14.so; do
+for name in libcodex_node.so libcodex_python.so libcodex_npm.so libcodex_prettier.so libpython3.14.so; do
  "$ndk_bin/llvm-readelf" -h -l -d "$output/$name"
 done
 echo '已写入语言环境产物和资产；仍需双ABI、16KB、stdio、TLS、npm脚本及原生扩展设备验收。'

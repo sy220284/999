@@ -84,6 +84,8 @@ python3 "$script_dir/应用CLI补丁.py" --source "$source_root" --patch "$scrip
 python3 "$script_dir/应用CLI补丁.py" --source "$source_root" --patch "$script_dir/安卓远程执行状态.patch" --manifest "$script_dir/安卓远程执行补丁来源.json"
 python3 "$script_dir/应用CLI补丁.py" --source "$source_root" --patch "$script_dir/安卓Unix共享核心.patch" --manifest "$script_dir/安卓Unix补丁来源.json"
 python3 "$script_dir/应用CLI补丁.py" --source "$source_root" --patch "$script_dir/安卓执行链补齐.patch" --manifest "$script_dir/安卓执行链补丁来源.json"
+python3 "$script_dir/应用CLI补丁.py" --source "$source_root" --patch "$script_dir/安卓MCP凭证注销.patch" --manifest "$script_dir/安卓MCP注销补丁来源.json"
+python3 "$script_dir/应用CLI补丁.py" --source "$source_root" --patch "$script_dir/安卓登录事件.patch" --manifest "$script_dir/安卓登录补丁来源.json"
 if [[ "$component" == worktree ]]; then
   mkdir -p "$source_root/codex-rs/worktree/src/bin"
   helper="$source_root/codex-rs/worktree/src/bin/codex-android-worktree.rs"

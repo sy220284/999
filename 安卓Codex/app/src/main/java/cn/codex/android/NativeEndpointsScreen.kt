@@ -26,6 +26,7 @@ import kotlinx.coroutines.flow.first
     var remoteUrl by rememberSaveable{mutableStateOf("")};var environmentId by rememberSaveable{mutableStateOf("")};var remoteName by rememberSaveable{mutableStateOf("手机执行器")}
     var remoteAuth by rememberSaveable{mutableStateOf(RemoteExecutorAuth.ACCOUNT)};var expires by remember{mutableStateOf("")}
     var profile by rememberSaveable{mutableStateOf("")};var region by rememberSaveable{mutableStateOf("")};var service by rememberSaveable{mutableStateOf("execute-api")}
+    var pidNamespace by rememberSaveable{mutableStateOf("isolate")};var proxyPrivate by rememberSaveable{mutableStateOf(false)}
     var forward by rememberSaveable{mutableStateOf(false)};var concurrent by rememberSaveable{mutableStateOf("1")};var strict by rememberSaveable{mutableStateOf(false)}
     var unix by rememberSaveable{mutableStateOf(false)}
     var remote by rememberSaveable{mutableStateOf(false)};var showToken by remember{mutableStateOf<NativeEndpointKind?>(null)}
@@ -47,6 +48,14 @@ import kotlinx.coroutines.flow.first
         }
         item{
             OutlinedTextField(port,{port=it},label={Text("本机端口（0为自动分配）")},enabled=states[kind]?.running!=true,modifier=Modifier.fillMaxWidth())
+            if(kind in setOf(NativeEndpointKind.EXECUTOR,NativeEndpointKind.REMOTE_EXECUTOR)){
+                OutlinedTextField(concurrent,{concurrent=it},label={Text("每连接并发请求（1–64）")},enabled=states[kind]?.running!=true,modifier=Modifier.fillMaxWidth())
+                Row{Checkbox(strict,{strict=it},enabled=states[kind]?.running!=true);Text("严格检查原版配置",Modifier.padding(top=12.dp))}
+                Text("原版进程策略（不代表手机已实现命名空间隔离）",style=MaterialTheme.typography.bodySmall)
+                Row{FilterChip(pidNamespace=="isolate",{pidNamespace="isolate"},label={Text("请求隔离")},enabled=states[kind]?.running!=true);FilterChip(pidNamespace=="inherit",{pidNamespace="inherit"},label={Text("继承同UID进程域")},enabled=states[kind]?.running!=true)}
+                Row{Checkbox(proxyPrivate,{proxyPrivate=it},enabled=states[kind]?.running!=true);Text("允许已许可私网目标走上游代理",Modifier.padding(top=12.dp))}
+                Text("继承模式允许影响其他同UID进程。私网路由仍受原版策略约束，不保证代理可用；手机缺少底层能力时不会因此变成已隔离。",style=MaterialTheme.typography.bodySmall)
+            }
             when(kind){
                 NativeEndpointKind.PROXY->{
                     OutlinedTextField(upstream,{upstream=it},label={Text("上游Responses完整HTTPS地址")},enabled=states[kind]?.running!=true,modifier=Modifier.fillMaxWidth())
@@ -72,24 +81,23 @@ import kotlinx.coroutines.flow.first
                     if(remoteAuth==RemoteExecutorAuth.ACCOUNT)Text("请先完成原版账号登录；手机连接偏好中的密钥不会自动作为注册凭证。",style=MaterialTheme.typography.bodySmall)
                     Row{Checkbox(forward,{forward=it},enabled=states[kind]?.running!=true && remoteAuth!=RemoteExecutorAuth.AWS);Text("转发本次已认证本机执行器",Modifier.padding(top=12.dp))}
                     Text("转发只使用当前本机执行器及其认证；停止目标会停止注册。Direct不支持转发。",style=MaterialTheme.typography.bodySmall)
-                    OutlinedTextField(concurrent,{concurrent=it},label={Text("每连接并发请求（1–64）")},enabled=states[kind]?.running!=true,modifier=Modifier.fillMaxWidth())
-                    Row{Checkbox(strict,{strict=it},enabled=states[kind]?.running!=true);Text("严格检查原版配置",Modifier.padding(top=12.dp))}
                     Text("注册后，获得远程授权的客户端可在本应用权限内执行和读写；普通请求仍没有项目沙箱。账号与AWS配置由原版加载，凭证必须来自真实服务，不会为你生成身份。",style=MaterialTheme.typography.bodySmall)
                 }
                 NativeEndpointKind.EXECUTOR->Text("持有本次随机连接密钥的客户端，可在本应用权限内读写文件、执行命令；它不是项目级沙箱。",style=MaterialTheme.typography.bodySmall)
                 NativeEndpointKind.DAEMON->{
                     Row{Checkbox(unix,{unix=it},enabled=states[kind]?.running!=true);Text("使用私有Unix连接（无本机TCP监听）",Modifier.padding(top=12.dp))}
                     Text("共享同一原版账号和项目，支持多客户端连接；关闭主界面的核心连接也会结束本次共享服务。启动前先结束任务。",style=MaterialTheme.typography.bodySmall)
+                    Row{Checkbox(strict,{strict=it},enabled=states[kind]?.running!=true);Text("严格检查原版核心配置",Modifier.padding(top=12.dp))}
                     Text(remotePreference,style=MaterialTheme.typography.bodySmall)
                     TextButton(onClick={scope.launch{remotePreference=try{withContext(Dispatchers.IO){when(manager.savedRemotePreference()){true->"未来启动：启用远控（原版持久设置）";false->"未来启动：停用远控（原版持久设置）";null->"未来启动：由原版账号偏好决定"}}}catch(_:Exception){"持久设置无法读取，请先核查原版配置"}}}){Text("核对未来启动设置")}
                     Text("在连接、订阅与认证页取消“仅本次”后启停远控，会写入原版持久设置。手机仍需你主动启动前台核心。",style=MaterialTheme.typography.bodySmall)
                     Row{Checkbox(remote,{remote=it},enabled=states[kind]?.running!=true);Text("本次启动启用原版远程控制",Modifier.padding(top=12.dp))}}
             }
             Button(onClick={act{
-                val selected=kind;val p=if(selected==NativeEndpointKind.REMOTE_EXECUTOR || selected==NativeEndpointKind.DAEMON && unix)0 else port.toInt();val u=upstream;val o=origin;val t=target;val key=credential;val metadata=headers;val r=remote;val ru=remoteUrl;val eid=environmentId;val rn=remoteName;val auth=remoteAuth;val expiry=expires.toLongOrNull() ?: 0L;val pr=profile;val reg=region;val svc=service;val uds=unix;val fw=forward;val authLabel=when(auth){RemoteExecutorAuth.ACCOUNT->"原版账号";RemoteExecutorAuth.AGENT_IDENTITY->"Agent Identity身份";RemoteExecutorAuth.AWS->"AWS签名";RemoteExecutorAuth.SCOPED->"作用域凭证"};val parallel=if(selected==NativeEndpointKind.REMOTE_EXECUTOR)concurrent.toInt()else 1;val checkConfig=strict
-                confirmation=(when(selected){NativeEndpointKind.REMOTE_EXECUTOR->"注册手机远程执行器？\n服务：$ru\n环境：$eid\n认证：$authLabel\n转发当前本机执行器：$fw\n将允许已授权远端客户端访问本应用可访问的文件与命令。";NativeEndpointKind.PROXY->"启动本机模型代理？\n上游：$u\n端口：$p\n会向该上游发送请求和密钥。";NativeEndpointKind.TUNNEL->"启动连接隧道？\n批准来源：$o\n目标：$t\n本机其他应用也可使用本机监听端口。";NativeEndpointKind.EXECUTOR->"启动执行服务？\n仅本机监听；获得连接密钥的客户端可在本应用权限内执行操作。";NativeEndpointKind.DAEMON->"启动共享核心？\n将关闭当前核心连接，使用保存的账号和模型设置。远程控制：${if(r)"本次启用"else"遵循原配置"}"}) to {
+                val selected=kind;val p=if(selected==NativeEndpointKind.REMOTE_EXECUTOR || selected==NativeEndpointKind.DAEMON && unix)0 else port.toInt();val u=upstream;val o=origin;val t=target;val key=credential;val metadata=headers;val r=remote;val ru=remoteUrl;val eid=environmentId;val rn=remoteName;val auth=remoteAuth;val expiry=expires.toLongOrNull() ?: 0L;val pr=profile;val reg=region;val svc=service;val uds=unix;val fw=forward;val authLabel=when(auth){RemoteExecutorAuth.ACCOUNT->"原版账号";RemoteExecutorAuth.AGENT_IDENTITY->"Agent Identity身份";RemoteExecutorAuth.AWS->"AWS签名";RemoteExecutorAuth.SCOPED->"作用域凭证"};val parallel=if(selected in setOf(NativeEndpointKind.REMOTE_EXECUTOR,NativeEndpointKind.EXECUTOR))concurrent.toInt()else 1;val checkConfig=strict;val pid=pidNamespace;val privateProxy=proxyPrivate
+                confirmation=(when(selected){NativeEndpointKind.REMOTE_EXECUTOR->"注册手机远程执行器？\n服务：$ru\n环境：$eid\n认证：$authLabel\n转发当前本机执行器：$fw\n进程策略：$pid；私网代理：$privateProxy\n将允许已授权远端客户端访问本应用可访问的文件与命令。";NativeEndpointKind.PROXY->"启动本机模型代理？\n上游：$u\n端口：$p\n会向该上游发送请求和密钥。";NativeEndpointKind.TUNNEL->"启动连接隧道？\n批准来源：$o\n目标：$t\n本机其他应用也可使用本机监听端口。";NativeEndpointKind.EXECUTOR->"启动执行服务？\n仅本机监听；获得连接密钥的客户端可在本应用权限内执行操作。\n进程策略：$pid；私网代理：$privateProxy";NativeEndpointKind.DAEMON->"启动共享核心？\n将关闭当前核心连接，使用保存的账号和模型设置。远程控制：${if(r)"本次启用"else"遵循原配置"}"}) to {
                     credential="";headers="[]"
-                    when(selected){NativeEndpointKind.REMOTE_EXECUTOR->manager.startRemoteExecutor(ru,eid,rn,auth,key,expiry,pr,reg,svc,fw,parallel,checkConfig);NativeEndpointKind.PROXY->manager.startProxy(u,key,p);NativeEndpointKind.TUNNEL->manager.startTunnel(o,t,p,key,metadata);NativeEndpointKind.EXECUTOR->manager.startExecutor(p);NativeEndpointKind.DAEMON->scope.launch{host.close();withTimeoutOrNull(10_000){host.state.first{!it.connected && !it.closing && !it.loading}}?.let{manager.startDaemon(p,r,uds)} ?: run{inputError="核心尚未关闭，请核查后重试"}}}
+                    when(selected){NativeEndpointKind.REMOTE_EXECUTOR->manager.startRemoteExecutor(ru,eid,rn,auth,key,expiry,pr,reg,svc,fw,parallel,checkConfig,pid,privateProxy);NativeEndpointKind.PROXY->manager.startProxy(u,key,p);NativeEndpointKind.TUNNEL->manager.startTunnel(o,t,p,key,metadata);NativeEndpointKind.EXECUTOR->manager.startExecutor(p,parallel,checkConfig,pid,privateProxy);NativeEndpointKind.DAEMON->scope.launch{host.close();withTimeoutOrNull(10_000){host.state.first{!it.connected && !it.closing && !it.loading}}?.let{manager.startDaemon(p,r,uds,checkConfig)} ?: run{inputError="核心尚未关闭，请核查后重试"}}}
                 }
             }},enabled=!restarting && states[kind]?.running!=true && !core.working && core.turnId==null && !core.loading){Text("启动${kind.title}")}
         }
@@ -113,8 +121,8 @@ import kotlinx.coroutines.flow.first
                 }
                 if(status.kind==NativeEndpointKind.DAEMON && status.ready){
                     TextButton(onClick={onBack();host.connect()},enabled=!restarting){Text("连接共享核心")}
-                    TextButton(onClick={act{val p=port.toInt();require(p in 0..65535);val r=remote;val uds=unix;val id=status.id
-                        confirmation="按当前端口和远控选项重启共享核心？\n本次连接和其他客户端任务将中断，已发生的变更不会撤销。" to {restarting=true;scope.launch{try{host.close();manager.stop(NativeEndpointKind.DAEMON,id);withTimeout(10_000){manager.state.first{it[NativeEndpointKind.DAEMON]?.let{row->row.id!=id || !row.running} ?: true};host.state.first{!it.connected && !it.loading && !it.closing}};check(manager.state.value[NativeEndpointKind.DAEMON]?.id==id){"核心已被其他启动替换，请核查"};manager.startDaemon(p,r,uds)}catch(failure:Exception){if(failure is CancellationException && failure !is TimeoutCancellationException)throw failure;inputError="重启未完成，请核查服务状态后手动处理"}finally{restarting=false}}}
+                    TextButton(onClick={act{val p=port.toInt();require(p in 0..65535);val r=remote;val uds=unix;val checkConfig=strict;val id=status.id
+                        confirmation="按当前端口和远控选项重启共享核心？\n本次连接和其他客户端任务将中断，已发生的变更不会撤销。" to {restarting=true;scope.launch{try{host.close();manager.stop(NativeEndpointKind.DAEMON,id);withTimeout(10_000){manager.state.first{it[NativeEndpointKind.DAEMON]?.let{row->row.id!=id || !row.running} ?: true};host.state.first{!it.connected && !it.loading && !it.closing}};check(manager.state.value[NativeEndpointKind.DAEMON]?.id==id){"核心已被其他启动替换，请核查"};manager.startDaemon(p,r,uds,checkConfig)}catch(failure:Exception){if(failure is CancellationException && failure !is TimeoutCancellationException)throw failure;inputError="重启未完成，请核查服务状态后手动处理"}finally{restarting=false}}}
                     }},enabled=!restarting && !core.working && core.turnId==null && !core.loading){Text("按当前设置重启")}
                 }
                 if(status.running)TextButton(onClick={confirmation="停止${status.kind.title}？\n连接和正在进行的工作将被中断，已发生的远程或文件变更需核查。" to {showToken=null;manager.stop(status.kind,status.id)}},enabled=!status.stopping){Text("停止此服务")}

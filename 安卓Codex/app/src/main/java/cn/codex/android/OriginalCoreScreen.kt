@@ -119,7 +119,7 @@ internal class OriginalRequestKey(private val request:ServerMessage.Request) {
     if (mcpManager) {
         OriginalMcpScreen(host.mcp, allowChanges = !state.working && state.turnId == null && !state.loading && !extensionState.mutating && !settingsState.mutating && !filesState.mutating && !fullTerminalState.running && !networkGit.running && !managedBusy,
             imports = imports, authorizationUrl = state.mcpAuthorizationUrl, authorizationName = state.mcpAuthorizationName,
-            hostError = state.error, onDismissHostError = host::dismissError, onLogin = { host.startMcpLogin(it) },
+            hostError = state.error, onDismissHostError = host::dismissError, onLogin = { name,options -> host.startMcpLogin(name,options) },
             onDismissAuthorization = host::dismissMcpLogin, onBack = { mcpManager = false })
         return
     }
@@ -349,7 +349,8 @@ internal fun openOriginalLogin(context: android.content.Context, url: String) {
     val form=preparedForm
     LaunchedEffect(request,suppliedResources){
         validationJob?.cancel();formLoading=true
-        val prepared=withContext(Dispatchers.Default){runCatching{(params["requestedSchema"] as? JsonObject)?.let{ElicitationForm(it,suppliedResources)}}.getOrNull()}
+        val standard=withContext(Dispatchers.IO){AndroidStandardSchema.available(context)}
+        val prepared=withContext(Dispatchers.Default){runCatching{(params["requestedSchema"] as? JsonObject)?.let{ElicitationForm(it,suppliedResources,standard)}}.getOrNull()}
         preparedForm=prepared;formLoading=false
         if(elicitation && prepared!=null && answers.isEmpty())answers=prepared.initialValues
     }
@@ -381,6 +382,7 @@ internal fun openOriginalLogin(context: android.content.Context, url: String) {
                     OutlinedButton(onClick = { openOriginalLogin(context, params.string("url")) }) { Text("打开授权页面") }
                     Text("完成服务页面的授权后，再确认返回工具。", style = MaterialTheme.typography.bodySmall)
                 } else if(formLoading){LinearProgressIndicator(Modifier.fillMaxWidth());Text("正在准备表单规则…")} else if (form?.supported == true) {
+                    if(form.requiresStandardValidation)Text("使用随包标准规则库离线校验；不获取外部引用、不改写你的答案。超过设备预算或规则不支持时拒绝提交。",style=MaterialTheme.typography.bodySmall)
                     if (form.rawInput) OutlinedTextField(answers["__form_json"].orEmpty(), { answers = answers + ("__form_json" to it) }, label = { Text("表单内容（JSON）") }, modifier = Modifier.fillMaxWidth())
                     else form.fields.forEach { field ->
                         Text(field.title + if (field.required) " *" else "")
@@ -426,7 +428,14 @@ internal fun openOriginalLogin(context: android.content.Context, url: String) {
                 val snapshot=answers;formValidating=true;formError=""
                 validationJob=formScope.launch{
                     try{
-                        val content=withContext(Dispatchers.Default){if(params.string("mode")=="url")JsonNull else requireNotNull(approvedForm).content(snapshot)}
+                        val content=if(params.string("mode")=="url")JsonNull else {
+                            val actual=requireNotNull(approvedForm)
+                            if(actual.requiresStandardValidation){
+                                val candidate=withContext(Dispatchers.Default){actual.draft(snapshot)}
+                                AndroidStandardSchema.validate(context,actual.normalizedSchema,actual.normalizedResources,candidate)
+                                candidate
+                            }else withContext(Dispatchers.Default){actual.content(snapshot)}
+                        }
                         if(!declined){
                             check(answers==snapshot && preparedForm===approvedForm && suppliedResources===approvedResources){"填写内容或规则已变化，请核对后重新提交"}
                             decided=true

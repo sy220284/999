@@ -1,0 +1,36 @@
+--- a/codex-rs/cli/src/mcp_cmd.rs
++++ b/codex-rs/cli/src/mcp_cmd.rs
+@@ -237,0 +238,6 @@
++    #[cfg(target_os = "android")]
++    #[arg(long, conflicts_with = "expected_sha256")]
++    pub preview: bool,
++    #[cfg(target_os = "android")]
++    #[arg(long)]
++    pub expected_sha256: Option<String>,
+@@ -632 +638,3 @@
+-    let LogoutArgs { name } = logout_args;
++    #[cfg(target_os = "android")]
++    let (android_preview, android_expected) = (logout_args.preview, logout_args.expected_sha256.clone());
++    let LogoutArgs { name, .. } = logout_args;
+@@ -651,0 +660,3 @@
++        #[cfg(target_os = "android")]
++        if android_logout_approval(android_preview, android_expected.as_deref(), &name, true,
++            serde_json::json!({"kind":"ema_auth","credential":credential_name,"issuer":idp.issuer,"home":config.codex_home}))? { return Ok(()); }
+@@ -673,0 +685,3 @@
++    #[cfg(target_os = "android")]
++    if android_logout_approval(android_preview, android_expected.as_deref(), &name, false,
++        serde_json::json!({"kind":"oauth","credential":credential_name,"url":url,"home":config.codex_home,"mode":format!("{:?}",config.mcp_oauth_credentials_store_mode)}))? { return Ok(()); }
+@@ -1165,0 +1180,13 @@
++
++#[cfg(target_os = "android")]
++fn android_logout_approval(preview: bool, expected: Option<&str>, name: &str, shared: bool, context: serde_json::Value) -> Result<bool> {
++    use sha2::{Digest, Sha256};
++    let value = serde_json::json!({"name":name,"context":context});
++    let digest = format!("{:x}", Sha256::digest(serde_json::to_vec(&value)?));
++    if preview {
++        println!("{}", serde_json::json!({"name":name,"sharedEnterprise":shared,"sha256":digest}));
++        return Ok(true);
++    }
++    if let Some(expected) = expected { anyhow::ensure!(expected.len()==64 && expected==digest, "MCP credential target changed; inspect again before logout"); }
++    Ok(false)
++}

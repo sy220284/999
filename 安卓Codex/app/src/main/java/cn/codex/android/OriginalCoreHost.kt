@@ -22,7 +22,7 @@ data class OriginalState(
     val items: List<OriginalItem> = emptyList(), val requests: List<ServerMessage.Request> = emptyList(),
     val account: String = "尚未读取账号", val error: String? = null, val status: String = "未启动原版核心",
     val loginUrl: String? = null, val loginCode: String? = null, val loginId: String? = null,
-    val historyCursor: String? = null,
+    val historyCursor: String? = null,val coreIdentity:JsonObject?=null,val coreIdentityAt:Long?=null,
     val mcpAuthorizationUrl: String? = null, val mcpAuthorizationName: String? = null, val mcpLoginId: String? = null,
     val agent: JsonObject? = null, val agentItems: List<OriginalItem> = emptyList(), val agentCursor: String? = null,
     val goal: JsonObject? = null, val attachments: List<JsonObject> = emptyList(), val attachmentCursor: String? = null,
@@ -73,47 +73,67 @@ class OriginalCoreHost(
     private val remainingEvents = OriginalRemainingEvents()
     val realtimeAudio = OriginalRealtimeAudio(context,scope)
     private val workspace = File(context.filesDir, "工作区/原版项目").apply { mkdirs() }
+    private var currentProject=workspace
     private val androidToolRoots=java.util.IdentityHashMap<ServerMessage.Request,File>()
     fun androidToolRoot(request:ServerMessage.Request)=androidToolRoots[request]?.absolutePath
     private val toolJobs = java.util.IdentityHashMap<ServerMessage.Request,Job>()
     private val engineHome = File(context.filesDir, "原版核心数据").apply { mkdirs() }
     val configurationJournal get() = (context.applicationContext as CodexApplication).configurationJournal
-    val extensions: OriginalExtensionsController = OriginalExtensionsController(scope, workspace.absolutePath, configurationJournal.lifecycle("插件、技能与自动规则")) { state.value.working || state.value.turnId != null || state.value.loading || otherTaskRunning() || managedChanging || mcp.state.value.mutating || settings.state.value.mutating || files.state.value.mutating || commands.state.value.running || (context.applicationContext as CodexApplication).fullTerminal.state.value.running }
-    val mcp: OriginalMcpController = OriginalMcpController(scope, workspace.absolutePath,
-        activeTask = { state.value.working || state.value.turnId != null || state.value.loading || state.value.closing || otherTaskRunning() || managedChanging || extensions.state.value.mutating || settings.state.value.mutating || files.state.value.mutating || commands.state.value.running || (context.applicationContext as CodexApplication).fullTerminal.state.value.running },
-        threadId = { state.value.threadId }, mutationLifecycle = configurationJournal.lifecycle("MCP 服务操作"))
+    var extensions: OriginalExtensionsController = projectExtensions(currentProject)
+        private set
+    var mcp: OriginalMcpController = projectMcp(currentProject)
+        private set
     val commands: OriginalCommandController = OriginalCommandController(scope,
         busyElsewhere = { state.value.working || state.value.turnId != null || state.value.loading || state.value.closing || otherTaskRunning() || managedChanging || extensions.state.value.mutating || mcp.state.value.mutating || settings.state.value.mutating || files.state.value.mutating || (context.applicationContext as CodexApplication).fullTerminal.state.value.running },
         lifecycle = configurationJournal.lifecycle("原版独立命令"))
-    val settings: OriginalSettingsController = OriginalSettingsController(scope, workspace.absolutePath,
-        activeTask = { state.value.working || state.value.turnId != null || state.value.loading || state.value.closing || otherTaskRunning() || configurationChanging },
-        threadId = { state.value.threadId }, lifecycle = configurationJournal.lifecycle("原版实验设置"))
-    var files: OriginalFilesController = OriginalFilesController(scope, workspace,
-        activeTask = { state.value.working || state.value.turnId != null || state.value.loading || state.value.closing || otherTaskRunning() || configurationChanging },
-        lifecycle = configurationJournal.lifecycle("原版项目文件"))
+    var settings: OriginalSettingsController = projectSettings(currentProject)
         private set
-    val library: OriginalLibraryController = OriginalLibraryController(scope, workspace.absolutePath, { state.value.threadId },
-        { state.value.working || state.value.turnId != null || state.value.loading || state.value.closing || otherTaskRunning() || configurationChanging }, configurationJournal.lifecycle("市场、分享与应用目录"))
+    var files: OriginalFilesController = projectFiles(currentProject)
+        private set
+    var library: OriginalLibraryController = projectLibrary(currentProject)
+        private set
     val services: OriginalServicesController = OriginalServicesController(scope, { state.value.threadId },
         { state.value.working || state.value.turnId != null || state.value.loading || state.value.closing || otherTaskRunning() || configurationChanging }, configurationJournal.lifecycle("账号授权与反馈"), CreditResetRequestStore(context))
-    val migration: OriginalMigrationController = OriginalMigrationController(scope, workspace.absolutePath,
-        { state.value.working || state.value.turnId != null || state.value.loading || state.value.closing || otherTaskRunning() || configurationChanging }, configurationJournal.lifecycle("配置与迁移"))
+    var migration: OriginalMigrationController = projectMigration(currentProject)
+        private set
     val queue=OriginalQueueController(scope,{state.value.loading || state.value.closing || otherTaskRunning() || configurationChanging},configurationJournal.lifecycle("待办队列变更"))
     private fun completionBusy()=state.value.working || state.value.turnId!=null || state.value.loading || state.value.closing || otherTaskRunning() || configurationChanging
     val sshTrust:AndroidSshTrust=AndroidSshTrust(context,scope,{completionBusy()},configurationJournal.lifecycle("SSH主机信任"))
     val projects=OriginalProjectsController(scope,{completionBusy()},configurationJournal.lifecycle("项目管理"),ProjectCreationRequestStore(context))
     val history=OriginalHistoryController(scope,{state.value.threadId},{completionBusy()},configurationJournal.lifecycle("会话记录与后台终端"))
-    val advanced=OriginalAdvancedController(scope,{state.value.threadId},workspace.absolutePath,{completionBusy()},configurationJournal.lifecycle("会话设置、记忆与采样"))
+    var advanced: OriginalAdvancedController = projectAdvanced(currentProject)
+        private set
     val connections=OriginalConnectionsController(scope,{state.value.threadId},{completionBusy()},configurationJournal.lifecycle("环境、远控与服务认证"))
-    val worktrees=OriginalWorktrees(scope,{completionBusy()},configurationJournal.lifecycle("托管工作树"),workspace.absolutePath,AndroidWorktreeRunner(context,workspace,engineHome)::execute)
+    var worktrees:OriginalWorktrees=projectWorktrees(currentProject)
+        private set
     val agentActions=OriginalAgentActions(scope,{completionBusy()},configurationJournal.lifecycle("共享代理操作"))
-    val cli=OriginalCliController(scope,{state.value.connected || (context.applicationContext as CodexApplication).nativeEndpoints.daemonRunning || completionBusy()},configurationJournal.lifecycle("云任务与本机维护"),OriginalCliRunner(context,scope,workspace,engineHome)::execute)
-    val search=OriginalSearchController(scope,workspace.absolutePath)
+    var cli: OriginalCliController = projectCli(currentProject)
+        private set
+    var search: OriginalSearchController = projectSearch(currentProject)
+        private set
     val webRtc:OriginalWebRtcAudio=OriginalWebRtcAudio(context,scope){realtime.stop()}
     val realtime:OriginalRealtimeController=OriginalRealtimeController(scope,{state.value.working || state.value.turnId!=null || state.value.loading || state.value.closing || otherTaskRunning() || configurationChanging},configurationJournal.lifecycle("实时会话"))
     val microphone=OriginalRealtimeMicrophone(context,scope){bytes -> realtime.sendAudio(bytes)}
     init {scope.launch{realtime.state.map{it.running}.distinctUntilChanged().collect{running->if(!running)webRtc.close()}}}
-    fun commandWorkspace() = workspace.absolutePath
+    private fun projectExtensions(root:File): OriginalExtensionsController = OriginalExtensionsController(scope, root.absolutePath, configurationJournal.lifecycle("插件、技能与自动规则")) { state.value.working || state.value.turnId != null || state.value.loading || otherTaskRunning() || managedChanging || mcp.state.value.mutating || settings.state.value.mutating || files.state.value.mutating || commands.state.value.running || (context.applicationContext as CodexApplication).fullTerminal.state.value.running }
+    private fun projectMcp(root:File): OriginalMcpController = OriginalMcpController(scope, root.absolutePath,
+        activeTask = { state.value.working || state.value.turnId != null || state.value.loading || state.value.closing || otherTaskRunning() || managedChanging || extensions.state.value.mutating || settings.state.value.mutating || files.state.value.mutating || commands.state.value.running || (context.applicationContext as CodexApplication).fullTerminal.state.value.running },
+        threadId = { state.value.threadId }, mutationLifecycle = configurationJournal.lifecycle("MCP 服务操作"))
+    private fun projectSettings(root:File): OriginalSettingsController = OriginalSettingsController(scope, root.absolutePath,
+        activeTask = { state.value.working || state.value.turnId != null || state.value.loading || state.value.closing || otherTaskRunning() || configurationChanging },
+        threadId = { state.value.threadId }, lifecycle = configurationJournal.lifecycle("原版实验设置"))
+    private fun projectFiles(root:File): OriginalFilesController = OriginalFilesController(scope, root,
+        activeTask = { state.value.working || state.value.turnId != null || state.value.loading || state.value.closing || otherTaskRunning() || configurationChanging },
+        lifecycle = configurationJournal.lifecycle("原版项目文件"))
+    private fun projectLibrary(root:File): OriginalLibraryController = OriginalLibraryController(scope, root.absolutePath, { state.value.threadId },
+        { state.value.working || state.value.turnId != null || state.value.loading || state.value.closing || otherTaskRunning() || configurationChanging }, configurationJournal.lifecycle("市场、分享与应用目录"))
+    private fun projectMigration(root:File): OriginalMigrationController = OriginalMigrationController(scope, root.absolutePath,
+        { state.value.working || state.value.turnId != null || state.value.loading || state.value.closing || otherTaskRunning() || configurationChanging }, configurationJournal.lifecycle("配置与迁移"))
+    private fun projectAdvanced(root:File): OriginalAdvancedController = OriginalAdvancedController(scope,{state.value.threadId},root.absolutePath,{completionBusy()},configurationJournal.lifecycle("会话设置、记忆与采样"))
+    private fun projectCli(root:File): OriginalCliController = OriginalCliController(scope,{state.value.connected || (context.applicationContext as CodexApplication).nativeEndpoints.daemonRunning || completionBusy()},configurationJournal.lifecycle("云任务与本机维护"),OriginalCliRunner(context,scope,root,engineHome)::execute)
+    private fun projectWorktrees(root:File):OriginalWorktrees=OriginalWorktrees(scope,{completionBusy()},configurationJournal.lifecycle("托管工作树"),root.absolutePath,AndroidWorktreeRunner(context,root,engineHome)::execute)
+    private fun projectSearch(root:File): OriginalSearchController = OriginalSearchController(scope,root.absolutePath)
+    fun commandWorkspace() = currentProject.absolutePath
     val managedChanging get() = worktrees.operations.state.value.mutating || agentActions.operations.state.value.mutating || cli.state.value.busy || sshTrust.state.value.working || projects.operations.state.value.mutating || history.operations.state.value.mutating || advanced.operations.state.value.mutating || connections.operations.state.value.mutating || queue.operations.state.value.mutating || realtime.state.value.running || library.operations.state.value.mutating || services.operations.state.value.mutating || migration.operations.state.value.mutating
     val configurationChanging get() = state.value.toolBusy || (context.applicationContext as CodexApplication).gitOperations.state.value.running || (context.applicationContext as CodexApplication).fullTerminal.state.value.running || commands.state.value.running || extensions.state.value.mutating || mcp.state.value.mutating || settings.state.value.mutating || files.state.value.mutating || managedChanging
     fun mcpImports() = McpTools(context).connections().map { it.name to it.url }
@@ -150,7 +170,7 @@ class OriginalCoreHost(
     }
     private suspend fun startProcess(epoch: Long) {
         val config = configLoader()
-        val session = engineFactory.open(OriginalEngineLaunch(context, config, workspace, engineHome, scope))
+        val session = engineFactory.open(OriginalEngineLaunch(context, config, currentProject, engineHome, scope))
         if (!lifecycle.isCurrent(epoch)) {
             withContext(NonCancellable + Dispatchers.IO) { session.close() }
             throw CancellationException("启动期间连接已关闭")
@@ -161,8 +181,9 @@ class OriginalCoreHost(
             try { rpc.messages.collect { message -> if (current(epoch, rpc)) onMessage(epoch, rpc, message) } } catch (cancelled: CancellationException) { throw cancelled } catch (failure: Exception) { if (current(epoch, rpc)) { close(); error(IllegalStateException("原版核心连接已中断，请重新启动后恢复会话")) } }
         }
         val api = OriginalCodexClient(rpc)
-        api.initialize()
+        val identity=api.initialize().jsonObject
         ensureCurrent(epoch, rpc)
+        mutable.update{it.copy(coreIdentity=identity,coreIdentityAt=System.currentTimeMillis())}
         if (config.apiKey.isNotBlank() && config.endpoint.trimEnd('/') == "https://api.openai.com/v1" && api.account().jsonObject["account"] == JsonNull) api.loginApiKey(config.apiKey)
         ensureCurrent(epoch, rpc)
         client = api;worktrees.bind(api);agentActions.bind(api);projects.bind(api);history.bind(api);advanced.bind(api);connections.bind(api);queue.bind(api); search.bind(api);realtime.bind(api);extensions.bind(api); mcp.bind(api); commands.bind(api); settings.bind(api); files.bind(api); library.bind(api); services.bind(api); migration.bind(api)
@@ -184,7 +205,7 @@ class OriginalCoreHost(
         listener?.cancel(); listener = null
         val session = engine
         engine = null; client = null
-        mutable.update { OriginalState(connectionEpoch = lifecycle.state.connectionEpoch, model = it.model, closing = true, status = "正在关闭核心") }
+        mutable.update { OriginalState(connectionEpoch = lifecycle.state.connectionEpoch, model = it.model,coreIdentity=it.coreIdentity,coreIdentityAt=it.coreIdentityAt, closing = true, status = "正在关闭核心") }
         closingJob = scope.launch(Dispatchers.IO) {
             try { session?.close() } catch (_: Exception) { mutable.update { it.copy(error = "核心资源回收未能确认，请检查进程状态后再启动") } } finally { mutable.update { it.copy(closing = false, status = "原版核心已关闭") } }
         }
@@ -211,7 +232,7 @@ class OriginalCoreHost(
     }
     fun newThread() = operation { api ->
         check(!state.value.working && state.value.turnId == null)
-        val thread = api.start(workspace.absolutePath, state.value.model).jsonObject.getValue("thread").jsonObject
+        val thread = api.start(currentProject.absolutePath, state.value.model).jsonObject.getValue("thread").jsonObject
         selectThread(thread); refreshThreads(api, false)
     }
     fun openThread(id: String) = operation { api ->
@@ -227,14 +248,33 @@ class OriginalCoreHost(
         val managed=worktrees.managedRows(api)
         return withContext(Dispatchers.IO){ManagedProjectRoots.resolve(workspace,File(cwd),managed)}
     }
+    private fun rebindProject(root:File,api:OriginalCodexClient){
+        check(!files.state.value.busy && files.state.value.watchId==null && !search.state.value.busy && search.state.value.sessionId==null){"请先结束文件操作、目录监听和文件搜索，再切换项目"}
+        check(state.value.mcpLoginId==null && state.value.mcpAuthorizationUrl==null){"MCP授权尚未结束，请完成授权或关闭核心后再切换项目"}
+        check(!worktrees.operations.state.value.busy){"工作树读取或变更尚未结束，请稍后再切换项目"}
+        check(!extensions.state.value.busy && !mcp.state.value.busy && !settings.state.value.busy && !library.operations.state.value.busy && !migration.operations.state.value.busy && !advanced.operations.state.value.busy && !advanced.state.value.cancelBusy && !cli.state.value.busy){"请先结束当前项目的读取和配置操作，再切换项目"}
+        check(extensions.state.value.rulesEditor==null && mcp.state.value.editor==null){"请先保存或关闭当前项目的配置编辑器"}
+        val activeImport=migration.state.value.activeImport
+        check(activeImport==null || migration.state.value.runs[activeImport]?.completed==true){"当前项目导入尚未完成，请先核查"}
+        // bind(null)先递增旧控制器代次并取消其任务，旧结果不能落入新项目。
+        extensions.bind(null);mcp.bind(null);settings.bind(null);files.bind(null);library.bind(null);migration.bind(null);advanced.bind(null);search.bind(null);worktrees.bind(null)
+        currentProject=root
+        extensions=projectExtensions(root).also{it.bind(api)};mcp=projectMcp(root).also{it.bind(api)};settings=projectSettings(root).also{it.bind(api)}
+        files=projectFiles(root).also{it.bind(api)};library=projectLibrary(root).also{it.bind(api)};migration=projectMigration(root).also{it.bind(api)}
+        advanced=projectAdvanced(root).also{it.bind(api)};search=projectSearch(root).also{it.bind(api)};cli=projectCli(root);worktrees=projectWorktrees(root).also{it.bind(api)}
+    }
     private suspend fun selectThread(thread: JsonObject, throughVersion: Long = state.value.threadUpdates.version) {
         val selectionEpoch=lifecycle.state.connectionEpoch;val selectionConnection=connection ?: error("原版连接已结束")
         val root=projectRoot(OriginalCodexClient(selectionConnection),thread.string("cwd"))
         ensureCurrent(selectionEpoch,selectionConnection)
-        if(root!=files.root.canonicalFile){
-            check(!files.state.value.busy && files.state.value.watchId==null){"请先结束文件操作和目录监听，再切换项目会话"}
-            files.bind(null)
-            files=OriginalFilesController(scope,root,{completionBusy()},configurationJournal.lifecycle("原版项目文件")).also{it.bind(client)}
+        if(root!=currentProject.canonicalFile){
+            val previousSearch=search
+            if(previousSearch.state.value.sessionId!=null || previousSearch.state.value.busy){
+                previousSearch.stop()
+                withTimeout(5000){previousSearch.state.first{!it.busy && it.sessionId==null}}
+                ensureCurrent(selectionEpoch,selectionConnection)
+            }
+            rebindProject(root,OriginalCodexClient(selectionConnection))
         }
         microphone.stop();realtimeAudio.stop();queue.selectThread(thread.string("id"))
         val turns = (thread["turns"] as? JsonArray).orEmpty().mapNotNull { it as? JsonObject }
@@ -293,7 +333,7 @@ class OriginalCoreHost(
     /** 已加载列表跨本次共享核心客户端；历史按原版来源分页，子代理不混作根任务。 */
     fun readAgents(source:String="loaded",more:Boolean=false)=operation { api->
         val section=source.takeIf{it.startsWith("section:")}?.removePrefix("section:")
-        require(source in setOf("loaded","interactive","exec") || section?.let{runCatching{UUID.fromString(it).toString()==it}.getOrDefault(false)}==true)
+        require(source in setOf("loaded","interactive","exec","all") || section?.let{runCatching{UUID.fromString(it).toString()==it}.getOrDefault(false)}==true)
         val epoch=lifecycle.state.connectionEpoch
         val cursor=if(more){check(state.value.agentsSource==source);state.value.agentsCursor ?: return@operation}else null
         val observedStatuses=state.value.threadStatuses
@@ -305,7 +345,7 @@ class OriginalCoreHost(
             for(id in ids){try{val thread=api.read(id,false).jsonObject.getValue("thread").jsonObject;require(thread.string("id")==id);found+=thread}catch(cancelled:CancellationException){throw cancelled}catch(_:Exception){failures++};ensureCurrent(epoch,api.connection)}
             rows=found
         }else{
-            page=api.call("thread/list",buildJsonObject{put("limit",30);put("archived",false);put("useStateDbOnly",true);put("sortKey",if(section!=null)"section_position"else"recency_at");if(section!=null){put("sectionId",section);put("sortDirection","asc")};put("sourceKinds",JsonArray((if(section!=null)listOf("cli","vscode","exec","appServer","subAgent","subAgentReview","subAgentCompact","subAgentThreadSpawn","subAgentOther","unknown")else if(source=="exec")listOf("exec","appServer")else listOf("cli","vscode")).map(::JsonPrimitive)));cursor?.let{put("cursor",it)}}).jsonObject
+            page=api.call("thread/list",buildJsonObject{put("limit",30);put("archived",false);put("useStateDbOnly",true);put("sortKey",if(section!=null)"section_position"else"recency_at");if(section!=null){put("sectionId",section);put("sortDirection","asc")};put("sourceKinds",JsonArray((if(section!=null || source=="all")listOf("cli","vscode","exec","appServer","subAgent","subAgentReview","subAgentCompact","subAgentThreadSpawn","subAgentOther","unknown")else if(source=="exec")listOf("exec","appServer")else listOf("cli","vscode")).map(::JsonPrimitive)));cursor?.let{put("cursor",it)}}).jsonObject
             rows=page.getValue("data").jsonArray.map{it.jsonObject};require(rows.size<=30)
         }
         ensureCurrent(epoch,api.connection)
@@ -395,7 +435,7 @@ class OriginalCoreHost(
         refreshThreads(api, state.value.archived)
     }
     fun inspect(kind: String) = operation { api ->
-        val data = when (kind) { "配额" -> api.rateLimits(); "技能" -> api.skills(workspace.absolutePath); "MCP" -> api.mcp(); "钩子" -> api.hooks(workspace.absolutePath, state.value.threadId); "插件" -> api.installedPlugins(workspace.absolutePath); else -> throw IllegalArgumentException("未知检查类型") }
+        val data = when (kind) { "配额" -> api.rateLimits(); "技能" -> api.skills(currentProject.absolutePath); "MCP" -> api.mcp(); "钩子" -> api.hooks(currentProject.absolutePath, state.value.threadId); "插件" -> api.installedPlugins(currentProject.absolutePath); else -> throw IllegalArgumentException("未知检查类型") }
         mutable.update { it.copy(report = Json { prettyPrint = true }.encodeToString(JsonElement.serializer(), data)) }
     }
     fun login(deviceCode: Boolean) = operation { api ->
@@ -409,9 +449,9 @@ class OriginalCoreHost(
         require(key.isNotBlank()) { "请先在连接设置中保存 API 密钥" }
         api.loginApiKey(key); readAccount(api)
     }
-    fun startMcpLogin(name: String) = operation { api ->
+    fun startMcpLogin(name: String,options:McpLoginOptions=McpLoginOptions()) = operation { api ->
         require(name.isNotBlank()); check(state.value.mcpAuthorizationUrl == null) { "已有 MCP 授权正在等待处理" }
-        val result = api.mcpLogin(name.trim(), state.value.threadId).jsonObject
+        val result = api.mcpLogin(name.trim(), state.value.threadId,options).jsonObject
         mutable.update { it.copy(mcpAuthorizationUrl = result.string("authorizationUrl").ifBlank { null }, mcpAuthorizationName = name.trim(), mcpLoginId = result.string("loginId").ifBlank { null }) }
     }
     fun dismissMcpLogin() { mutable.update { it.copy(mcpAuthorizationUrl = null) } }
@@ -519,7 +559,7 @@ class OriginalCoreHost(
         var turnFinished = false
         try {
             if (state.value.threadId == null) {
-                val thread = api.start(workspace.absolutePath, state.value.model).jsonObject.getValue("thread").jsonObject
+                val thread = api.start(currentProject.absolutePath, state.value.model).jsonObject.getValue("thread").jsonObject
                 ensureCurrent(epoch, api.connection); selectThread(thread)
             }
             val thread = requireNotNull(lifecycle.state.threadId)

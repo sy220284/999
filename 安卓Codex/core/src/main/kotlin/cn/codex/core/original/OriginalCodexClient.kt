@@ -65,9 +65,7 @@ class OriginalCodexClient(val connection: AppServerConnection) {
         plugin.locator().forEach { (key, value) -> put(key, value) }; put("installAttemptId", attemptId)
     }, 180_000)
     suspend fun uninstallPlugin(pluginId: String) = call("plugin/uninstall", buildJsonObject { put("pluginId", pluginId) }, 180_000)
-    suspend fun mcpLogin(name: String, threadId: String?) = call("mcpServer/oauth/login", buildJsonObject {
-        put("name", name); threadId?.let { put("threadId", it) }; put("timeoutSecs", 180)
-    })
+    suspend fun mcpLogin(name:String,threadId:String?,options:McpLoginOptions=McpLoginOptions())=call("mcpServer/oauth/login",options.params(name,threadId),(options.timeoutSeconds+15)*1000L)
     suspend fun config(cwd: String? = null) = call("config/read", buildJsonObject { put("includeLayers", true); cwd?.let { put("cwd", it) } })
     suspend fun writeConfig(snapshot: OriginalConfigSnapshot, edit: JsonObject) = call("config/batchWrite", OriginalConfigEdits.request(snapshot, edit))
     suspend fun writeConfig(snapshot: OriginalConfigSnapshot, edits: List<JsonObject>) = call("config/batchWrite", OriginalConfigEdits.request(snapshot, edits))
