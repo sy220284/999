@@ -1,11 +1,11 @@
 variant,status,detail,source,validation
 Agents,部分业务路径,总览动作/指定回合停止/用量、嵌套根过滤/最近更新与真实段落顺序；原版工作树读取合并desktop与自定义根/版本、创建批准冻结配置、文件根按托管记录核对；全部原TUI分组/配置与跨客户端并发行为仍未等价验收,codex-rs/cli/src/main.rs,未运行验证；业务替代不代表CLI逐参数兼容
 TcpTunnel,业务路径已有源码,原版HTTP/3 CONNECT前台服务；精确批准来源/目标、元数据和stdin凭证、真实LISTENING就绪、AUTH_UPDATED更新及独立停止；本机其他应用可使用监听端口,codex-rs/cli/src/main.rs,未运行验证；业务替代不代表CLI逐参数兼容
-Exec,业务路径已有源码,原版任务/回合发送与独立命令，未交付原CLI的全部参数/JSON退出语义,codex-rs/cli/src/main.rs,未运行验证；业务替代不代表CLI逐参数兼容
+Exec,部分业务路径,已具备任务/回合发送和独立手机命令；非交互exec的输出Schema/JSONL/最后消息文件/ephemeral与ignore选项、profile/附加目录及退出语义未完整对应，不能以普通会话替代全CLI流程,codex-rs/cli/src/main.rs,未运行验证；业务替代不代表CLI逐参数兼容
 Review,业务路径已有源码,审查页及review/start,codex-rs/cli/src/main.rs,未运行验证；业务替代不代表CLI逐参数兼容
-Login,业务路径已有源码,账号登录页及核心登录,codex-rs/cli/src/main.rs,未运行验证；业务替代不代表CLI逐参数兼容
+Login,部分业务路径,API密钥/设备码/浏览器登录已有受控入口；原版with-access-token持久登录导入和自定义issuer/client-id等高级设置未完整对应；远程Agent Identity临时凭证不是持久账号登录,codex-rs/cli/src/main.rs,未运行验证；业务替代不代表CLI逐参数兼容
 Logout,业务路径已有源码,核心退出登录,codex-rs/cli/src/main.rs,未运行验证；业务替代不代表CLI逐参数兼容
-Mcp,业务路径已有源码,MCP配置/工具/资源/OAuth管理,codex-rs/cli/src/main.rs,未运行验证；业务替代不代表CLI逐参数兼容
+Mcp,部分业务路径,配置CRUD、工具/资源/OAuth登录和高级配置已有代码；单服务器OAuth凭证注销没有受控入口，每次登录clientRegistration/scopes等未完整传递；删除配置不等于注销凭证,codex-rs/cli/src/main.rs,未运行验证；业务替代不代表CLI逐参数兼容
 Plugin,业务路径已有源码,市场/插件安装和配置,codex-rs/cli/src/main.rs,未运行验证；业务替代不代表CLI逐参数兼容
 AppServer,部分业务路径,stdio、前台共享WS或私有Unix核心与原版app-server proxy，确切PID就绪、停止/重启、协议ZIP导出；桌面托管/自启/包钉选不适用，版本/Prettier等管理子项仍待补齐,codex-rs/cli/src/main.rs,未运行验证；业务替代不代表CLI逐参数兼容
 RemoteControl,业务路径已有源码,本次/持久启停、配对/撤销；读取原版settings.json供下一次主动启动使用，禁用走原版内部环境标记并在启动时消费；桌面自启/包托管由手机前台生命周期与签名APK替代,codex-rs/cli/src/main.rs,未运行验证；业务替代不代表CLI逐参数兼容
