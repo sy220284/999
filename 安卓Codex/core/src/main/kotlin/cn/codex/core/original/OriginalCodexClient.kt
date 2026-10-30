@@ -17,10 +17,10 @@ class OriginalCodexClient(val connection: AppServerConnection) {
     suspend fun threads(cursor: String? = null, archived: Boolean = false) = call("thread/list", buildJsonObject {
         put("limit", 30); put("archived", archived); cursor?.let { put("cursor", it) }
     })
-    suspend fun start(cwd: String, model: String?) = call("thread/start", buildJsonObject {
+    suspend fun start(cwd: String, model: String?,options:JsonObject=buildJsonObject{}) = call("thread/start", buildJsonObject {
         put("cwd", cwd); model?.takeIf { it.isNotBlank() }?.let { put("model", it) }
         // Android UID 仅隔离其他应用，不能宣称桌面项目沙箱；UI 必须先披露并取得本次同意。
-        put("sandbox", "danger-full-access"); put("approvalPolicy", "untrusted")
+        if(options["sandbox"]==null && options["permissions"]==null)put("sandbox", "danger-full-access");if("approvalPolicy" !in options && options["permissions"]==null)put("approvalPolicy", "untrusted");OriginalThreadLaunchOptions.parse(options.toString()).forEach{(key,value)->put(key,value)}
         put("dynamicTools", OriginalAndroidTools.definitions())
     })
     suspend fun resume(threadId: String) = call("thread/resume", buildJsonObject { put("threadId", threadId) })
@@ -32,16 +32,18 @@ class OriginalCodexClient(val connection: AppServerConnection) {
     suspend fun archive(threadId: String, archived: Boolean) = call(if (archived) "thread/archive" else "thread/unarchive", id(threadId))
     suspend fun rename(threadId: String, title: String) = call("thread/name/set", buildJsonObject { put("threadId", threadId); put("name", title) })
     suspend fun compact(threadId: String) = call("thread/compact/start", id(threadId))
-    suspend fun turn(threadId: String, text: String, effort: String?) = call("turn/start", buildJsonObject {
-        put("threadId", threadId); put("input", textInput(text))
-        effort?.takeIf { it.isNotBlank() }?.let { put("effort", it) }
+    suspend fun turn(threadId: String, text: String, effort: String?, extra:JsonArray=JsonArray(emptyList()),options:JsonObject=buildJsonObject{}) = call("turn/start", buildJsonObject {
+        put("threadId", threadId); put("input", OriginalInputContract.input(text,extra))
+        effort?.takeIf { it.isNotBlank() }?.let { put("effort", it) };OriginalTurnOptions.parse(options.toString()).forEach{(key,value)->put(key,value)}
     })
-    suspend fun steer(threadId: String, turnId: String, text: String) = call("turn/steer", buildJsonObject {
-        put("threadId", threadId); put("expectedTurnId", turnId); put("input", textInput(text))
+    suspend fun steer(threadId: String, turnId: String, text: String,extra:JsonArray=JsonArray(emptyList())) = call("turn/steer", buildJsonObject {
+        put("threadId", threadId); put("expectedTurnId", turnId); put("input", OriginalInputContract.input(text,extra))
     })
     suspend fun interrupt(threadId: String, turnId: String) = call("turn/interrupt", buildJsonObject { put("threadId", threadId); put("turnId", turnId) })
     suspend fun account() = call("account/read", buildJsonObject { put("refreshToken", false) })
     suspend fun loginApiKey(key: String) = call("account/login/start", buildJsonObject { put("type", "apiKey"); put("apiKey", key) })
+    suspend fun loginBedrock(apiKey:String,region:String)=call("account/login/start",buildJsonObject{require(apiKey.isNotBlank() && region.isNotBlank());put("type","amazonBedrock");put("apiKey",apiKey);put("region",region)})
+    suspend fun loginBedrockKeys(accessKey:String,secret:String,session:String?,region:String)=call("account/login/start",buildJsonObject{require(accessKey.isNotBlank() && secret.isNotBlank() && region.isNotBlank());put("type","amazonBedrockAccessKeys");put("accessKeyId",accessKey);put("secretAccessKey",secret);session?.takeIf{it.isNotBlank()}?.let{put("sessionToken",it)};put("region",region)})
     suspend fun loginDeviceCode() = call("account/login/start", buildJsonObject { put("type", "chatgptDeviceCode") }, 180_000)
     suspend fun loginBrowser() = call("account/login/start", buildJsonObject { put("type", "chatgpt") })
     suspend fun cancelLogin(loginId: String) = call("account/login/cancel", buildJsonObject { put("loginId", loginId) })
@@ -112,7 +114,7 @@ class OriginalCodexClient(val connection: AppServerConnection) {
     suspend fun copyFile(source: String, destination: String, recursive: Boolean) = call("fs/copy", buildJsonObject { put("sourcePath", source); put("destinationPath", destination); put("recursive", recursive) })
     suspend fun watchFiles(watchId: String, path: String) = call("fs/watch", buildJsonObject { put("watchId", watchId); put("path", path) })
     suspend fun unwatchFiles(watchId: String) = call("fs/unwatch", buildJsonObject { put("watchId", watchId) })
-    suspend fun review(threadId: String, target: JsonObject) = call("review/start", buildJsonObject { put("threadId", threadId); put("target", target); put("delivery", "inline") })
+    suspend fun review(threadId: String, target: JsonObject,delivery:String="inline") = call("review/start", buildJsonObject { put("threadId", threadId); put("target", target); require(delivery in setOf("inline","detached"));put("delivery", delivery) })
     suspend fun loadedThreads(cursor: String? = null) = call("thread/loaded/list", buildJsonObject { put("limit", 30); cursor?.let { put("cursor", it) } })
     suspend fun updateThreadGit(threadId: String, patch: JsonObject) = call("thread/metadata/update", buildJsonObject { put("threadId", threadId); put("gitInfo", patch) })
     suspend fun attachmentOwners(type: String, key: String, cursor: String? = null) = call("thread/attachmentOwner/list", buildJsonObject { put("attachmentType", type); put("identityKey", key); put("limit", 30); cursor?.let { put("cursor", it) } })
@@ -159,7 +161,7 @@ class OriginalCodexClient(val connection: AppServerConnection) {
     suspend fun startSearchSession(session: String, roots: List<String>) = call("fuzzyFileSearch/sessionStart", buildJsonObject { put("sessionId",session);put("roots",JsonArray(roots.map(::JsonPrimitive))) })
     suspend fun updateSearchSession(session: String, query: String) = call("fuzzyFileSearch/sessionUpdate", buildJsonObject { put("sessionId",session);put("query",query) })
     suspend fun stopSearchSession(session: String) = call("fuzzyFileSearch/sessionStop", buildJsonObject { put("sessionId",session) })
-    suspend fun startRealtime(thread: String, audioOutput: Boolean, offer: String?=null) = call("thread/realtime/start", buildJsonObject { put("threadId",thread);put("outputModality",if(audioOutput) "audio" else "text");put("transport",buildJsonObject { put("type",if(offer==null)"websocket" else "webrtc");offer?.let{put("sdp",OriginalWebRtcPolicy.sdp(it))} });put("version","v2") })
+    suspend fun startRealtime(thread: String, audioOutput: Boolean, offer: String?=null,options:JsonObject=buildJsonObject{}) = call("thread/realtime/start", buildJsonObject { put("threadId",thread);put("outputModality",if(audioOutput) "audio" else "text");put("transport",buildJsonObject { put("type",if(offer==null)"websocket" else "webrtc");offer?.let{put("sdp",OriginalWebRtcPolicy.sdp(it))} });if("version" !in options)put("version","v2");OriginalRealtimeOptions.parse(options.toString()).forEach{(key,value)->put(key,value)} })
     suspend fun appendRealtimeText(thread: String, text: String) = call("thread/realtime/appendText", buildJsonObject { put("threadId",thread);put("text",text);put("role","user") })
     suspend fun appendRealtimeAudio(thread: String, bytes: ByteArray, sampleRate: Int, channels: Int) = call("thread/realtime/appendAudio", buildJsonObject { put("threadId",thread);put("audio",buildJsonObject { put("data",java.util.Base64.getEncoder().encodeToString(bytes));put("sampleRate",sampleRate);put("numChannels",channels);put("samplesPerChannel",bytes.size/(channels*2));put("itemId",JsonNull) }) },10_000)
     suspend fun stopRealtime(thread: String) = call("thread/realtime/stop", buildJsonObject { put("threadId",thread) })

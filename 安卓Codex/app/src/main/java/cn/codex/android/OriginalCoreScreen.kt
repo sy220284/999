@@ -42,13 +42,14 @@ internal class OriginalRequestKey(private val request:ServerMessage.Request) {
     val sshStatus by host.sshTrust.state.collectAsState()
     val projectsStatus by host.projects.operations.state.collectAsState()
     val historyStatus by host.history.operations.state.collectAsState()
+    val detachedStatus by host.detachedReview.operations.state.collectAsState()
     val advancedStatus by host.advanced.operations.state.collectAsState()
     val connectionsStatus by host.connections.operations.state.collectAsState()
     val searchStatus by host.search.state.collectAsState()
     val realtimeStatus by host.realtime.state.collectAsState()
     val agentActionStatus by host.agentActions.operations.state.collectAsState()
     val worktreeStatus by host.worktrees.operations.state.collectAsState()
-    val managedBusy = worktreeStatus.busy ||  agentActionStatus.busy ||  cliStatus.busy || sshStatus.working || projectsStatus.mutating || historyStatus.mutating || advancedStatus.mutating || connectionsStatus.mutating || queueStatus.busy || realtimeStatus.running || libraryStatus.mutating || servicesStatus.mutating || migrationStatus.mutating
+    val managedBusy = detachedStatus.busy || worktreeStatus.busy ||  agentActionStatus.busy ||  cliStatus.busy || sshStatus.working || projectsStatus.mutating || historyStatus.mutating || advancedStatus.mutating || connectionsStatus.mutating || queueStatus.busy || realtimeStatus.running || libraryStatus.mutating || servicesStatus.mutating || migrationStatus.mutating
     val configurationRecords by host.configurationJournal.records.collectAsState()
     val configurationReadError by host.configurationJournal.readError.collectAsState()
     val activeConfiguration by host.configurationJournal.active.collectAsState()
@@ -72,6 +73,10 @@ internal class OriginalRequestKey(private val request:ServerMessage.Request) {
     val policyContext=LocalContext.current
     var restrictedCommands by remember { mutableStateOf(AndroidCommandPolicy.enabled(policyContext)) }
     var policyError by remember { mutableStateOf<String?>(null) }
+    var extraInput by remember(state.connectionEpoch,state.threadId){mutableStateOf(JsonArray(emptyList()))}
+    var showInputs by remember{mutableStateOf(false)}
+    var launchText by remember{mutableStateOf("{}")}
+    var turnOptions by remember{mutableStateOf("{}")};var inputError by remember{mutableStateOf<String?>(null)}
     var draft by remember { mutableStateOf("") }
     var renamed by remember { mutableStateOf<String?>(null) }
     val context = LocalContext.current
@@ -91,7 +96,7 @@ internal class OriginalRequestKey(private val request:ServerMessage.Request) {
         }, confirmButton = { TextButton(onClick = { host.closeAgent(); host.openThread(agent.string("id")) }, enabled = !state.working && state.turnId == null && !state.loading) { Text("切换到此会话") } }, dismissButton = { TextButton(onClick = host::closeAgent) { Text("关闭查看") } })
     }
     advancedManager?.let { page ->
-        val allow = !state.working && state.turnId == null && !state.loading && !extensionState.mutating && !mcpState.mutating && !settingsState.mutating && !filesState.mutating && !fullTerminalState.running && !networkGit.running && !commandState.running && !managedBusy
+        val allow = !state.working && state.turnId == null && !state.loading && !state.contextSynchronizing && !extensionState.mutating && !mcpState.mutating && !settingsState.mutating && !filesState.mutating && !fullTerminalState.running && !networkGit.running && !commandState.running && !managedBusy
         when (page) {
             "代理总览" -> OriginalAgentsScreen(host) { advancedManager = null }
             "应用更新" -> AndroidUpdateScreen { advancedManager = null }
@@ -109,15 +114,15 @@ internal class OriginalRequestKey(private val request:ServerMessage.Request) {
         return
     }
     if (skillsManager) { OriginalSkillsScreen(host.extensions, allowChanges = !state.working && state.turnId == null && !state.loading && !mcpState.mutating && !settingsState.mutating && !filesState.mutating && !fullTerminalState.running && !networkGit.running && !managedBusy && !commandState.running) { skillsManager = false }; return }
-    if (filesManager) { OriginalFilesScreen(host.files, allowChanges = !state.working && state.turnId == null && !state.loading && !extensionState.mutating && !mcpState.mutating && !settingsState.mutating && !filesState.mutating && !fullTerminalState.running && !networkGit.running && !managedBusy && !commandState.running) { filesManager = false }; return }
-    if (settingsManager) { OriginalSettingsScreen(host.settings, allowChanges = !state.working && state.turnId == null && !state.loading && !extensionState.mutating && !mcpState.mutating && !settingsState.mutating && !filesState.mutating && !fullTerminalState.running && !networkGit.running && !managedBusy && !commandState.running) { settingsManager = false }; return }
+    if (filesManager) { OriginalFilesScreen(host.files, allowChanges = !state.working && state.turnId == null && !state.loading && !state.contextSynchronizing && !extensionState.mutating && !mcpState.mutating && !settingsState.mutating && !filesState.mutating && !fullTerminalState.running && !networkGit.running && !managedBusy && !commandState.running) { filesManager = false }; return }
+    if (settingsManager) { OriginalSettingsScreen(host.settings, allowChanges = !state.working && state.turnId == null && !state.loading && !state.contextSynchronizing && !extensionState.mutating && !mcpState.mutating && !settingsState.mutating && !filesState.mutating && !fullTerminalState.running && !networkGit.running && !managedBusy && !commandState.running) { settingsManager = false }; return }
     if (commandManager) { OriginalCommandScreen(host.commands, host.commandWorkspace()) { commandManager = false }; return }
     if (realtimeManager) { OriginalRealtimeScreen(host) { realtimeManager = false }; return }
     if (searchManager) { OriginalSearchScreen(host,onOpen={path->host.files.read(path);searchManager=false;filesManager=true}) { searchManager = false }; return }
     if (eventsManager) { OriginalEventsScreen(host,onRealtime={eventsManager=false;realtimeManager=true}) { eventsManager = false }; return }
     if (sessionManager) { OriginalSessionScreen(host, initialTab = sessionInitialTab) { sessionManager = false }; return }
     if (mcpManager) {
-        OriginalMcpScreen(host.mcp, allowChanges = !state.working && state.turnId == null && !state.loading && !extensionState.mutating && !settingsState.mutating && !filesState.mutating && !fullTerminalState.running && !networkGit.running && !managedBusy,
+        OriginalMcpScreen(host.mcp, allowChanges = !state.working && state.turnId == null && !state.loading && !state.contextSynchronizing && !extensionState.mutating && !settingsState.mutating && !filesState.mutating && !fullTerminalState.running && !networkGit.running && !managedBusy,
             imports = imports, authorizationUrl = state.mcpAuthorizationUrl, authorizationName = state.mcpAuthorizationName,
             hostError = state.error, onDismissHostError = host::dismissError, onLogin = { name,options -> host.startMcpLogin(name,options) },
             onDismissAuthorization = host::dismissMcpLogin, onBack = { mcpManager = false })
@@ -125,7 +130,7 @@ internal class OriginalRequestKey(private val request:ServerMessage.Request) {
     }
     if (extensions) { OriginalExtensionsScreen(host.extensions, allowChanges = !state.working && state.turnId == null && !state.loading && !mcpState.mutating && !settingsState.mutating && !filesState.mutating && !fullTerminalState.running && !networkGit.running && !managedBusy, onBack = { extensions = false }); return }
     val active = state.working || state.turnId != null
-    val editable = state.connected && !state.loading && !extensionState.mutating && !mcpState.mutating && !settingsState.mutating && !filesState.mutating && !commandState.running && !fullTerminalState.running && !networkGit.running && !managedBusy && !active
+    val editable = state.connected && !state.loading && !state.contextSynchronizing && !extensionState.mutating && !mcpState.mutating && !settingsState.mutating && !filesState.mutating && !commandState.running && !fullTerminalState.running && !networkGit.running && !managedBusy && !active
     Column(Modifier.fillMaxSize().imePadding()) {
         LazyColumn(Modifier.weight(1f).fillMaxWidth(), contentPadding = PaddingValues(20.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
             item {
@@ -224,8 +229,11 @@ internal class OriginalRequestKey(private val request:ServerMessage.Request) {
                 }
                 item {
                     OutlinedTextField(state.model, host::selectModel, label = { Text("本次会话模型") }, enabled = editable && state.threadId == null, singleLine = true, modifier = Modifier.fillMaxWidth())
+                    TextButton(onClick={host.compareRunningVersions()},enabled=editable){Text("核对运行核心与随包CLI版本")};state.versionComparison?.let{Text(it,style=MaterialTheme.typography.bodySmall)}
                     TextButton(onClick = { host.loadModels() }, enabled = editable) { Text("获取原版模型列表") }
                     if (state.models.isNotEmpty()) LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) { items(state.models) { model -> FilterChip(selected = state.model == model, onClick = { host.selectModel(model) }, enabled = editable && state.threadId == null, label = { Text(model) }) } }
+                    OutlinedTextField(launchText,{launchText=it},label={Text("新会话设置（JSON：权限方案、服务、指令等，可选）")},enabled=editable,modifier=Modifier.fillMaxWidth())
+                    TextButton(onClick={host.setLaunchOptions(launchText)},enabled=editable){Text("应用到后续新会话与工作树")}
                     Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         FilledTonalButton(onClick = { host.newThread() }, enabled = editable) { Text("新建会话") }
                         OutlinedButton(onClick = { host.refresh(!state.archived) }, enabled = editable) { Text(if (state.archived) "最近会话" else "已归档") }
@@ -292,13 +300,19 @@ internal class OriginalRequestKey(private val request:ServerMessage.Request) {
                 if (state.report.isNotBlank()) item { ExpandableCard("核心返回详情", state.report, Icons.Outlined.Info) }
             }
         }
-        if (state.loading) LinearProgressIndicator(Modifier.fillMaxWidth())
+        if (state.contextSynchronizing) Text("正在同步项目目录…")
+        if (state.loading || state.contextSynchronizing) LinearProgressIndicator(Modifier.fillMaxWidth())
         if (state.connected) Surface(tonalElevation = 2.dp) {
             Column(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 10.dp)) {
                 OutlinedTextField(draft, { draft = it }, label = { Text(if (active) "追加本次任务的指令" else "交给 Codex 的任务") }, modifier = Modifier.fillMaxWidth(), maxLines = 6, shape = RoundedCornerShape(18.dp))
+                TextButton(onClick={showInputs=!showInputs}){Text(if(showInputs)"收起附加输入"else"图片、音频、技能与提及（${extraInput.size}）")}
+                if(showInputs){OriginalInputAttachments(host,extraInput,{extraInput=it},!state.loading && !state.contextSynchronizing)
+                    if(!active)OutlinedTextField(turnOptions,{turnOptions=it},label={Text("本回合高级设置（JSON：模型、输出规则、权限、服务档位等）")},modifier=Modifier.fillMaxWidth())
+                }
+                inputError?.let{Text(it,color=MaterialTheme.colorScheme.error)}
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
                     if (active) TextButton(onClick = { host.stop() }) { Text("停止任务") }
-                    Button(onClick = { if (active) host.steer(draft) else host.send(draft); draft = "" }, enabled = draft.isNotBlank() && !state.loading && !extensionState.mutating && !mcpState.mutating && !settingsState.mutating && !filesState.mutating && !commandState.running && !fullTerminalState.running && !networkGit.running && !managedBusy && host.selectedThreadUsable() && (!active || state.turnId != null)) { Text(if (active) "追加指令" else "发送") }
+                    Button(onClick = { try{if (active) host.steer(draft,extraInput) else host.send(draft,extraInput,OriginalTurnOptions.parse(turnOptions)); draft = "";extraInput=JsonArray(emptyList());inputError=null}catch(failure:Exception){inputError=failure.message} }, enabled = (draft.isNotBlank() || extraInput.isNotEmpty()) && !state.loading && !state.contextSynchronizing && !extensionState.mutating && !mcpState.mutating && !settingsState.mutating && !filesState.mutating && !commandState.running && !fullTerminalState.running && !networkGit.running && !managedBusy && host.selectedThreadUsable() && (!active || state.turnId != null)) { Text(if (active) "追加指令" else "发送") }
                 }
             }
         }

@@ -30,6 +30,7 @@ import kotlinx.coroutines.flow.first
     var forward by rememberSaveable{mutableStateOf(false)};var concurrent by rememberSaveable{mutableStateOf("1")};var strict by rememberSaveable{mutableStateOf(false)}
     var unix by rememberSaveable{mutableStateOf(false)}
     var remote by rememberSaveable{mutableStateOf(false)};var showToken by remember{mutableStateOf<NativeEndpointKind?>(null)}
+    var startupText by remember{mutableStateOf("{}")};var startupLoaded by remember{mutableStateOf(false)};var startupSaving by remember{mutableStateOf(false)}
     var remotePreference by remember{mutableStateOf("尚未读取未来启动设置")}
     var restrictedCommands by remember{mutableStateOf(AndroidCommandPolicy.enabled(app))}
     var restarting by remember{mutableStateOf(false)}
@@ -85,6 +86,11 @@ import kotlinx.coroutines.flow.first
                 }
                 NativeEndpointKind.EXECUTOR->Text("持有本次随机连接密钥的客户端，可在本应用权限内读写文件、执行命令；它不是项目级沙箱。",style=MaterialTheme.typography.bodySmall)
                 NativeEndpointKind.DAEMON->{
+                    if(!startupLoaded)LaunchedEffect(Unit){try{startupText=withContext(Dispatchers.IO){OriginalAppServerPreferences.read(app).toString()};startupLoaded=true}catch(failure:Exception){inputError="核心启动选项读取失败：${failure.message}"}}
+                    OutlinedTextField(startupText,{startupText=it},label={Text("原版进程参数JSON（strictConfig、analyticsDefaultEnabled、cloudSkillsSnapshot、codeModeHost）")},modifier=Modifier.fillMaxWidth(),enabled=!manager.running && !core.connected)
+                    Text("远程代码模式主机会收到代码与上下文。analyticsDefaultEnabled=true会启用原版默认分析；请仅主动选择可信设置。",style=MaterialTheme.typography.bodySmall)
+                    TextButton(onClick={val captured=startupText;startupSaving=true;scope.launch{try{check(!manager.running && !host.state.value.connected && !host.state.value.closing);withContext(Dispatchers.IO){OriginalAppServerPreferences.write(app,captured)};inputError=null}catch(failure:Exception){if(failure is CancellationException)throw failure;inputError=failure.message ?: "启动选项未保存"}finally{startupSaving=false}}},enabled=!startupSaving && !manager.running && !core.connected && !core.closing){Text("保存到下次核心启动")}
+
                     Row{Checkbox(unix,{unix=it},enabled=states[kind]?.running!=true);Text("使用私有Unix连接（无本机TCP监听）",Modifier.padding(top=12.dp))}
                     Text("共享同一原版账号和项目，支持多客户端连接；关闭主界面的核心连接也会结束本次共享服务。启动前先结束任务。",style=MaterialTheme.typography.bodySmall)
                     Row{Checkbox(strict,{strict=it},enabled=states[kind]?.running!=true);Text("严格检查原版核心配置",Modifier.padding(top=12.dp))}

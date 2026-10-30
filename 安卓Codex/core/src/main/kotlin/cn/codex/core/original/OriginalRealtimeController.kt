@@ -28,7 +28,7 @@ class OriginalRealtimeController(private val scope:CoroutineScope,private val bu
         generation++;voicesJob?.cancel();controlSerial++;stopRequested=false;job?.cancel();control?.cancel();finished?.cancel();started?.cancel();acknowledged?.cancel()
         finished=null;started=null;acknowledged=null;api=client;mutable.value=if(client==null)state.value.copy(connected=false,running=false,ready=false,controlBusy=false,status="连接已结束，请核查最后会话结果") else OriginalRealtimeState(connected=true)
     }
-    fun start(thread:String,audioOutput:Boolean,webRtcOffer:(suspend ()->String)?=null) {
+    fun start(thread:String,audioOutput:Boolean,options:JsonObject=buildJsonObject{},webRtcOffer:(suspend ()->String)?=null) {
         if(state.value.running)return
         if(busyElsewhere()){mutable.update{it.copy(error="请先结束其他执行任务或配置变更")};return}
         val client=api ?: return
@@ -45,7 +45,7 @@ class OriginalRealtimeController(private val scope:CoroutineScope,private val bu
                 val offer=webRtcOffer?.invoke()
                 coroutineScope {
                     submitted=true
-                    val response=async{client.startRealtime(thread,audioOutput,offer)}
+                    val response=async{client.startRealtime(thread,audioOutput,offer,options)}
                     select<Unit> {
                         response.onAwait {
                             ack.complete(Unit)

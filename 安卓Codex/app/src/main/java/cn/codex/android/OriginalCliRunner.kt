@@ -73,8 +73,14 @@ class OriginalCliRunner(private val context:Context,private val scope:CoroutineS
                 environment.putAll(settings.environment)
                 environment["CODEX_ANDROID_VAULT_SOCKET"]=vault.path;environment["CODEX_ANDROID_VAULT_HOST_PID"]=android.os.Process.myPid().toString()
                 val bridge=OriginalVerificationServer(context,scope).also{verification=it};environment["CODEX_ANDROID_VERIFICATION_SOCKET"]=bridge.path
-                for(arg in plan.arguments){if(arg.startsWith("--image="))projectInput(arg.substringAfter('='),false);if(arg.startsWith("--output-schema="))projectInput(arg.substringAfter('='),false)}
-            }else{environment.remove("CODEX_ACCESS_TOKEN");environment.remove("CODEX_ANDROID_FORWARD_AUTH");environment.remove("CODEX_ANDROID_EXECUTOR_EVENTS");environment.remove(AndroidCommandPolicyDocument.ENV);environment.putAll(AndroidCommandPolicy.environment(context))}
+                for(arg in plan.arguments){if(arg.startsWith("--cd="))projectInput(arg.substringAfter('='),true);if(arg.startsWith("--image="))projectInput(arg.substringAfter('='),false);if(arg.startsWith("--output-schema="))projectInput(arg.substringAfter('='),false)}
+            }else{
+                if(plan.arguments.take(2)==listOf("app-server","--print-startup-config")){
+                    val settings=NativeOriginalEngineFactory.settings(context,SecureSettings(context).load(),home)
+                    val original=arguments.drop(4);arguments.clear();arguments+=settings.arguments;arguments+=original
+                    environment.putAll(settings.environment);environment["CODEX_ANDROID_VAULT_SOCKET"]=vault.path;environment["CODEX_ANDROID_VAULT_HOST_PID"]=android.os.Process.myPid().toString()
+                }
+                environment.remove("CODEX_ACCESS_TOKEN");environment.remove("CODEX_ANDROID_FORWARD_AUTH");environment.remove("CODEX_ANDROID_EXECUTOR_EVENTS");environment.remove(AndroidCommandPolicyDocument.ENV);environment.putAll(AndroidCommandPolicy.environment(context))}
             val child=NativeCoreProcess(binary,arguments,environment,workspace).also{process=it};vault.authorize(child.pid);verification?.authorize(child.pid)
             coroutineScope{
                 val stdout=async(Dispatchers.IO){

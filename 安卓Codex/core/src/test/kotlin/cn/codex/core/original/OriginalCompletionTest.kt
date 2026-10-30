@@ -143,4 +143,34 @@ class OriginalCompletionTest {
             assertTrue(c.state.value.subscriptions.isEmpty())
         }}finally{scope.cancel();dispatcher.close()}
     }
+    @Test fun bedrockCredentialKindsReachOriginalLoginWithoutStatePersistence()=runBlocking{
+        val dispatcher=Executors.newSingleThreadExecutor().asCoroutineDispatcher();val scope=CoroutineScope(SupervisorJob()+dispatcher)
+        try{Wire(scope).use{wire->
+            val api=OriginalCodexClient(wire.rpc)
+            val key=scope.async{api.loginBedrock("secret-api","us-east-1")};val first=wire.next()
+            assertEquals("amazonBedrock",first.getValue("params").jsonObject.string("type"));assertEquals("secret-api",first.getValue("params").jsonObject.string("apiKey"));wire.reply(first,buildJsonObject{});key.await()
+            val keys=scope.async{api.loginBedrockKeys("access","secret","session","us-east-1")};val second=wire.next();val params=second.getValue("params").jsonObject
+            assertEquals("amazonBedrockAccessKeys",params.string("type"));assertEquals("session",params.string("sessionToken"));wire.reply(second,buildJsonObject{});keys.await()
+        }}finally{scope.cancel();dispatcher.close()}
+    }
+    @Test fun detachedReviewUsesReturnedThreadAndActualTerminalStatus()=runBlocking{
+        val dispatcher=Executors.newSingleThreadExecutor().asCoroutineDispatcher();val scope=CoroutineScope(SupervisorJob()+dispatcher)
+        try{Wire(scope).use{wire->
+            val c=OriginalDetachedReview(scope,{false},OriginalMutationLifecycle.None)
+            withContext(dispatcher){c.bind(OriginalCodexClient(wire.rpc));c.start("source",OriginalSessionActions.reviewTarget("uncommittedChanges"))}
+            val request=wire.next();assertEquals("detached",request.getValue("params").jsonObject.string("delivery"))
+            wire.reply(request,buildJsonObject{put("reviewThreadId","review");put("turn",buildJsonObject{put("id","review-turn");put("status","completed")})})
+            withTimeout(3000){c.operations.state.first{!it.busy}}
+            assertEquals("source",c.state.value.source);assertEquals("review",c.state.value.thread);assertEquals("completed",c.state.value.result?.string("status"))
+        }}finally{scope.cancel();dispatcher.close()}
+    }
+    @Test fun overviewDiscoveryMergesTwoSourcesAndKeepsUnshownRows()=runBlocking{
+        val dispatcher=Executors.newSingleThreadExecutor().asCoroutineDispatcher();val scope=CoroutineScope(SupervisorJob()+dispatcher)
+        try{Wire(scope).use{wire->
+            val discovery=OriginalAgentsDiscovery();val result=scope.async{discovery.next(OriginalCodexClient(wire.rpc),1)}
+            repeat(2){val request=wire.next();val other=request.getValue("params").jsonObject.getValue("sourceKinds").jsonArray.isNotEmpty();wire.reply(request,buildJsonObject{put("data",buildJsonArray{add(buildJsonObject{put("id",if(other)"exec"else"interactive");put("updatedAt",if(other)20 else 10);put("ephemeral",false)})})})}
+            assertEquals("exec",result.await().rows.single().string("id"))
+            val rest=discovery.next(OriginalCodexClient(wire.rpc),10);assertEquals("interactive",rest.rows.single().string("id"));assertFalse(rest.more)
+        }}finally{scope.cancel();dispatcher.close()}
+    }
 }

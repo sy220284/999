@@ -17,6 +17,8 @@ import cn.codex.core.original.*
 import kotlinx.serialization.json.*
 
 @Composable fun OriginalSessionScreen(host: OriginalCoreHost, initialTab: String = "目标", onBack: () -> Unit) {
+    val detached by host.detachedReview.state.collectAsState();val detachedStatus by host.detachedReview.operations.state.collectAsState()
+    var separateReview by remember{mutableStateOf(false)}
     val state by host.state.collectAsState()
     val extensions by host.extensions.state.collectAsState()
     val mcp by host.mcp.state.collectAsState()
@@ -38,7 +40,7 @@ import kotlinx.serialization.json.*
     var ownerTypeInput by remember(state.ownerType) { mutableStateOf(state.ownerType) }
     var ownerKeyInput by remember(state.ownerKey) { mutableStateOf(state.ownerKey) }
     var before by remember(state.threadId) { mutableStateOf("") }
-    val editable = state.connected && !state.loading && !state.working && state.turnId == null && !extensions.mutating && !mcp.mutating && !settings.mutating && !files.mutating && !commands.running && !fullTerminal.running && !networkGit.running && !libraryStatus.mutating && !servicesStatus.mutating && !migrationStatus.mutating && !realtimeStatus.running && !queueStatus.busy && host.selectedThreadUsable()
+    val editable = !detachedStatus.busy && !state.contextSynchronizing && state.connected && !state.loading && !state.working && state.turnId == null && !extensions.mutating && !mcp.mutating && !settings.mutating && !files.mutating && !commands.running && !fullTerminal.running && !networkGit.running && !libraryStatus.mutating && !servicesStatus.mutating && !migrationStatus.mutating && !realtimeStatus.running && !queueStatus.busy && host.selectedThreadUsable()
     BackHandler(onBack = onBack)
     LaunchedEffect(state.connectionEpoch, state.threadId) { confirm = null; goalEdit = false; sectionEdit = null; attachmentEdit = false }
     LaunchedEffect(tab, state.threadId) {
@@ -60,7 +62,12 @@ import kotlinx.serialization.json.*
             if(tab=="待办" && state.threadId!=null)item{OriginalQueuePanel(host,onBack)}
             if (tab == "高级操作" && state.threadId != null) item { OriginalThreadAdvanced(host, editable, onBack) }
             if (tab == "代码审查" && state.threadId != null) item {
-                OriginalReviewForm(editable) { type, value, title -> host.startReview(type, value, title); if (host.state.value.working) onBack() }
+                Row{Checkbox(separateReview,{separateReview=it},enabled=editable && !detachedStatus.busy);Text("在独立会话中审查")}
+                OriginalReviewForm(editable && !detachedStatus.busy,separateReview) { type,value,title->if(separateReview)host.detachedReview.start(requireNotNull(state.threadId),OriginalSessionActions.reviewTarget(type,value,title))else{host.startReview(type,value,title);if(host.state.value.working)onBack()}}
+                if(detached.status.isNotBlank())Text(detached.status)
+                detachedStatus.error?.let{Text(it,color=MaterialTheme.colorScheme.error)};detached.stopError?.let{Text(it,color=MaterialTheme.colorScheme.error)}
+                if(detachedStatus.busy)TextButton(onClick={host.detachedReview.stop()},enabled=!detached.stopBusy){Text("停止独立审查")}
+                detached.thread?.let{id->TextButton(onClick={host.openThread(id);onBack()},enabled=!detachedStatus.busy && !state.loading){Text("打开独立审查会话")}}
             }
             if (tab == "Git 资料" && state.threadId != null) item {
                 ThreadGitEditor(state.threadId!!, state.threadGitInfo, editable, host::loadGitMetadata, host::saveGitMetadata)

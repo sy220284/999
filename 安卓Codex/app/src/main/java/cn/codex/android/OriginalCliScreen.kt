@@ -90,10 +90,12 @@ private data class CliConfirmation(val title:String,val body:String,val action:(
             if(execAction in setOf("resume","fork","review-base","review-commit"))OutlinedTextField(execSession,{execSession=it},label={Text("会话、基准分支或提交标识")},enabled=idle,modifier=Modifier.fillMaxWidth())
             OutlinedTextField(execPrompt,{execPrompt=it},label={Text("任务或自定审查要求")},enabled=idle,modifier=Modifier.fillMaxWidth())
             OutlinedTextField(execOptions,{execOptions=it},label={Text("原版高级选项JSON")},enabled=idle,modifier=Modifier.fillMaxWidth(),minLines=4)
-            Text("可选：model/profile、json、ephemeral、ignore-user-config、ignore-rules、strict-config、output-schema（项目文件）、image/add-dir数组、thread-source、cyber-access-program、worktree等；继续会话可用all=true，提交审查可用review-title。output-last-message=true导出最后回复。沙箱/自动审批冲突按原版拒绝；不支持的手机策略不会假装成功。",style=MaterialTheme.typography.bodySmall)
+            Text("可选：model/profile、json、ephemeral、ignore-user-config、ignore-rules、strict-config、output-schema（项目文件）、image/add-dir数组、thread-source、cyber-access-program、worktree等；config数组逐字传原版配置覆盖（宿主凭证/环境键受保护），stdin可与任务提示组合，color和cd可选；无提示fork保留原版行为。继续会话可用all=true，提交审查可用review-title。output-last-message=true导出最后回复。沙箱/自动审批冲突按原版拒绝；不支持的手机策略不会假装成功。",style=MaterialTheme.typography.bodySmall)
             TextButton(onClick={action{val request=OriginalStandaloneCommands.exec(execPrompt.ifBlank{if(execAction.startsWith("review-"))"审查项目"else""},Json.parseToJsonElement(execOptions).jsonObject,execAction,execSession)
                 confirmation=CliConfirmation("运行原版独立任务并使用额度？","项目：${host.commandWorkspace()}\n${request.arguments.joinToString(" ")}\n${request.input}\n可能修改项目和执行命令。跳过审批/Hook信任选项会扩大访问权限；取消不会撤销已有变更。"){host.cli.maintain(request)}}},enabled=idle){Text("核对参数后执行")}
             core.coreIdentity?.let{identity->Text("上次核心握手：${identity.string("userAgent")}\n平台：${identity.string("platformOs")}，${core.coreIdentityAt?.let{java.util.Date(it).toString()}.orEmpty()}。这是上次连接记录，不代表核心仍在运行。",style=MaterialTheme.typography.bodySmall)}
+            TextButton(onClick={host.cli.maintain(OriginalCliCommands.startupConfig())},enabled=idle){Text("检查原版启动配置与要求")}
+            TextButton(onClick={confirmation=CliConfirmation("退出账号并重新检查启动要求？","将通过原版流程退出当前登录，然后读取配置要求。"){host.cli.maintain(OriginalCliCommands.startupConfig(true))}},enabled=idle){Text("退出登录后检查启动配置")}
             TextButton(onClick={host.cli.maintain(OriginalStandaloneCommands.version())},enabled=idle){Text("读取随包CLI版本")}
         }
         item{Text("导入原版登录凭证",style=MaterialTheme.typography.titleMedium)

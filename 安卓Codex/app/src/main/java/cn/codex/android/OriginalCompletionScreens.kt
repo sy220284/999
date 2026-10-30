@@ -178,6 +178,7 @@ private val completionPadding=PaddingValues(20.dp)
     val c=host.connections;val state by c.state.collectAsState();val status by c.operations.state.collectAsState();val core by host.state.collectAsState()
     var tab by rememberSaveable{mutableStateOf(0)};var env by rememberSaveable{mutableStateOf("")};var url by rememberSaveable{mutableStateOf("")};var token by remember{mutableStateOf("")};var requestId by remember{mutableStateOf("")}
     var ephemeral by rememberSaveable{mutableStateOf(true)};var manual by rememberSaveable{mutableStateOf(false)};var profile by rememberSaveable{mutableStateOf("")};var region by rememberSaveable{mutableStateOf("")}
+    var bedrockKey by remember{mutableStateOf("")};var accessKey by remember{mutableStateOf("")};var secretKey by remember{mutableStateOf("")};var sessionToken by remember{mutableStateOf("")}
     var server by rememberSaveable{mutableStateOf("codex_apps")};var stream by rememberSaveable{mutableStateOf("")};var args by rememberSaveable{mutableStateOf("{}")}
     var challenge by remember{mutableStateOf("")};var title by rememberSaveable{mutableStateOf("")};var description by rememberSaveable{mutableStateOf("")}
     var confirmation by remember{mutableStateOf<CompletionConfirmation?>(null)};val idle=status.connected && !status.busy
@@ -219,10 +220,15 @@ private val completionPadding=PaddingValues(20.dp)
             items(state.streamEvents){event->CompletionValue("订阅事件",event)}
         }
         if(tab==3)item{
-            Text("读取原版核心可见的AWS配置，选择现有profile或环境凭证。此页不收集AWS密钥。",style=MaterialTheme.typography.bodySmall)
+            Text("读取原版核心可见的AWS配置，选择现有profile或环境凭证。也可显式导入API密钥或AWS访问密钥，提交后清除本页明文。",style=MaterialTheme.typography.bodySmall)
             Button(onClick={c.discoverBedrock()},enabled=idle){Text("发现AWS配置")};CompletionValue("可用配置",state.bedrock)
             CompletionField("Profile名称（空白为环境凭证）",profile,{profile=it},idle);CompletionField("AWS区域",region,{region=it},idle)
             TextButton(onClick={val p=profile.takeIf{it.isNotBlank()};val r=region;confirmation=CompletionConfirmation("切换Bedrock认证配置？","凭证来源：${p ?: "环境变量"}\n区域：$r\n后续模型请求将使用此配置。"){c.bedrock(p,r)}},enabled=idle && region.isNotBlank()){Text("使用此配置")}
+            listOf("Bedrock API密钥" to bedrockKey,"AWS访问密钥ID" to accessKey,"AWS秘密访问密钥" to secretKey,"AWS会话令牌（可选）" to sessionToken).forEachIndexed{index,(label,value)->
+                OutlinedTextField(value,{when(index){0->bedrockKey=it;1->accessKey=it;2->secretKey=it;else->sessionToken=it}},label={Text(label)},visualTransformation=PasswordVisualTransformation(),enabled=idle,modifier=Modifier.fillMaxWidth())
+            }
+            TextButton(onClick={val key=bedrockKey;val selectedRegion=region;confirmation=CompletionConfirmation("使用Bedrock API密钥登录？","区域：$selectedRegion\n凭证由原版核心加密存储，已有登录可能被替换。"){c.loginBedrock(key,selectedRegion);bedrockKey=""}},enabled=idle && bedrockKey.isNotBlank() && region.isNotBlank()){Text("使用API密钥登录")}
+            TextButton(onClick={val access=accessKey;val secret=secretKey;val session=sessionToken;val selectedRegion=region;confirmation=CompletionConfirmation("使用AWS访问密钥登录？","区域：$selectedRegion\n将替换原版当前认证配置。"){c.loginBedrockKeys(access,secret,session,selectedRegion);accessKey="";secretKey="";sessionToken=""}},enabled=idle && accessKey.isNotBlank() && secretKey.isNotBlank() && region.isNotBlank()){Text("使用AWS访问密钥登录")}
             TextButton(onClick={c.requirements()},enabled=idle){Text("检查GovCloud要求")};CompletionValue("要求检查结果",state.requirements)
         }
         if(tab==4)item{

@@ -8,7 +8,7 @@ import kotlinx.serialization.json.*
 data class OriginalAdvancedState(val memory:JsonObject?=null,val memoryStatus:JsonObject?=null,val threadSettings:JsonObject?=null,
     val sample:JsonObject?=null,val sampleRequest:JsonElement?=null,val cancelBusy:Boolean=false,val elicitation:JsonObject?=null,
     val plugins:OriginalCompletionPage=OriginalCompletionPage(),val pluginQuery:String="",val modes:JsonObject?=null,val diagnostics:JsonObject?=null)
-class OriginalAdvancedController(private val scope:CoroutineScope,private val thread:()->String?,private val cwd:String,active:()->Boolean,lifecycle:OriginalMutationLifecycle) {
+class OriginalAdvancedController(private val scope:CoroutineScope,private val thread:()->String?,private val cwd:String,active:()->Boolean,lifecycle:OriginalMutationLifecycle,private val settingsChanged:(JsonObject,JsonObject)->Unit = {_,_->}) {
     val operations=OriginalOperationRunner(scope,active,lifecycle)
     private val mutable=MutableStateFlow(OriginalAdvancedState());val state=mutable.asStateFlow()
     private var api:OriginalCodexClient?=null;private var cancelJob:Job?=null
@@ -23,6 +23,7 @@ class OriginalAdvancedController(private val scope:CoroutineScope,private val th
             require(actual==approved){"会话已变化，请重新读取后确认设置"}
             if(turn==null)api.updateThreadSettings(id,patch)else{require(turn.isNotBlank());val result=api.updateTurnSettings(id,turn,patch).jsonObject;operations.notice(stamp,"回合设置状态：${result.string("status")}")}
             val fresh=api.read(id,false).jsonObject.getValue("thread").jsonObject;update(stamp,id){it.copy(threadSettings=fresh)}
+            if(turn==null)settingsChanged(fresh,patch)
             if(turn==null)operations.notice(stamp,"设置请求已返回，已重新读取会话；权限调整请核对实际结果")
         }
     }

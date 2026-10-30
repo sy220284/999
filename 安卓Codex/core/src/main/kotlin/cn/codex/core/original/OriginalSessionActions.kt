@@ -4,7 +4,7 @@ import kotlinx.serialization.json.*
 
 data class OriginalMetadataEdit(val mode: String, val value: String = "")
 sealed interface OriginalTurnTask {
-    data class Prompt(val text: String) : OriginalTurnTask
+    data class Prompt(val text: String,val input:JsonArray=JsonArray(emptyList()),val options:JsonObject=buildJsonObject{}) : OriginalTurnTask
     data class Review(val threadId: String, val target: JsonObject) : OriginalTurnTask
     data class QueueAdd(val threadId:String,val text:String,val clientMessageId:String):OriginalTurnTask
     data class QueueStart(val threadId:String,val id:String):OriginalTurnTask

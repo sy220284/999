@@ -110,6 +110,17 @@ class OriginalCoreHostTest {
             assertEquals(folder.absolutePath,config.getValue("params").jsonObject.getValue("cwd").jsonPrimitive.content)
         }finally{host.close();scope.cancel();peer.dispose();folder.deleteRecursively()}
     }
+    @Test fun settingsNotificationRebindsCurrentDirectoryWithoutReopeningThread()=runBlocking{
+        val scope=CoroutineScope(SupervisorJob()+Dispatchers.Main.immediate);val peer=FakeSession(scope)
+        val host=host(scope,OriginalEngineFactory{peer});val folder=File(peer.threadCwd,"settings-context-${java.util.UUID.randomUUID()}").apply{mkdirs()}
+        try{
+            host.connect();ready(host);host.openThread("thread")?.join();val oldFiles=host.files
+            peer.threadCwd=folder
+            peer.notify("thread/settings/updated",buildJsonObject{put("threadId","thread");put("threadSettings",buildJsonObject{put("cwd",folder.absolutePath)})})
+            withTimeout(5000){while(host.commandWorkspace()!=folder.canonicalPath || host.state.value.contextSynchronizing)delay(10)}
+            assertNotSame(oldFiles,host.files);assertEquals(folder.canonicalFile,host.files.root.canonicalFile)
+        }finally{host.close();scope.cancel();peer.dispose();folder.deleteRecursively()}
+    }
     @Test fun startupTimeoutClosesOneCreatedSession() = runBlocking {
         val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
         val calls = AtomicInteger(); var session: FakeSession? = null

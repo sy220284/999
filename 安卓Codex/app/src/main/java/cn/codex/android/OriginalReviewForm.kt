@@ -10,7 +10,7 @@ import cn.codex.core.string
 import cn.codex.core.original.*
 import kotlinx.serialization.json.JsonObject
 
-@Composable fun OriginalReviewForm(enabled: Boolean, onStart: (String, String, String) -> Unit) {
+@Composable fun OriginalReviewForm(enabled: Boolean,separate:Boolean=false, onStart: (String, String, String) -> Unit) {
     var type by remember { mutableStateOf("uncommittedChanges") }
     var value by remember(type) { mutableStateOf("") }
     var title by remember { mutableStateOf("") }
@@ -18,7 +18,7 @@ import kotlinx.serialization.json.JsonObject
     val ready = enabled && (type == "uncommittedChanges" || value.isNotBlank())
     Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
         Text("让 Codex 审查代码", style = MaterialTheme.typography.titleLarge)
-        Text("在当前会话中启动审查，进度和结果显示在对话里。可通过任务通知停止；审查会调用模型与工具，消耗当前服务额度。", style = MaterialTheme.typography.bodyMedium)
+        Text(if(separate)"在独立会话中启动审查，当前对话保持不变。可在本页停止或打开结果；审查会调用模型和工具并产生用量。"else"在当前会话中启动审查，进度和结果显示在对话里。可通过任务通知停止；审查会调用模型与工具，消耗当前服务额度。", style = MaterialTheme.typography.bodyMedium)
         Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             listOf("uncommittedChanges" to "未提交修改", "baseBranch" to "与分支对比", "commit" to "指定提交", "custom" to "自定范围").forEach { (key, label) -> FilterChip(type == key, { type = key }, enabled = enabled, label = { Text(label) }) }
         }

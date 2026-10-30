@@ -4,9 +4,9 @@ import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.*
 import kotlinx.serialization.json.*
 
-data class WorktreeCreationPreview(val configuration:WorktreeConfiguration,val root:String,val fork:String?,val model:String?,val base:String?)
+data class WorktreeCreationPreview(val configuration:WorktreeConfiguration,val root:String,val fork:String?,val model:String?,val base:String?,val launch:JsonObject=buildJsonObject{})
 data class OriginalWorktreeState(val rows:List<JsonObject> = emptyList(),val thread:JsonObject?=null,val retained:String?=null,val settings:JsonObject?=null,val preview:WorktreeCreationPreview?=null)
-class OriginalWorktrees(scope:CoroutineScope,active:()->Boolean,lifecycle:OriginalMutationLifecycle,private val source:String,private val execute:suspend(List<String>,JsonObject)->String){
+class OriginalWorktrees(scope:CoroutineScope,active:()->Boolean,lifecycle:OriginalMutationLifecycle,private val source:String,private val execute:suspend(List<String>,JsonObject)->String,private val launchOptions:()->JsonObject={buildJsonObject{}}){
     val operations=OriginalOperationRunner(scope,active,lifecycle)
     private val mutable=MutableStateFlow(OriginalWorktreeState());val state=mutable.asStateFlow()
     fun bind(api:OriginalCodexClient?){operations.bind(api);mutable.value=OriginalWorktreeState()}
@@ -17,20 +17,21 @@ class OriginalWorktrees(scope:CoroutineScope,active:()->Boolean,lifecycle:Origin
         val configuration=config(api);configuration.request(base)
         val settings=Json.parseToJsonElement(invoke(listOf("settings",source),configuration)).jsonObject
         val root=settings.string("root");require(root.isNotBlank())
-        if(operations.current(stamp))mutable.update{it.copy(preview=WorktreeCreationPreview(configuration,root,fork,model,base),settings=settings)}
+        if(operations.current(stamp))mutable.update{it.copy(preview=WorktreeCreationPreview(configuration,root,fork,model,base,launchOptions()),settings=settings)}
         operations.notice(stamp,"已核对创建目录与版本，请确认后创建")
     }
     fun dismissCreate(){mutable.update{it.copy(preview=null)}}
     fun create(approved:WorktreeCreationPreview)=operations.run(true){api,stamp->
         require(state.value.preview===approved){"创建预览已经变化"}
         val configuration=config(api);require(configuration==approved.configuration){"工作树配置已变化，请重新核对创建目录"}
+        require(approved.launch==launchOptions()){"新会话设置已变化，请重新预览工作树"}
         val fork=approved.fork;val model=approved.model;val base=approved.base
         if(operations.current(stamp))mutable.update{it.copy(preview=null)}
         val checkout=Json.parseToJsonElement(invoke(listOf("create",source),configuration,base)).jsonObject
         val root=checkout.string("root");val cwd=checkout.string("cwd");require(root.isNotBlank() && cwd.isNotBlank())
         if(operations.current(stamp))mutable.update{it.copy(retained=root)}
         // 会话请求一旦发出，结果不明时保留目录；绝不删除可能已经被核心/其他客户端使用的工作树。
-        val result=if(fork==null)api.start(cwd,model)else api.fork(fork,cwd)
+        val result=if(fork==null)api.start(cwd,model,approved.launch)else api.fork(fork,cwd)
         val thread=result.jsonObject.getValue("thread").jsonObject;require(thread.string("cwd")==cwd && thread.string("id").isNotBlank()){"核心未使用新工作树目录，请核查保留目录"}
         require(config(api)==configuration){"工作树配置已变化，保留新目录与会话，请核查后手动绑定"}
         invoke(listOf("bind",source,root,thread.string("id")),configuration)

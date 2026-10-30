@@ -25,6 +25,7 @@ object OriginalCliCommands {
     }
     fun latestDiff(task:String)=OriginalCliPlan("预览任务最新差异",listOf("apply","--preview","--",identity(task)))
     fun latestApply(task:String,diff:String):OriginalCliPlan{require(diff.isNotBlank() && diff.toByteArray().size<=2*1024*1024);return OriginalCliPlan("应用任务最新差异",listOf("apply",identity(task)),true,expectedDiff=diff)}
+    fun startupConfig(signOut:Boolean=false)=OriginalCliPlan(if(signOut)"退出账号并检查启动配置"else"检查核心启动配置",listOf("app-server","--print-startup-config","--startup-client-info", "{\"name\":\"codex_android\",\"title\":\"Codex · 随行\",\"version\":\"0.1.0\"}")+(if(signOut)listOf("--startup-sign-out")else emptyList()),signOut)
     fun models(bundled:Boolean)=OriginalCliPlan("读取原版模型目录",listOf("debug","models")+if(bundled)listOf("--bundled")else emptyList())
     fun promptInput(prompt:String,images:List<String>):OriginalCliPlan{
         require(prompt.toByteArray().size<=65536 && '\u0000' !in prompt && images.size<=8)

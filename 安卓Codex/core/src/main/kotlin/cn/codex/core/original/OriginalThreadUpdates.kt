@@ -50,14 +50,14 @@ object OriginalThreadUpdates {
             "thread/environment/disconnected" -> if (previous.environmentId != null && previous.environmentId != params.string("environmentId")) return old else previous.copy(environmentId = params.string("environmentId"), environmentConnected = false, notice = "执行环境已断开")
             "thread/settings/updated" -> {
                 val settings = params["threadSettings"] as? JsonObject ?: return old
-                previous.copy(settings = settings, patch = JsonObject(previous.patch + mapOf("model" to (settings["model"] ?: JsonNull), "modelProvider" to (settings["modelProvider"] ?: JsonNull))), notice = "会话设置已更新，以下显示核心当前配置")
+                previous.copy(settings = settings, patch = JsonObject(previous.patch + mapOf("model" to (settings["model"] ?: JsonNull), "modelProvider" to (settings["modelProvider"] ?: JsonNull)) + (settings["cwd"]?.let{mapOf("cwd" to it)} ?: emptyMap())), notice = "会话设置已更新，以下显示核心当前配置")
             }
             else -> return old
         }
         val changedFields = when (method) {
             "thread/name/updated" -> listOf("name")
             "thread/project/updated" -> listOf("projectId")
-            "thread/settings/updated" -> listOf("model", "modelProvider")
+            "thread/settings/updated" -> listOf("model", "modelProvider", "cwd")
             else -> emptyList()
         }
         val stamped = next.copy(version = version,

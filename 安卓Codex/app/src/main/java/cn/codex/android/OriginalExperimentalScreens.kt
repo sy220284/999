@@ -51,6 +51,9 @@ import kotlinx.serialization.json.*
     val mic by host.microphone.state.collectAsState()
     val sound by host.realtimeAudio.state.collectAsState()
     val media by host.webRtc.state.collectAsState()
+    var startupOptions by remember{mutableStateOf("{}")};var chosenVoice by remember{mutableStateOf("")};var startupError by remember{mutableStateOf<String?>(null)}
+    var pendingEpoch by remember{mutableStateOf<Long?>(null)}
+    var pendingOptions by remember{mutableStateOf<kotlinx.serialization.json.JsonObject?>(null)}
     var useWebRtc by rememberSaveable{mutableStateOf(false)}
     var pendingWebRtcThread by remember{mutableStateOf<String?>(null)}
     var pendingMicrophoneThread by remember{mutableStateOf<String?>(null)}
@@ -63,11 +66,11 @@ import kotlinx.serialization.json.*
     var permissionDenied by remember{mutableStateOf(false)}
     val permission=rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()){granted->
         permissionDenied=!granted
-        val pending=pendingWebRtcThread;val microphoneThread=pendingMicrophoneThread;pendingWebRtcThread=null;pendingMicrophoneThread=null
-        if(granted && cn.codex.core.original.OriginalRealtimePermission.allows(pending,host.state.value.threadId,owner.lifecycle.currentState.isAtLeast(Lifecycle.State.STARTED)))host.realtime.start(requireNotNull(pending),true){host.webRtc.prepare(requireNotNull(pending))}
+        val pending=pendingWebRtcThread;val approvedOptions=pendingOptions;val approvedEpoch=pendingEpoch;pendingOptions=null;pendingEpoch=null;val microphoneThread=pendingMicrophoneThread;pendingWebRtcThread=null;pendingMicrophoneThread=null
+        if(granted && approvedEpoch==host.state.value.connectionEpoch && approvedOptions!=null && cn.codex.core.original.OriginalRealtimePermission.allows(pending,host.state.value.threadId,owner.lifecycle.currentState.isAtLeast(Lifecycle.State.STARTED)))host.realtime.start(requireNotNull(pending),true,options=approvedOptions){host.webRtc.prepare(requireNotNull(pending))}
         else if(granted && pending==null && cn.codex.core.original.OriginalRealtimePermission.allows(microphoneThread,host.state.value.threadId,owner.lifecycle.currentState.isAtLeast(Lifecycle.State.STARTED)) && microphoneThread==host.realtime.state.value.threadId && host.realtime.state.value.ready && !host.realtime.state.value.controlBusy && !host.realtime.state.value.webRtc)host.microphone.start()
     }
-    fun stop(){pendingWebRtcThread=null;pendingMicrophoneThread=null;host.microphone.stop();host.realtimeAudio.stop();host.webRtc.close();host.realtime.stop()}
+    fun stop(){pendingOptions=null;pendingEpoch=null;pendingWebRtcThread=null;pendingMicrophoneThread=null;host.microphone.stop();host.realtimeAudio.stop();host.webRtc.close();host.realtime.stop()}
     fun back(){if(state.running)exitConfirm=true else onBack()}
     BackHandler(onBack=::back)
     LaunchedEffect(state.running,leaveAfterStop){if(leaveAfterStop && !state.running)onBack()}
@@ -84,12 +87,15 @@ import kotlinx.serialization.json.*
             Text("可选WebSocket或WebRTC音频连接原版实时服务。文字、录音会发送给服务提供方并可能产生用量；结束前保留前台运行提示，进入后台会请求结束。",style=MaterialTheme.typography.bodySmall)
             TextButton(onClick={host.realtime.voices()},enabled=core.connected && !state.voicesBusy){Text("读取可用声音")}
             state.voices?.let{SelectionContainer{Text(it.toString().take(8192),style=MaterialTheme.typography.bodySmall)}}
+            OutlinedTextField(chosenVoice,{chosenVoice=it},label={Text("声音名称（留空沿用核心配置）")},enabled=!state.running,modifier=Modifier.fillMaxWidth())
+            OutlinedTextField(startupOptions,{startupOptions=it},label={Text("高级启动设置（JSON，可选v1/v2/v3、model、prompt、initialItems等）")},enabled=!state.running,modifier=Modifier.fillMaxWidth())
+            startupError?.let{Text(it,color=MaterialTheme.colorScheme.error)}
             if(permissionDenied)Text("未授予麦克风权限，可选择WebSocket继续文字会话。",color=MaterialTheme.colorScheme.error)
             if(core.threadId==null)Text("请先返回工作区创建或选择会话。")
             Row{Checkbox(useWebRtc,{useWebRtc=it;if(it)audioOutput=true},enabled=!state.running);Text("使用WebRTC音频（手动开启麦克风和播放）",Modifier.padding(top=12.dp))}
             Row{Checkbox(audioOutput,{audioOutput=it},enabled=!state.running && !useWebRtc);Text("请求音频回复",Modifier.padding(top=12.dp))}
             Row{Checkbox(consent,{consent=it},enabled=!state.running);Text("我确认开始实时会话并使用服务额度",Modifier.padding(top=12.dp))}
-            Button(onClick={core.threadId?.let{thread->if(useWebRtc){pendingMicrophoneThread=null;pendingWebRtcThread=thread;permission.launch(Manifest.permission.RECORD_AUDIO)}else host.realtime.start(thread,audioOutput)}},enabled=core.connected && core.threadId!=null && !state.running && !core.loading && consent && host.selectedThreadUsable()){Text("开始实时会话")}
+            Button(onClick={core.threadId?.let{thread->try{val parsed=cn.codex.core.original.OriginalRealtimeOptions.parse(startupOptions);val options=if(chosenVoice.isBlank())parsed else kotlinx.serialization.json.JsonObject(parsed+("voice" to kotlinx.serialization.json.JsonPrimitive(chosenVoice)));pendingOptions=options;pendingEpoch=core.connectionEpoch;startupError=null;if(useWebRtc){pendingMicrophoneThread=null;pendingWebRtcThread=thread;permission.launch(Manifest.permission.RECORD_AUDIO)}else host.realtime.start(thread,audioOutput,options=options)}catch(failure:Exception){startupError=failure.message}}},enabled=core.connected && core.threadId!=null && !state.running && pendingWebRtcThread==null && !core.loading && !core.contextSynchronizing && consent && host.selectedThreadUsable()){Text("开始实时会话")}
             if(state.running){
                 OutlinedTextField(text,{text=it},label={Text("实时文字输入")},modifier=Modifier.fillMaxWidth())
                 Row{TextButton(onClick={host.realtime.send(text);text=""},enabled=state.ready && !state.controlBusy && text.isNotBlank()){Text("发送文字")}

@@ -90,7 +90,7 @@ object NativeOriginalEngineFactory:OriginalEngineFactory {
         put("CODEX_ANDROID_VAULT_SOCKET",vault.path)
         put("CODEX_ANDROID_VAULT_HOST_PID",android.os.Process.myPid().toString())
             }
-            val process=NativeCoreProcess(binary,listOf("--listen","stdio://")+settings.arguments,env,workspace).also{child=it}
+            val process=NativeCoreProcess(binary,listOf("--listen","stdio://")+cn.codex.core.original.OriginalAppServerOptions.arguments(OriginalAppServerPreferences.read(context),workspace)+settings.arguments,env,workspace).also{child=it}
             vault.authorize(process.pid)
         verifier.authorize(process.pid)
             scope.launch(Dispatchers.IO){runCatching{process.errors.use{stream->val bytes=ByteArray(4096)

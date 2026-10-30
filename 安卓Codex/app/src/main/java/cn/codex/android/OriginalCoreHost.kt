@@ -15,7 +15,7 @@ import java.util.UUID
 
 /** Application 持有连接；Compose 只订阅状态。原版任务由独立前台服务等待完成。 */
 data class OriginalState(
-    val connectionEpoch: Long = 0, val connected: Boolean = false, val closing: Boolean = false, val loading: Boolean = false, val working: Boolean = false,
+    val versionComparison:String?=null,val launchOptions:JsonObject=buildJsonObject{},val contextSynchronizing:Boolean=false,val connectionEpoch: Long = 0, val connected: Boolean = false, val closing: Boolean = false, val loading: Boolean = false, val working: Boolean = false,
     val threadId: String? = null, val turnId: String? = null,
     val agentsOverview:List<JsonObject> = emptyList(),val agentsCursor:String?=null,val agentsSource:String="loaded",val agentsReadFailures:Int=0,
     val threads: List<JsonObject> = emptyList(), val nextCursor: String? = null, val archived: Boolean = false,
@@ -74,6 +74,10 @@ class OriginalCoreHost(
     val realtimeAudio = OriginalRealtimeAudio(context,scope)
     private val workspace = File(context.filesDir, "工作区/原版项目").apply { mkdirs() }
     private var currentProject=workspace
+    private var contextSyncJob:Job?=null
+    private var contextRevision=0L
+    private var agentsDiscovery=OriginalAgentsDiscovery()
+    private val requestedProfiles=mutableMapOf<String,String>()
     private val androidToolRoots=java.util.IdentityHashMap<ServerMessage.Request,File>()
     fun androidToolRoot(request:ServerMessage.Request)=androidToolRoots[request]?.absolutePath
     private val toolJobs = java.util.IdentityHashMap<ServerMessage.Request,Job>()
@@ -103,6 +107,7 @@ class OriginalCoreHost(
     val history=OriginalHistoryController(scope,{state.value.threadId},{completionBusy()},configurationJournal.lifecycle("会话记录与后台终端"))
     var advanced: OriginalAdvancedController = projectAdvanced(currentProject)
         private set
+    val detachedReview=OriginalDetachedReview(scope,{completionBusy()},configurationJournal.lifecycle("独立代码审查"))
     val connections=OriginalConnectionsController(scope,{state.value.threadId},{completionBusy()},configurationJournal.lifecycle("环境、远控与服务认证"))
     var worktrees:OriginalWorktrees=projectWorktrees(currentProject)
         private set
@@ -129,13 +134,13 @@ class OriginalCoreHost(
         { state.value.working || state.value.turnId != null || state.value.loading || state.value.closing || otherTaskRunning() || configurationChanging }, configurationJournal.lifecycle("市场、分享与应用目录"))
     private fun projectMigration(root:File): OriginalMigrationController = OriginalMigrationController(scope, root.absolutePath,
         { state.value.working || state.value.turnId != null || state.value.loading || state.value.closing || otherTaskRunning() || configurationChanging }, configurationJournal.lifecycle("配置与迁移"))
-    private fun projectAdvanced(root:File): OriginalAdvancedController = OriginalAdvancedController(scope,{state.value.threadId},root.absolutePath,{completionBusy()},configurationJournal.lifecycle("会话设置、记忆与采样"))
+    private fun projectAdvanced(root:File): OriginalAdvancedController = OriginalAdvancedController(scope,{state.value.threadId},root.absolutePath,{completionBusy()},configurationJournal.lifecycle("会话设置、记忆与采样"),settingsChanged={thread,patch->patch["permissions"]?.let{value->val id=thread.string("id");if(value==JsonNull)requestedProfiles.remove(id)else requestedProfiles[id]=value.jsonPrimitive.content};if(thread.string("id")==state.value.threadId && thread.string("cwd").isNotBlank() && thread.string("cwd")!=currentProject.absolutePath)synchronizeProjectContext()})
     private fun projectCli(root:File): OriginalCliController = OriginalCliController(scope,{state.value.connected || (context.applicationContext as CodexApplication).nativeEndpoints.daemonRunning || completionBusy()},configurationJournal.lifecycle("云任务与本机维护"),OriginalCliRunner(context,scope,root,engineHome)::execute)
-    private fun projectWorktrees(root:File):OriginalWorktrees=OriginalWorktrees(scope,{completionBusy()},configurationJournal.lifecycle("托管工作树"),root.absolutePath,AndroidWorktreeRunner(context,root,engineHome)::execute)
+    private fun projectWorktrees(root:File):OriginalWorktrees=OriginalWorktrees(scope,{completionBusy()},configurationJournal.lifecycle("托管工作树"),root.absolutePath,AndroidWorktreeRunner(context,root,engineHome)::execute,::launchOptions)
     private fun projectSearch(root:File): OriginalSearchController = OriginalSearchController(scope,root.absolutePath)
     fun commandWorkspace() = currentProject.absolutePath
-    val managedChanging get() = worktrees.operations.state.value.mutating || agentActions.operations.state.value.mutating || cli.state.value.busy || sshTrust.state.value.working || projects.operations.state.value.mutating || history.operations.state.value.mutating || advanced.operations.state.value.mutating || connections.operations.state.value.mutating || queue.operations.state.value.mutating || realtime.state.value.running || library.operations.state.value.mutating || services.operations.state.value.mutating || migration.operations.state.value.mutating
-    val configurationChanging get() = state.value.toolBusy || (context.applicationContext as CodexApplication).gitOperations.state.value.running || (context.applicationContext as CodexApplication).fullTerminal.state.value.running || commands.state.value.running || extensions.state.value.mutating || mcp.state.value.mutating || settings.state.value.mutating || files.state.value.mutating || managedChanging
+    val managedChanging get() = detachedReview.operations.state.value.busy || worktrees.operations.state.value.mutating || agentActions.operations.state.value.mutating || cli.state.value.busy || sshTrust.state.value.working || projects.operations.state.value.mutating || history.operations.state.value.mutating || advanced.operations.state.value.mutating || connections.operations.state.value.mutating || queue.operations.state.value.mutating || realtime.state.value.running || library.operations.state.value.mutating || services.operations.state.value.mutating || migration.operations.state.value.mutating
+    val configurationChanging get() = state.value.contextSynchronizing || state.value.toolBusy || (context.applicationContext as CodexApplication).gitOperations.state.value.running || (context.applicationContext as CodexApplication).fullTerminal.state.value.running || commands.state.value.running || extensions.state.value.mutating || mcp.state.value.mutating || settings.state.value.mutating || files.state.value.mutating || managedChanging
     fun mcpImports() = McpTools(context).connections().map { it.name to it.url }
     private fun error(error: Throwable) { mutable.update { it.copy(error = error.message ?: "原版核心操作失败") } }
     fun dismissError() { mutable.update { it.copy(error = null) } }
@@ -186,7 +191,7 @@ class OriginalCoreHost(
         mutable.update{it.copy(coreIdentity=identity,coreIdentityAt=System.currentTimeMillis())}
         if (config.apiKey.isNotBlank() && config.endpoint.trimEnd('/') == "https://api.openai.com/v1" && api.account().jsonObject["account"] == JsonNull) api.loginApiKey(config.apiKey)
         ensureCurrent(epoch, rpc)
-        client = api;worktrees.bind(api);agentActions.bind(api);projects.bind(api);history.bind(api);advanced.bind(api);connections.bind(api);queue.bind(api); search.bind(api);realtime.bind(api);extensions.bind(api); mcp.bind(api); commands.bind(api); settings.bind(api); files.bind(api); library.bind(api); services.bind(api); migration.bind(api)
+        client = api;detachedReview.bind(api);worktrees.bind(api);agentActions.bind(api);projects.bind(api);history.bind(api);advanced.bind(api);connections.bind(api);queue.bind(api); search.bind(api);realtime.bind(api);extensions.bind(api); mcp.bind(api); commands.bind(api); settings.bind(api); files.bind(api); library.bind(api); services.bind(api); migration.bind(api)
         mutable.update { it.copy(connected = true, status = "原版核心已连接 · 凭证由手机 Keystore 加密保存", model = config.model) }
         refreshThreads(api, false); readAccount(api, epoch)
     }
@@ -195,13 +200,14 @@ class OriginalCoreHost(
         if (state.value.closing) return
         lifecycle.disconnect(lifecycle.state.connectionEpoch)
         mutable.update{it.copy(verifyingElicitation=null,verificationError=null)}
-        microphone.stop();realtimeAudio.stop();webRtc.close();worktrees.bind(null);agentActions.bind(null);projects.bind(null);history.bind(null);advanced.bind(null);connections.bind(null);queue.bind(null);search.bind(null);realtime.bind(null);remainingEvents.reset();toolJobs.values.toList().forEach { it.cancel() };toolJobs.clear();androidToolRoots.clear()
+        microphone.stop();realtimeAudio.stop();webRtc.close();detachedReview.bind(null);worktrees.bind(null);agentActions.bind(null);projects.bind(null);history.bind(null);advanced.bind(null);connections.bind(null);queue.bind(null);search.bind(null);realtime.bind(null);remainingEvents.reset();toolJobs.values.toList().forEach { it.cancel() };toolJobs.clear();androidToolRoots.clear()
         if (cancelStartup) startupJob?.cancel()
         operationJob?.cancel(); operationJob = null
         reservedTask = null
         stopping?.cancel(); stopping = null
         extensions.bind(null); mcp.bind(null); commands.bind(null); settings.bind(null); files.bind(null); library.bind(null); services.bind(null); migration.bind(null)
         turnWaiter?.finished?.completeExceptionally(IllegalStateException("原版核心已停止")); turnWaiter = null
+        contextSyncJob?.cancel();contextSyncJob=null
         listener?.cancel(); listener = null
         val session = engine
         engine = null; client = null
@@ -219,6 +225,20 @@ class OriginalCoreHost(
         val entries = (response["data"] as? JsonArray).orEmpty().mapNotNull { it as? JsonObject }
         mutable.update { it.copy(threads = OriginalThreadUpdates.overlay((if (more) it.threads + entries else entries).distinctBy { row -> row.string("id") }, it.threadUpdates, archived, before), threadListVersion = before, nextCursor = response.string("nextCursor").ifBlank { null }, archived = archived) }
     }
+    fun setLaunchOptions(text:String){try{val options=OriginalThreadLaunchOptions.parse(text);mutable.update{it.copy(launchOptions=options,error=null)}}catch(failure:Exception){error(failure)}}
+    private fun launchOptions():JsonObject{
+        val id=state.value.threadId
+        val settings=state.value.threadUpdates.threads[id]?.settings
+        val selected=id?.let{requestedProfiles[it]}
+        return OriginalThreadLaunchOptions.inherit(state.value.launchOptions,selected,settings)
+    }
+    fun compareRunningVersions()=operation{api->
+        val epoch=lifecycle.state.connectionEpoch
+        val result=OriginalCliRunner(context,scope,currentProject,engineHome).execute(OriginalStandaloneCommands.version())
+        ensureCurrent(epoch,api.connection);check(result.exitCode==0){"随包CLI版本读取失败：${result.exitCode}"}
+        val comparison=OriginalCoreVersions.compare(result.output,state.value.coreIdentity?.string("userAgent").orEmpty())
+        mutable.update{it.copy(versionComparison=comparison)}
+    }
     fun selectModel(model: String) { mutable.update { it.copy(model = model) } }
     fun loadModels() = operation { api ->
         val found = mutableListOf<String>(); var cursor: String? = null
@@ -232,7 +252,7 @@ class OriginalCoreHost(
     }
     fun newThread() = operation { api ->
         check(!state.value.working && state.value.turnId == null)
-        val thread = api.start(currentProject.absolutePath, state.value.model).jsonObject.getValue("thread").jsonObject
+        val thread = api.start(currentProject.absolutePath, state.value.model,launchOptions()).jsonObject.getValue("thread").jsonObject
         selectThread(thread); refreshThreads(api, false)
     }
     fun openThread(id: String) = operation { api ->
@@ -247,6 +267,36 @@ class OriginalCoreHost(
         if(normal!=null)return normal
         val managed=worktrees.managedRows(api)
         return withContext(Dispatchers.IO){ManagedProjectRoots.resolve(workspace,File(cwd),managed)}
+    }
+    private fun synchronizeProjectContext(){
+        contextRevision++
+        mutable.update{it.copy(contextSynchronizing=true)}
+        if(contextSyncJob?.isActive==true)return
+        val epoch=lifecycle.state.connectionEpoch;val rpc=connection ?: return
+        contextSyncJob=scope.launch{
+            try{
+                do{
+                    val revision=contextRevision
+                    while(state.value.loading || state.value.working || state.value.turnId!=null || advanced.operations.state.value.busy || files.state.value.busy || search.state.value.busy)delay(20)
+                    withTimeout(30_000){
+                        ensureCurrent(epoch,rpc)
+                        val id=state.value.threadId ?: return@withTimeout
+                        val api=OriginalCodexClient(rpc)
+                        val thread=api.read(id,false).jsonObject.getValue("thread").jsonObject
+                        check(thread.string("id")==id && state.value.threadId==id){"目录同步时会话已变化"}
+                        val root=projectRoot(api,thread.string("cwd"));ensureCurrent(epoch,rpc)
+                        if(root!=currentProject.canonicalFile){
+                            val previous=search
+                            if(previous.state.value.sessionId!=null){previous.stop();previous.state.first{!it.busy && it.sessionId==null}}
+                            rebindProject(root,api)
+                        }
+                    }
+                }while(revision!=contextRevision)
+                mutable.update{it.copy(contextSynchronizing=false,status="项目目录已同步")}
+            }catch(cancelled:CancellationException){
+                if(cancelled is TimeoutCancellationException && current(epoch,rpc)){close();error(IllegalStateException("项目目录同步超时，已断开核心；请重新打开会话核查目录"))}else throw cancelled
+            }catch(failure:Exception){if(current(epoch,rpc)){close();error(IllegalStateException("项目目录同步未完成，已断开核心：${failure.message}"))}}
+        }
     }
     private fun rebindProject(root:File,api:OriginalCodexClient){
         check(!files.state.value.busy && files.state.value.watchId==null && !search.state.value.busy && search.state.value.sessionId==null){"请先结束文件操作、目录监听和文件搜索，再切换项目"}
@@ -333,12 +383,17 @@ class OriginalCoreHost(
     /** 已加载列表跨本次共享核心客户端；历史按原版来源分页，子代理不混作根任务。 */
     fun readAgents(source:String="loaded",more:Boolean=false)=operation { api->
         val section=source.takeIf{it.startsWith("section:")}?.removePrefix("section:")
-        require(source in setOf("loaded","interactive","exec","all") || section?.let{runCatching{UUID.fromString(it).toString()==it}.getOrDefault(false)}==true)
+        require(source in setOf("loaded","interactive","exec","all","overview") || section?.let{runCatching{UUID.fromString(it).toString()==it}.getOrDefault(false)}==true)
         val epoch=lifecycle.state.connectionEpoch
         val cursor=if(more){check(state.value.agentsSource==source);state.value.agentsCursor ?: return@operation}else null
         val observedStatuses=state.value.threadStatuses
         val rows:List<JsonObject>;val page:JsonObject;var failures=0
-        if(source=="loaded"){
+        if(source=="overview"){
+            if(!more)agentsDiscovery=OriginalAgentsDiscovery()
+            val discovery=agentsDiscovery;val batch=discovery.next(api)
+            rows=batch.rows;failures=batch.failures
+            page=buildJsonObject{if(batch.more)put("nextCursor",UUID.randomUUID().toString())}
+        }else if(source=="loaded"){
             page=api.loadedThreads(cursor).jsonObject
             val ids=page.getValue("data").jsonArray.map{it.jsonPrimitive.content};require(ids.size<=30 && ids.distinct().size==ids.size)
             val found=mutableListOf<JsonObject>()
@@ -351,7 +406,7 @@ class OriginalCoreHost(
         ensureCurrent(epoch,api.connection)
         val next=page.string("nextCursor").ifBlank{null};require(next==null || next!=cursor && next.length<=8192)
         agentActions.refreshed(rows.map{it.string("id")}.toSet())
-        val combined=((if(more)state.value.agentsOverview else emptyList())+rows).distinctBy{it.string("id")};require(combined.size<=200){"总览最多保留200项，请按来源缩小范围"}
+        val combined=((if(more)state.value.agentsOverview else emptyList())+rows).distinctBy{it.string("id")};require(source=="overview" || combined.size<=200){"总览最多保留200项，请按来源缩小范围"}
         mutable.update{current->val refreshed=rows.map{it.string("id")}.toSet();current.copy(agentsOverview=combined,agentsCursor=next,agentsSource=source,agentsReadFailures=failures,threadStatuses=current.threadStatuses.filter{(id,value)->id !in refreshed || value!==observedStatuses[id]})}
     }
     fun inspectAgent(threadId: String) = operation { api ->
@@ -461,9 +516,8 @@ class OriginalCoreHost(
         val label = when (account?.string("type")) { "chatgpt" -> "ChatGPT · ${account.string("email")} · ${account.string("planType")}"; "apiKey" -> "API 密钥"; else -> "尚未登录" }
         if (current(epoch, api.connection) && client === api) mutable.update { it.copy(account = label) }
     }
-    fun send(text: String) {
-        if (text.isBlank()) return
-        reserve(OriginalTurnTask.Prompt(text), text)
+    fun send(text:String,extra:JsonArray=JsonArray(emptyList()),options:JsonObject=buildJsonObject{}) {
+        try{OriginalInputContract.input(text,extra);reserve(OriginalTurnTask.Prompt(text,extra,OriginalTurnOptions.parse(options.toString())),text.ifBlank{"媒体任务"})}catch(failure:Exception){error(failure)}
     }
     fun shellCommand(command: String, timeout: String) {
         try {
@@ -559,7 +613,7 @@ class OriginalCoreHost(
         var turnFinished = false
         try {
             if (state.value.threadId == null) {
-                val thread = api.start(currentProject.absolutePath, state.value.model).jsonObject.getValue("thread").jsonObject
+                val thread = api.start(currentProject.absolutePath, state.value.model,launchOptions()).jsonObject.getValue("thread").jsonObject
                 ensureCurrent(epoch, api.connection); selectThread(thread)
             }
             val thread = requireNotNull(lifecycle.state.threadId)
@@ -577,7 +631,11 @@ class OriginalCoreHost(
                     when (task) {
                         is OriginalTurnTask.QueueAdd -> error("加入队列由独立托管分支处理")
                         is OriginalTurnTask.QueueStart -> {check(thread==task.threadId);api.startQueue(thread,task.id)}
-                        is OriginalTurnTask.Prompt -> api.turn(thread, task.text, configLoader().reasoning)
+                        is OriginalTurnTask.Prompt -> {
+                            val root=(task.options["cwd"] as? JsonPrimitive)?.takeIf{it.isString}?.content?.let{projectRoot(api,it)} ?: currentProject
+                            task.options["runtimeWorkspaceRoots"]?.takeIf{it!=JsonNull}?.jsonArray?.forEach{projectRoot(api,it.jsonPrimitive.content)}
+                            api.turn(thread,task.text,configLoader().reasoning,withContext(Dispatchers.IO){OriginalInputContract.localPaths(task.input,root)},task.options)
+                        }
                         is OriginalTurnTask.Review -> { check(thread == task.threadId) { "审查所属会话已变化" }; api.review(thread, task.target) }
                         is OriginalTurnTask.Shell -> { check(thread == task.threadId); api.threadShell(thread, task.command, task.timeoutMs) }
                     }
@@ -622,7 +680,7 @@ class OriginalCoreHost(
     private fun applyOutcome(outcome: Outcome) {
         mutable.update { it.copy(status = when (outcome.status) { "failed" -> "任务失败"; "interrupted" -> "任务已停止"; else -> "任务完成" }, error = outcome.error) }
     }
-    fun steer(text: String) = operation { api -> api.steer(requireNotNull(state.value.threadId), requireNotNull(state.value.turnId), text) }
+    fun steer(text:String,extra:JsonArray=JsonArray(emptyList()))=operation{api->val inputs=withContext(Dispatchers.IO){OriginalInputContract.localPaths(extra,currentProject)};api.steer(requireNotNull(state.value.threadId),requireNotNull(state.value.turnId),text,inputs)}
     fun stop() {
         if (stopping?.isActive == true) return
         val epoch = lifecycle.state.connectionEpoch
@@ -766,6 +824,10 @@ class OriginalCoreHost(
                 mutable.update { it.copy(events = remainingEvents.state) }
             }
             return
+        }
+        if(method=="thread/settings/updated" && params.string("threadId")==state.value.threadId){
+            val cwd=(params["threadSettings"] as? JsonObject)?.string("cwd").orEmpty()
+            if(cwd.isNotBlank() && cwd!=currentProject.absolutePath)synchronizeProjectContext()
         }
         if(method=="thread/queue/changed")queue.changed(params.string("threadId"))
         if (method in setOf("thread/started", "thread/readState/changed", "thread/archived", "thread/deleted", "thread/unarchived", "thread/closed", "thread/reverted", "thread/name/updated", "thread/attachment/updated", "thread/prediction/updated", "thread/queue/changed", "project/changed", "thread/project/updated", "thread/environment/connected", "thread/environment/disconnected", "thread/settings/updated")) {

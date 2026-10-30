@@ -27,7 +27,7 @@ import kotlinx.serialization.json.*
     LazyColumn(Modifier.fillMaxSize(),contentPadding=PaddingValues(20.dp),verticalArrangement=Arrangement.spacedBy(12.dp)){
         item{TextButton(onClick=onBack){Text("返回工作区")};Text("代理总览",style=MaterialTheme.typography.headlineSmall)
             Text("已加载列表来自当前连接的核心；使用共享核心时包含其他客户端的任务。切换来源后请重新读取，列表不是全部账号的实时全局状态。",style=MaterialTheme.typography.bodySmall)
-            listOf("loaded" to "当前核心已加载","interactive" to "交互历史","exec" to "执行与服务历史","all" to "全部来源历史",("section:"+OriginalAgentActions.PINNED) to "置顶历史").forEach{(key,label)->FilterChip(source==key,{source=key},label={Text(label)},enabled=!state.loading)}
+            listOf("overview" to "原版总览发现","loaded" to "当前核心已加载","interactive" to "交互历史","exec" to "执行与服务历史","all" to "全部来源历史",("section:"+OriginalAgentActions.PINNED) to "置顶历史").forEach{(key,label)->FilterChip(source==key,{source=key},label={Text(label)},enabled=!state.loading)}
             if(source.startsWith("section:"))Text("当前段落顺序：${source.removePrefix("section:")}，请读取此来源核对最新顺序。",style=MaterialTheme.typography.bodySmall)
             Row{Checkbox(children,{children=it});Text("同时显示子代理",Modifier.padding(top=12.dp))}
             OutlinedTextField(rootFilter,{rootFilter=it},label={Text("筛选根会话ID（留空为全部）")},modifier=Modifier.fillMaxWidth())
