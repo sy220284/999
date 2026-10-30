@@ -1,0 +1,31 @@
+--- a/codex-rs/cloud-tasks/src/cli.rs
++++ b/codex-rs/cloud-tasks/src/cli.rs
+@@ -16,0 +17,2 @@
++    /// Android trusted UI: discover the same authorized cloud environments as the TUI.
++    Environments,
+@@ -101,0 +104,3 @@
++    /// Android trusted UI: require the selected diff to match the reviewed UTF-8 file.
++    #[arg(long, hide = true)]
++    pub expected_diff_file: Option<std::path::PathBuf>,
+--- a/codex-rs/cloud-tasks/src/lib.rs
++++ b/codex-rs/cloud-tasks/src/lib.rs
+@@ -175,0 +176,10 @@
++}
++
++async fn run_environments_command() -> anyhow::Result<()> {
++    let ctx = init_backend("codex_cloud_tasks_environments").await?;
++    let normalized = util::normalize_base_url(&ctx.base_url);
++    let headers = util::build_chatgpt_headers().await?;
++    let environments = crate::env_detect::list_environments(&ctx.environment_http, &normalized, &headers).await?;
++    let rows: Vec<_> = environments.iter().take(200).map(|row| serde_json::json!({"id":row.id,"label":row.label,"isPinned":row.is_pinned,"repoHints":row.repo_hints})).collect();
++    println!("{}", serde_json::to_string(&serde_json::json!({"environments":rows,"truncated":environments.len()>200}))?);
++    Ok(())
+@@ -611,0 +622,6 @@
++    if let Some(path) = &args.expected_diff_file {
++        let file = std::fs::File::open(path)?;
++        let mut expected = Vec::new();
++        std::io::Read::read_to_end(&mut std::io::Read::take(file, 2 * 1024 * 1024 + 1), &mut expected)?;
++        anyhow::ensure!(expected.len() <= 2 * 1024 * 1024 && expected == selected.diff.as_bytes(), "Cloud diff changed after approval; review it again");
++    }
+@@ -755,0 +772 @@
++            crate::cli::Command::Environments => run_environments_command().await,

@@ -1,0 +1,40 @@
+--- a/codex-rs/exec-server/src/remote.rs
++++ b/codex-rs/exec-server/src/remote.rs
+@@ -828,0 +829,2 @@
++                #[cfg(target_os = "android")]
++                android_executor_status(&config.environment_id, "noise", "connected");
+@@ -849,0 +852,2 @@
++                #[cfg(target_os = "android")]
++                android_executor_status(&config.environment_id, "noise", "disconnected");
+@@ -1886,0 +1891,9 @@
++
++#[cfg(target_os = "android")]
++pub(super) fn android_executor_status(environment: &str, transport: &str, state: &str) {
++    if std::env::var_os("CODEX_ANDROID_EXECUTOR_EVENTS").as_deref() != Some(std::ffi::OsStr::new("1")) { return; }
++    use std::io::Write;
++    let value = serde_json::json!({"androidRemoteExecutor":1,"pid":std::process::id(),"environmentId":environment,"transport":transport,"state":state});
++    let mut output = std::io::stdout().lock();
++    let _ = writeln!(output, "{value}"); let _ = output.flush();
++}
+--- a/codex-rs/exec-server/src/remote/direct.rs
++++ b/codex-rs/exec-server/src/remote/direct.rs
+@@ -169,0 +170,2 @@
++                #[cfg(target_os = "android")]
++                super::android_executor_status(&config.environment_id, "direct", "connected");
+@@ -186,0 +189,2 @@
++                #[cfg(target_os = "android")]
++                super::android_executor_status(&config.environment_id, "direct", "disconnected");
+--- a/codex-rs/cli/src/exec_server_credential.rs
++++ b/codex-rs/cli/src/exec_server_credential.rs
+@@ -208,0 +209,2 @@
++    #[cfg(target_os = "android")]
++    let mut android_sequence = 0u64;
+@@ -227,0 +230,8 @@
++            #[cfg(target_os = "android")]
++            if std::env::var_os("CODEX_ANDROID_EXECUTOR_EVENTS").as_deref() == Some(std::ffi::OsStr::new("1")) {
++                use std::io::Write;
++                android_sequence = android_sequence.saturating_add(1);
++                let value = serde_json::json!({"androidRemoteExecutor":1,"pid":std::process::id(),"environmentId":environment_id,"credentialSequence":android_sequence});
++                let mut output = std::io::stdout().lock();
++                let _ = writeln!(output, "{value}"); let _ = output.flush();
++            }

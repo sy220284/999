@@ -1,0 +1,16 @@
+/* 与 Theme.kt 保持对应；原生界面采用系统中文无衬线。 */
+:root {
+  --background:#f7f8f3; --surface:#edf0e9; --text:#1a231e;
+  --text-secondary:#536157; --accent:#28634d; --accent-surface:#d9ede1;
+  --neutral-0:#ffffff; --neutral-1:#f7f8f3; --neutral-2:#f1f3ed;
+  --neutral-3:#edf0e9; --neutral-4:#e3e9df; --neutral-5:#d4ddd2;
+  --neutral-6:#738176; --neutral-7:#536157; --neutral-8:#1a231e;
+  --radius-card:14px; --radius-composer:24px; --space-unit:4px;
+  --body-size:16px; --body-leading:27px;
+  --motion-micro:180ms; --motion-page:220ms;
+}
+@media(prefers-color-scheme:dark) {
+  :root { --background:#111615; --surface:#1b2220; --text:#e8eeea;
+    --text-secondary:#b0beb5; --accent:#9cdbc0; --accent-surface:#234a3c; }
+}
+@media(prefers-reduced-motion:reduce) { :root { --motion-micro:0ms; --motion-page:0ms; } }

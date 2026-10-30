@@ -1,0 +1,547 @@
+[
+  {
+    "method": "initialize",
+    "status": "待移植",
+    "detail": "尚未实现，不能视为 Android 本身不支持"
+  },
+  {
+    "method": "thread/start",
+    "status": "安卓等价实现",
+    "detail": "新建对话"
+  },
+  {
+    "method": "thread/resume",
+    "status": "安卓等价实现",
+    "detail": "打开历史会话"
+  },
+  {
+    "method": "thread/fork",
+    "status": "安卓等价实现",
+    "detail": "会话分叉"
+  },
+  {
+    "method": "thread/archive",
+    "status": "安卓等价实现",
+    "detail": "归档会话"
+  },
+  {
+    "method": "thread/delete",
+    "status": "安卓等价实现",
+    "detail": "永久删除会话前由用户确认，不删除项目文件"
+  },
+  {
+    "method": "thread/unsubscribe",
+    "status": "待移植",
+    "detail": "尚未实现，不能视为 Android 本身不支持"
+  },
+  {
+    "method": "thread/name/set",
+    "status": "安卓等价实现",
+    "detail": "会话重命名"
+  },
+  {
+    "method": "thread/goal/set",
+    "status": "安卓等价实现",
+    "detail": "设置任务目标"
+  },
+  {
+    "method": "thread/goal/get",
+    "status": "安卓等价实现",
+    "detail": "显示任务目标"
+  },
+  {
+    "method": "thread/goal/clear",
+    "status": "安卓等价实现",
+    "detail": "清空任务目标"
+  },
+  {
+    "method": "thread/metadata/update",
+    "status": "待移植",
+    "detail": "尚未实现，不能视为 Android 本身不支持"
+  },
+  {
+    "method": "thread/attachment/add",
+    "status": "部分适配",
+    "detail": "图片与 UTF-8 文本附件"
+  },
+  {
+    "method": "thread/attachment/list",
+    "status": "部分适配",
+    "detail": "当前待发送附件"
+  },
+  {
+    "method": "thread/attachmentOwner/list",
+    "status": "待移植",
+    "detail": "尚未实现，不能视为 Android 本身不支持"
+  },
+  {
+    "method": "thread/attachment/remove",
+    "status": "部分适配",
+    "detail": "清除待发送附件"
+  },
+  {
+    "method": "thread/section/move",
+    "status": "安卓等价实现",
+    "detail": "按项目分类移动会话，持久化 sectionId，中文界面入口；非上游 RPC"
+  },
+  {
+    "method": "thread/unarchive",
+    "status": "安卓等价实现",
+    "detail": "恢复归档"
+  },
+  {
+    "method": "thread/compact/start",
+    "status": "安卓等价实现",
+    "detail": "使用配置的模型分批摘要旧消息和工具结果，保留最近四轮，UI 全量记录不丢失；尚无原版 RPC"
+  },
+  {
+    "method": "thread/shellCommand",
+    "status": "安卓等价实现",
+    "detail": "手机 shell 命令"
+  },
+  {
+    "method": "thread/approveGuardianDeniedAction",
+    "status": "待移植",
+    "detail": "尚未实现，不能视为 Android 本身不支持"
+  },
+  {
+    "method": "thread/revert",
+    "status": "安卓等价实现",
+    "detail": "按会话及最近任务 ID 撤销文件工具变更，冲突检测后原子应用，记录不可回滚的命令副作用；无上游 RPC"
+  },
+  {
+    "method": "thread/list",
+    "status": "安卓等价实现",
+    "detail": "按项目筛选会话摘要"
+  },
+  {
+    "method": "threadSection/list",
+    "status": "安卓等价实现",
+    "detail": "显示当前项目的持久化会话分类"
+  },
+  {
+    "method": "threadSection/create",
+    "status": "安卓等价实现",
+    "detail": "创建项目分类，禁止重名"
+  },
+  {
+    "method": "threadSection/update",
+    "status": "安卓等价实现",
+    "detail": "重命名已存在分类，禁止重名"
+  },
+  {
+    "method": "threadSection/delete",
+    "status": "安卓等价实现",
+    "detail": "分类删除前检查其下没有会话，不会误删聊天历史"
+  },
+  {
+    "method": "thread/loaded/list",
+    "status": "待移植",
+    "detail": "尚未实现，不能视为 Android 本身不支持"
+  },
+  {
+    "method": "thread/read",
+    "status": "安卓等价实现",
+    "detail": "按需读取单个会话"
+  },
+  {
+    "method": "thread/turns/list",
+    "status": "待移植",
+    "detail": "尚未实现，不能视为 Android 本身不支持"
+  },
+  {
+    "method": "thread/items/list",
+    "status": "待移植",
+    "detail": "尚未实现，不能视为 Android 本身不支持"
+  },
+  {
+    "method": "thread/inject_items",
+    "status": "待移植",
+    "detail": "尚未实现，不能视为 Android 本身不支持"
+  },
+  {
+    "method": "skills/list",
+    "status": "安卓等价实现",
+    "detail": "发现项目技能"
+  },
+  {
+    "method": "skills/extraRoots/set",
+    "status": "安卓等价实现",
+    "detail": "项目内额外技能根目录持久化配置，UI 与模型均可设置"
+  },
+  {
+    "method": "hooks/list",
+    "status": "待移植",
+    "detail": "尚未实现，不能视为 Android 本身不支持"
+  },
+  {
+    "method": "marketplace/add",
+    "status": "待移植",
+    "detail": "尚未实现，不能视为 Android 本身不支持"
+  },
+  {
+    "method": "marketplace/remove",
+    "status": "待移植",
+    "detail": "尚未实现，不能视为 Android 本身不支持"
+  },
+  {
+    "method": "marketplace/upgrade",
+    "status": "待移植",
+    "detail": "尚未实现，不能视为 Android 本身不支持"
+  },
+  {
+    "method": "plugin/list",
+    "status": "待移植",
+    "detail": "尚未实现，不能视为 Android 本身不支持"
+  },
+  {
+    "method": "plugin/installed",
+    "status": "待移植",
+    "detail": "尚未实现，不能视为 Android 本身不支持"
+  },
+  {
+    "method": "plugin/reconcile",
+    "status": "待移植",
+    "detail": "尚未实现，不能视为 Android 本身不支持"
+  },
+  {
+    "method": "plugin/read",
+    "status": "待移植",
+    "detail": "尚未实现，不能视为 Android 本身不支持"
+  },
+  {
+    "method": "plugin/skill/read",
+    "status": "待移植",
+    "detail": "尚未实现，不能视为 Android 本身不支持"
+  },
+  {
+    "method": "plugin/share/save",
+    "status": "待移植",
+    "detail": "尚未实现，不能视为 Android 本身不支持"
+  },
+  {
+    "method": "plugin/share/updateTargets",
+    "status": "待移植",
+    "detail": "尚未实现，不能视为 Android 本身不支持"
+  },
+  {
+    "method": "plugin/share/list",
+    "status": "待移植",
+    "detail": "尚未实现，不能视为 Android 本身不支持"
+  },
+  {
+    "method": "plugin/share/checkout",
+    "status": "待移植",
+    "detail": "尚未实现，不能视为 Android 本身不支持"
+  },
+  {
+    "method": "plugin/share/delete",
+    "status": "待移植",
+    "detail": "尚未实现，不能视为 Android 本身不支持"
+  },
+  {
+    "method": "app/read",
+    "status": "待移植",
+    "detail": "尚未实现，不能视为 Android 本身不支持"
+  },
+  {
+    "method": "app/list",
+    "status": "待移植",
+    "detail": "尚未实现，不能视为 Android 本身不支持"
+  },
+  {
+    "method": "app/installed",
+    "status": "待移植",
+    "detail": "尚未实现，不能视为 Android 本身不支持"
+  },
+  {
+    "method": "fs/readFile",
+    "status": "安卓等价实现",
+    "detail": "按行读取文本"
+  },
+  {
+    "method": "fs/writeFile",
+    "status": "安卓等价实现",
+    "detail": "写入文件并审批"
+  },
+  {
+    "method": "fs/createDirectory",
+    "status": "安卓等价实现",
+    "detail": "创建目录"
+  },
+  {
+    "method": "fs/getMetadata",
+    "status": "安卓等价实现",
+    "detail": "文件和目录的大小、类型、修改时间；本机工具 stat_path，无上游 RPC"
+  },
+  {
+    "method": "fs/readDirectory",
+    "status": "安卓等价实现",
+    "detail": "只读目录元信息"
+  },
+  {
+    "method": "fs/remove",
+    "status": "安卓等价实现",
+    "detail": "文件或目录删除审批；非空目录需 recursive=true，不支持根目录删除"
+  },
+  {
+    "method": "fs/copy",
+    "status": "安卓等价实现",
+    "detail": "二进制文件或目录原子复制；不覆盖已存在的目标；需用户审批"
+  },
+  {
+    "method": "fs/watch",
+    "status": "待移植",
+    "detail": "尚未实现，不能视为 Android 本身不支持"
+  },
+  {
+    "method": "fs/unwatch",
+    "status": "待移植",
+    "detail": "尚未实现，不能视为 Android 本身不支持"
+  },
+  {
+    "method": "skills/config/write",
+    "status": "安卓等价实现",
+    "detail": "set_skill_roots 写入项目级技能目录配置，需要模型工具审批"
+  },
+  {
+    "method": "plugin/install",
+    "status": "待移植",
+    "detail": "尚未实现，不能视为 Android 本身不支持"
+  },
+  {
+    "method": "plugin/uninstall",
+    "status": "待移植",
+    "detail": "尚未实现，不能视为 Android 本身不支持"
+  },
+  {
+    "method": "turn/start",
+    "status": "安卓等价实现",
+    "detail": "Responses 与本地工具循环"
+  },
+  {
+    "method": "turn/steer",
+    "status": "安卓等价实现",
+    "detail": "任务运行时追加指令，文件持久信箱保证先保存再确认消费；模型当前响应结束后注入，无原版 RPC"
+  },
+  {
+    "method": "turn/interrupt",
+    "status": "安卓等价实现",
+    "detail": "停止模型请求与本机命令"
+  },
+  {
+    "method": "review/start",
+    "status": "部分适配",
+    "detail": "通过审查提示词启动，尚无上游独立 Review 协议"
+  },
+  {
+    "method": "model/list",
+    "status": "安卓等价实现",
+    "detail": "从服务动态获取模型列表"
+  },
+  {
+    "method": "account/gatewayOAuth/read",
+    "status": "待移植",
+    "detail": "尚未实现，不能视为 Android 本身不支持"
+  },
+  {
+    "method": "account/gatewayOAuth/login",
+    "status": "待移植",
+    "detail": "尚未实现，不能视为 Android 本身不支持"
+  },
+  {
+    "method": "account/gatewayOAuth/cancel",
+    "status": "待移植",
+    "detail": "尚未实现，不能视为 Android 本身不支持"
+  },
+  {
+    "method": "modelProvider/capabilities/read",
+    "status": "待移植",
+    "detail": "尚未实现，不能视为 Android 本身不支持"
+  },
+  {
+    "method": "experimentalFeature/list",
+    "status": "待移植",
+    "detail": "尚未实现，不能视为 Android 本身不支持"
+  },
+  {
+    "method": "permissionProfile/list",
+    "status": "待移植",
+    "detail": "尚未实现，不能视为 Android 本身不支持"
+  },
+  {
+    "method": "experimentalFeature/enablement/set",
+    "status": "待移植",
+    "detail": "尚未实现，不能视为 Android 本身不支持"
+  },
+  {
+    "method": "mcpServer/oauth/login",
+    "status": "待移植",
+    "detail": "尚未实现，不能视为 Android 本身不支持"
+  },
+  {
+    "method": "config/mcpServer/reload",
+    "status": "部分适配",
+    "detail": "每次操作读取本地配置"
+  },
+  {
+    "method": "mcpServerStatus/list",
+    "status": "部分适配",
+    "detail": "手动检查工具列表，尚无持续状态同步"
+  },
+  {
+    "method": "mcpServer/resource/read",
+    "status": "安卓等价实现",
+    "detail": "无认证 HTTPS MCP 资源读取"
+  },
+  {
+    "method": "mcpServer/tool/call",
+    "status": "安卓等价实现",
+    "detail": "无认证 HTTPS MCP 工具调用"
+  },
+  {
+    "method": "windowsSandbox/setupStart",
+    "status": "平台不适用或受限",
+    "detail": "Windows 沙箱不适用于 Android"
+  },
+  {
+    "method": "windowsSandbox/readiness",
+    "status": "平台不适用或受限",
+    "detail": "Windows 沙箱不适用于 Android"
+  },
+  {
+    "method": "account/login/start",
+    "status": "待移植",
+    "detail": "尚未实现，不能视为 Android 本身不支持"
+  },
+  {
+    "method": "account/login/cancel",
+    "status": "待移植",
+    "detail": "尚未实现，不能视为 Android 本身不支持"
+  },
+  {
+    "method": "account/logout",
+    "status": "待移植",
+    "detail": "尚未实现，不能视为 Android 本身不支持"
+  },
+  {
+    "method": "account/rateLimits/read",
+    "status": "待移植",
+    "detail": "尚未实现，不能视为 Android 本身不支持"
+  },
+  {
+    "method": "account/rateLimitResetCredit/consume",
+    "status": "待移植",
+    "detail": "尚未实现，不能视为 Android 本身不支持"
+  },
+  {
+    "method": "account/usage/read",
+    "status": "待移植",
+    "detail": "尚未实现，不能视为 Android 本身不支持"
+  },
+  {
+    "method": "account/workspaceMessages/read",
+    "status": "待移植",
+    "detail": "尚未实现，不能视为 Android 本身不支持"
+  },
+  {
+    "method": "account/sendAddCreditsNudgeEmail",
+    "status": "待移植",
+    "detail": "尚未实现，不能视为 Android 本身不支持"
+  },
+  {
+    "method": "feedback/upload",
+    "status": "待移植",
+    "detail": "尚未实现，不能视为 Android 本身不支持"
+  },
+  {
+    "method": "feedback/save",
+    "status": "待移植",
+    "detail": "尚未实现，不能视为 Android 本身不支持"
+  },
+  {
+    "method": "command/exec",
+    "status": "安卓等价实现",
+    "detail": "非交互 shell 执行"
+  },
+  {
+    "method": "command/exec/write",
+    "status": "安卓等价实现",
+    "detail": "Android 原生 PTY 交互式 shell，支持标准输入、尺寸调整和停止；纯文本显示，未提供原版 JSON-RPC 协议或完整终端仿真"
+  },
+  {
+    "method": "command/exec/terminate",
+    "status": "安卓等价实现",
+    "detail": "取消当前 shell"
+  },
+  {
+    "method": "command/exec/resize",
+    "status": "安卓等价实现",
+    "detail": "Android 原生 PTY 交互式 shell，支持标准输入、尺寸调整和停止；纯文本显示，未提供原版 JSON-RPC 协议或完整终端仿真"
+  },
+  {
+    "method": "config/read",
+    "status": "安卓等价实现",
+    "detail": "读取本机连接与偏好设置"
+  },
+  {
+    "method": "externalAgentConfig/detect",
+    "status": "待移植",
+    "detail": "尚未实现，不能视为 Android 本身不支持"
+  },
+  {
+    "method": "externalAgentConfig/import",
+    "status": "待移植",
+    "detail": "尚未实现，不能视为 Android 本身不支持"
+  },
+  {
+    "method": "externalAgentConfig/import/recordHistory",
+    "status": "待移植",
+    "detail": "尚未实现，不能视为 Android 本身不支持"
+  },
+  {
+    "method": "externalAgentConfig/import/readHistories",
+    "status": "待移植",
+    "detail": "尚未实现，不能视为 Android 本身不支持"
+  },
+  {
+    "method": "config/value/write",
+    "status": "安卓等价实现",
+    "detail": "保存连接与偏好设置"
+  },
+  {
+    "method": "config/batchWrite",
+    "status": "安卓等价实现",
+    "detail": "保存完整配置"
+  },
+  {
+    "method": "configRequirements/read",
+    "status": "待移植",
+    "detail": "尚未实现，不能视为 Android 本身不支持"
+  },
+  {
+    "method": "account/read",
+    "status": "部分适配",
+    "detail": "仅 API 密钥配置，无 ChatGPT 账户信息"
+  },
+  {
+    "method": "getConversationSummary",
+    "status": "待移植",
+    "detail": "尚未实现，不能视为 Android 本身不支持"
+  },
+  {
+    "method": "gitDiffToRemote",
+    "status": "待移植",
+    "detail": "尚未实现，不能视为 Android 本身不支持"
+  },
+  {
+    "method": "getAuthStatus",
+    "status": "待移植",
+    "detail": "尚未实现，不能视为 Android 本身不支持"
+  },
+  {
+    "method": "fuzzyFileSearch",
+    "status": "安卓等价实现",
+    "detail": "文件名和内容子串搜索（不是上游模糊匹配算法）"
+  }
+]

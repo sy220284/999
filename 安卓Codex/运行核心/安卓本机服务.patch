@@ -1,0 +1,157 @@
+--- a/codex-rs/responses-api-proxy/src/lib.rs
++++ b/codex-rs/responses-api-proxy/src/lib.rs
+@@ -45,0 +46,9 @@
++    /// Optional Android loopback-client capability, independent from the upstream key.
++    #[arg(long)]
++    pub client_token_file: Option<PathBuf>,
++    /// Bound incoming body memory when serving a local mobile client.
++    #[arg(long)]
++    pub max_request_bytes: Option<usize>,
++    /// The owning parent keeps stdin open after the initial upstream credential.
++    #[arg(long)]
++    pub exit_on_stdin_close: bool,
+@@ -124,0 +134 @@
++    max_request_bytes: Option<usize>,
+@@ -130,0 +141,8 @@
++    anyhow::ensure!(args.max_request_bytes.is_none_or(|n| n > 0 && n <= 64 * 1024 * 1024), "invalid request budget");
++    let client_token = args.client_token_file.as_ref().map(|path| -> Result<_> {
++        let file = File::open(path)?;
++        let mut bytes = Vec::new();
++        std::io::Read::read_to_end(&mut file.take(129), &mut bytes)?;
++        anyhow::ensure!((32..=128).contains(&bytes.len()) && bytes.iter().all(|b| b.is_ascii_alphanumeric() || *b == b'-' || *b == b'_'), "invalid local client capability");
++        Ok(Arc::new(zeroize::Zeroizing::new(String::from_utf8(bytes)?)))
++    }).transpose()?;
+@@ -131,0 +150,11 @@
++    if args.exit_on_stdin_close {
++        std::thread::spawn(|| {
++            let mut byte = [0u8; 1];
++            loop {
++                match std::io::stdin().read(&mut byte) {
++                    Err(error) if error.kind() == std::io::ErrorKind::Interrupted => continue,
++                    _ => std::process::exit(0),
++                }
++            }
++        });
++    }
+@@ -147,0 +177 @@
++        max_request_bytes: args.max_request_bytes,
+@@ -159,3 +188,0 @@
+-    if let Some(path) = args.server_info.as_ref() {
+-        write_server_info(path, bound_addr.port())?;
+-    }
+@@ -172,0 +200,3 @@
++    if let Some(path) = args.server_info.as_ref() {
++        write_server_info(path, bound_addr.port())?;
++    }
+@@ -178,0 +209 @@
++        let client_token = client_token.clone();
+@@ -181,0 +213,4 @@
++            if client_token.as_ref().is_some_and(|token| !local_client_authorized(request.headers(), token.as_str())) {
++                let _ = request.respond(Response::new_empty(StatusCode(401)));
++                return;
++            }
+@@ -224,0 +260,10 @@
++}
++
++fn local_client_authorized(headers: &[Header], token: &str) -> bool {
++    use subtle::ConstantTimeEq;
++    if headers.iter().any(|header| header.field.equiv("Origin")) { return false; }
++    let mut incoming = headers.iter().filter(|header| header.field.equiv("Authorization"));
++    let Some(header) = incoming.next() else { return false; };
++    if incoming.next().is_some() { return false; }
++    let expected = format!("Bearer {token}");
++    bool::from(header.value.as_str().as_bytes().ct_eq(expected.as_bytes()))
+@@ -247,2 +292,9 @@
+-    let reader = req.as_reader();
+-    reader.read_to_end(&mut body)?;
++    {
++        let reader = req.as_reader();
++        if let Some(limit) = config.max_request_bytes { reader.take((limit + 1) as u64).read_to_end(&mut body)?; }
++        else { reader.read_to_end(&mut body)?; }
++    }
++    if config.max_request_bytes.is_some_and(|limit| body.len() > limit) {
++        let _ = req.respond(Response::new_empty(StatusCode(413)));
++        return Ok(());
++    }
+@@ -348,0 +401,17 @@
++
++#[cfg(test)]
++mod android_client_capability_tests {
++    use super::*;
++    fn h(name: &str, value: &str) -> Header { Header::from_bytes(name.as_bytes(), value.as_bytes()).unwrap() }
++    #[test]
++    fn capability_is_required_and_never_accepts_a_duplicate_header() {
++        assert!(!local_client_authorized(&[], "capability"));
++        assert!(local_client_authorized(&[h("Authorization", "Bearer capability")], "capability"));
++        assert!(!local_client_authorized(&[h("Authorization", "Bearer wrong")], "capability"));
++        assert!(!local_client_authorized(&[h("Authorization", "Bearer capability"), h("Authorization", "Bearer capability")], "capability"));
++    }
++    #[test]
++    fn browser_origin_is_refused_even_with_a_valid_capability() {
++        assert!(!local_client_authorized(&[h("Authorization", "Bearer capability"), h("Origin", "https://example.invalid")], "capability"));
++    }
++}
+--- a/codex-rs/responses-api-proxy/Cargo.toml
++++ b/codex-rs/responses-api-proxy/Cargo.toml
+@@ -30,0 +31 @@
++subtle = "=2.6.1"
+--- a/codex-rs/responses-api-proxy/src/auth_tests.rs
++++ b/codex-rs/responses-api-proxy/src/auth_tests.rs
+@@ -566,0 +567 @@
++            max_request_bytes: None,
+@@ -660,0 +662 @@
++            max_request_bytes: None,
+--- a/codex-rs/cli/src/exec_server_command.rs
++++ b/codex-rs/cli/src/exec_server_command.rs
+@@ -164 +163,0 @@
+-        requires_if("true", "exec_server_remote"),
+@@ -349 +348 @@
+-                exec_server_telemetry::ParentLifetime::Independent,
++                if self.exit_on_stdin_close { exec_server_telemetry::ParentLifetime::StdinPipe } else { exec_server_telemetry::ParentLifetime::Independent },
+--- a/codex-rs/cli/src/main.rs
++++ b/codex-rs/cli/src/main.rs
+@@ -1287,0 +1288,9 @@
++                    #[cfg(target_os = "android")]
++                    if std::env::var_os("CODEX_ANDROID_DAEMON_PARENT_STDIN").as_deref() == Some(std::ffi::OsStr::new("1")) {
++                        std::thread::spawn(|| {
++                            let _ = std::io::copy(&mut std::io::stdin().lock(), &mut std::io::sink());
++                            unsafe { libc::kill(libc::getpid(), libc::SIGTERM); }
++                            std::thread::sleep(std::time::Duration::from_secs(5));
++                            unsafe { libc::kill(libc::getpid(), libc::SIGKILL); }
++                        });
++                    }
+--- a/codex-rs/app-server-transport/src/transport/websocket.rs
++++ b/codex-rs/app-server-transport/src/transport/websocket.rs
+@@ -175,0 +176,5 @@
++    #[cfg(target_os = "android")]
++    if let Some(path) = std::env::var_os("CODEX_ANDROID_DAEMON_RECEIPT") {
++        let data = serde_json::to_vec(&serde_json::json!({"pid":std::process::id(),"address":format!("ws://{local_addr}")})).map_err(std::io::Error::other)?;
++        std::fs::write(path, data)?;
++    }
+--- a/codex-rs/chatgpt/src/apply_command.rs
++++ b/codex-rs/chatgpt/src/apply_command.rs
+@@ -18,0 +19,8 @@
++    /// Inspect exact latest diff without applying it.
++    #[arg(long, conflicts_with = "expected_diff_file")]
++    pub preview: bool,
++
++    /// Refuse to apply if the latest diff differs from these reviewed bytes.
++    #[arg(long)]
++    pub expected_diff_file: Option<PathBuf>,
++
+@@ -34,0 +43,15 @@
++    if apply_cli.preview || apply_cli.expected_diff_file.is_some() {
++        use std::io::{Read, Write};
++        let turn = task_response.current_diff_task_turn.as_ref().ok_or_else(|| anyhow::anyhow!("No diff turn found"))?;
++        let diff = turn.output_items.iter().find_map(|item| match item {
++            OutputItem::Pr(PrOutputItem { output_diff }) => Some(output_diff.diff.as_str()),
++            _ => None,
++        }).ok_or_else(|| anyhow::anyhow!("No PR output item found"))?;
++        anyhow::ensure!(diff.len() <= 2 * 1024 * 1024, "Diff exceeds review budget");
++        if apply_cli.preview { std::io::stdout().write_all(diff.as_bytes())?; return Ok(()); }
++        if let Some(path) = apply_cli.expected_diff_file {
++            let mut reviewed = Vec::new();
++            std::fs::File::open(path)?.take(2 * 1024 * 1024 + 1).read_to_end(&mut reviewed)?;
++            anyhow::ensure!(reviewed.as_slice() == diff.as_bytes(), "Task diff changed after review; preview it again");
++        }
++    }

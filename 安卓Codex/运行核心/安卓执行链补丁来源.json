@@ -1,0 +1,16 @@
+{
+  "source_commit": "970111f6cb62cc02fe36a82ea7d71b37a2889c97",
+  "patch_sha256": "ed9eb7a630f667d5bf88610c076713e02367ccbcdb7b1ea17d62f99c66fb7ce1",
+  "files": [
+    {
+      "path": "codex-rs/exec-server/src/forward.rs",
+      "before": "ed4be16bcf1433c69e96f117540fd5243912bdebad1e2fef908be20daec2297f",
+      "after": "bc83d25a0e6f850a123a67847bf6c343721fdb6683f3d4bb25254ad93cfa8857"
+    },
+    {
+      "path": "codex-rs/sandboxing/src/spawn.rs",
+      "before": "6a92bc742aaca33e210f9d494d7f19722c96ec2698f2c239718ae053244d645c",
+      "after": "c12701b607036409ab28db2a554d348d7e1f628ad0afea829ff0c278f3bc1f47"
+    }
+  ]
+}

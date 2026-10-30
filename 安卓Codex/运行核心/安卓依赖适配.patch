@@ -1,0 +1,219 @@
+diff --git a/codex-rs/http-client/Cargo.toml b/codex-rs/http-client/Cargo.toml
+--- a/codex-rs/http-client/Cargo.toml
++++ b/codex-rs/http-client/Cargo.toml
+@@ -11,7 +11,7 @@
+ http = { workspace = true }
+ http-body = "1.0.1"
+ httpdate = { workspace = true }
+-native-tls = "0.2"
++native-tls = { version = "0.2", features = ["vendored"] }
+ opentelemetry = { workspace = true }
+ reqwest = { workspace = true, features = ["json", "rustls-tls", "rustls-tls-native-roots", "stream"] }
+ rustls = { workspace = true }
+diff --git a/codex-rs/mxc-sandbox/Cargo.toml b/codex-rs/mxc-sandbox/Cargo.toml
+--- a/codex-rs/mxc-sandbox/Cargo.toml
++++ b/codex-rs/mxc-sandbox/Cargo.toml
+@@ -21,10 +21,12 @@
+ codex-utils-absolute-path = { workspace = true }
+ codex-utils-path-uri = { workspace = true }
+ codex-windows-sandbox = { workspace = true }
+-mxc-sdk = { workspace = true }
+ serde = { workspace = true, features = ["derive"] }
+ serde_json = { workspace = true }
+ thiserror = { workspace = true }
++
++[target.'cfg(not(target_os = "android"))'.dependencies]
++mxc-sdk = { workspace = true }
+
+ [target.'cfg(windows)'.dependencies]
+ flatbuffers = { workspace = true }
+diff --git a/codex-rs/mxc-sandbox/src/lib.rs b/codex-rs/mxc-sandbox/src/lib.rs
+--- a/codex-rs/mxc-sandbox/src/lib.rs
++++ b/codex-rs/mxc-sandbox/src/lib.rs
+@@ -5,7 +5,7 @@
+ mod availability;
+ #[cfg(windows)]
+ mod native;
+-#[cfg(any(windows, test))]
++#[cfg(any(windows, all(test, not(target_os = "android"))))]
+ mod policy;
+ mod transport;
+ #[cfg(windows)]
+@@ -169,6 +169,6 @@
+     }
+ }
+
+-#[cfg(test)]
++#[cfg(all(test, not(target_os = "android")))]
+ #[path = "policy_tests.rs"]
+ mod tests;
+diff --git a/codex-rs/keyring-store/Cargo.toml b/codex-rs/keyring-store/Cargo.toml
+--- a/codex-rs/keyring-store/Cargo.toml
++++ b/codex-rs/keyring-store/Cargo.toml
+@@ -25,6 +25,9 @@
+ [target.'cfg(any(target_os = "freebsd", target_os = "openbsd"))'.dependencies]
+ keyring = { workspace = true, features = ["sync-secret-service"] }
+
++[target.'cfg(target_os = "android")'.dependencies]
++libc = { workspace = true }
++
+ [dev-dependencies]
+ pretty_assertions = { workspace = true }
+
+diff --git a/codex-rs/keyring-store/src/lib.rs b/codex-rs/keyring-store/src/lib.rs
+--- a/codex-rs/keyring-store/src/lib.rs
++++ b/codex-rs/keyring-store/src/lib.rs
+@@ -1,8 +1,10 @@
++#[cfg(not(target_os = "android"))]
+ use keyring::Entry;
+ use keyring::Error as KeyringError;
+ use std::error::Error;
+ use std::fmt;
+ use std::fmt::Debug;
++#[cfg(not(target_os = "android"))]
+ use tracing::trace;
+
+ pub enum CredentialStoreError {
+@@ -74,6 +76,10 @@
+ #[derive(Debug, Clone, Copy)]
+ pub struct DefaultKeyringStore;
+
++#[cfg(target_os = "android")]
++mod android;
++
++#[cfg(not(target_os = "android"))]
+ impl KeyringStore for DefaultKeyringStore {
+     fn load(&self, service: &str, account: &str) -> Result<Option<String>, CredentialStoreError> {
+         trace!("keyring.load start");
+diff --git a/codex-rs/Cargo.lock b/codex-rs/Cargo.lock
+--- a/codex-rs/Cargo.lock
++++ b/codex-rs/Cargo.lock
+@@ -3835,6 +3835,7 @@
+ version = "0.0.0"
+ dependencies = [
+  "keyring",
++ "libc",
+  "pretty_assertions",
+  "secret-service",
+  "security-framework 3.5.1",
+diff --git a/codex-rs/install-context/src/lib.rs b/codex-rs/install-context/src/lib.rs
+--- a/codex-rs/install-context/src/lib.rs
++++ b/codex-rs/install-context/src/lib.rs
+@@ -8,7 +8,9 @@
+ use serde::Deserialize;
+
+ const BIN_DIRNAME: &str = "bin";
+-const CODE_MODE_HOST_EXECUTABLE_NAME: &str = if cfg!(windows) {
++const CODE_MODE_HOST_EXECUTABLE_NAME: &str = if cfg!(target_os = "android") {
++    "libcodex_code_mode_host.so"
++} else if cfg!(windows) {
+     "codex-code-mode-host.exe"
+ } else {
+     "codex-code-mode-host"
+@@ -149,6 +151,12 @@
+     }
+
+     pub fn rg_command(&self) -> PathBuf {
++        // Android executable must come from the installed native library directory.
++        if cfg!(target_os = "android") {
++            return std::env::current_exe().ok()
++                .and_then(|exe| exe.parent().map(|dir| dir.join("libcodex_rg.so")))
++                .unwrap_or_else(|| PathBuf::from("libcodex_rg.so"));
++        }
+         if let Some(package_layout) = &self.package_layout
+             && let Some(path_dir) = &package_layout.path_dir
+         {
+diff --git a/codex-rs/shell-command/src/shell_detect.rs b/codex-rs/shell-command/src/shell_detect.rs
+--- a/codex-rs/shell-command/src/shell_detect.rs
++++ b/codex-rs/shell-command/src/shell_detect.rs
+@@ -250,7 +250,11 @@
+     })
+ }
+
+-const SH_FALLBACK_PATHS: &[&str] = &["/bin/sh"];
++const SH_FALLBACK_PATHS: &[&str] = if cfg!(target_os = "android") {
++    &["/system/bin/sh"]
++} else {
++    &["/bin/sh"]
++};
+
+ fn get_sh_shell() -> Option<DetectedShell> {
+     let shell_path = get_shell_path(ShellType::Sh, "sh", SH_FALLBACK_PATHS);
+@@ -334,7 +338,7 @@
+     } else {
+         DetectedShell {
+             shell_type: ShellType::Sh,
+-            shell_path: PathBuf::from("/bin/sh"),
++            shell_path: PathBuf::from(if cfg!(target_os = "android") { "/system/bin/sh" } else { "/bin/sh" }),
+         }
+     }
+ }
+diff --git a/codex-rs/install-context/src/lib_tests.rs b/codex-rs/install-context/src/lib_tests.rs
+--- a/codex-rs/install-context/src/lib_tests.rs
++++ b/codex-rs/install-context/src/lib_tests.rs
+@@ -161,6 +161,7 @@
+         /*method_override*/ None,
+         /*codex_home*/ Some(codex_home.path()),
+     );
++    #[cfg(not(target_os = "android"))]
+     assert_eq!(context.rg_command(), default_rg_command());
+     Ok(())
+ }
+@@ -236,6 +237,7 @@
+             .join(CODE_MODE_HOST_EXECUTABLE_NAME)
+             .into_path_buf()
+     );
++    #[cfg(not(target_os = "android"))]
+     assert_eq!(
+         context.rg_command(),
+         canonical_path_dir
+@@ -324,6 +326,7 @@
+             }),
+         }
+     );
++    #[cfg(not(target_os = "android"))]
+     assert_eq!(
+         context.rg_command(),
+         canonical_path_dir
+@@ -357,6 +360,7 @@
+     );
+     assert_eq!(context.method, InstallMethod::Npm);
+     assert!(context.package_layout.is_some());
++    #[cfg(not(target_os = "android"))]
+     assert_eq!(
+         context.rg_command(),
+         canonical_path_dir
+@@ -381,6 +385,7 @@
+         /*method_override*/ None,
+         /*codex_home*/ None,
+     );
++    #[cfg(not(target_os = "android"))]
+     assert_eq!(context.rg_command(), default_rg_command());
+     Ok(())
+ }
+@@ -411,6 +416,7 @@
+         context.code_mode_host_program_from_exe(Some(&fallback_exe_path)),
+         package_dir.path().join(CODE_MODE_HOST_EXECUTABLE_NAME)
+     );
++    #[cfg(not(target_os = "android"))]
+     assert_eq!(context.rg_command(), default_rg_command());
+     assert_eq!(context.bundled_resource(TEST_RESOURCE_NAME), None);
+     Ok(())
+@@ -516,3 +522,17 @@
+
+ #[path = "bundle_tests.rs"]
+ mod bundle_tests;
++
++#[cfg(target_os = "android")]
++#[test]
++fn android_rg_uses_installed_executable_directory_instead_of_desktop_layout() -> std::io::Result<()> {
++    let home = tempfile::tempdir()?;
++    let fake_exe = home.path().join("desktop/bin/codex");
++    let context = InstallContext::from_exe_with_codex_home(
++        false, Some(&fake_exe), None, Some(home.path()),
++    );
++    let exe = std::env::current_exe()?;
++    let expected = exe.parent().expect("executable directory").join("libcodex_rg.so");
++    assert_eq!(context.rg_command(), expected);
++    Ok(())
++}

@@ -1,0 +1,990 @@
+{
+  "source_commit": "970111f6cb62cc02fe36a82ea7d71b37a2889c97",
+  "workspace_members": 163,
+  "note": "包含业务库、内部依赖、测试及独立程序，不能把成员数量当作功能完成率。实际目标/feature和链接需构建核对。",
+  "members": [
+    {
+      "path": "codex-rs/aws-auth/Cargo.toml",
+      "package": "codex-aws-auth",
+      "sha256": "b42bbe49eea0f86ba859b05db8d3d948b5c493122cd607dcc8630412279cf8da",
+      "meaning": "源码构成索引，非单项功能或运行完成证明"
+    },
+    {
+      "path": "codex-rs/analytics/Cargo.toml",
+      "package": "codex-analytics",
+      "sha256": "afc0af9c9765b77c05aca745d48db31acc507f84ffc17f51b785b24726de5e7d",
+      "meaning": "源码构成索引，非单项功能或运行完成证明"
+    },
+    {
+      "path": "codex-rs/agent-graph-store/Cargo.toml",
+      "package": "codex-agent-graph-store",
+      "sha256": "6d13bbf262fa180b318e43ff1295a7db31f4939bc5f174c1fc1f63c46b2ea568",
+      "meaning": "源码构成索引，非单项功能或运行完成证明"
+    },
+    {
+      "path": "codex-rs/agent-message-board-client/Cargo.toml",
+      "package": "codex-agent-message-board-client",
+      "sha256": "ac43d8973e170fe3d74cf6ad7d66947737c81c2e9527fcb05a06873af651ec6c",
+      "meaning": "源码构成索引，非单项功能或运行完成证明"
+    },
+    {
+      "path": "codex-rs/agent-identity/Cargo.toml",
+      "package": "codex-agent-identity",
+      "sha256": "6abd72371d8289b9a216491aee14eef2dde7627e42bf3dc4c4aa05979c0901b8",
+      "meaning": "源码构成索引，非单项功能或运行完成证明"
+    },
+    {
+      "path": "codex-rs/agent-roles/Cargo.toml",
+      "package": "codex-agent-roles",
+      "sha256": "3af8b9b54fb46748eccf7ffa346d3ab6151e3d340840d52b0cdbf5bc4b748882",
+      "meaning": "源码构成索引，非单项功能或运行完成证明"
+    },
+    {
+      "path": "codex-rs/backend-client/Cargo.toml",
+      "package": "codex-backend-client",
+      "sha256": "3f536d6194f6e2221e10ec9ca11b7d1c5bdc89b71cb0ef35b28c6f6d7aa153ac",
+      "meaning": "源码构成索引，非单项功能或运行完成证明"
+    },
+    {
+      "path": "codex-rs/cloud-client/Cargo.toml",
+      "package": "codex-cloud-client",
+      "sha256": "0c9742a41ee08870a00e7f5baf6d61e8f5a50b6f8b11c32ec8fdebac312ba605",
+      "meaning": "源码构成索引，非单项功能或运行完成证明"
+    },
+    {
+      "path": "codex-rs/bwrap/Cargo.toml",
+      "package": "codex-bwrap",
+      "sha256": "5b524ac2c30f4029cae77721c026d3487a6628473b042d26f354ab6075ec4a7c",
+      "meaning": "源码构成索引，非单项功能或运行完成证明"
+    },
+    {
+      "path": "codex-rs/build-info/Cargo.toml",
+      "package": "codex-build-info",
+      "sha256": "492f56d0347f602e21786b2f432bd10aeba5266d9cac0fc83e639cbbb16c06da",
+      "meaning": "源码构成索引，非单项功能或运行完成证明"
+    },
+    {
+      "path": "codex-rs/ansi-escape/Cargo.toml",
+      "package": "codex-ansi-escape",
+      "sha256": "082f09f80662226c37c5818d271582e30ce93d67b2204286330a9b2ade5372a8",
+      "meaning": "源码构成索引，非单项功能或运行完成证明"
+    },
+    {
+      "path": "codex-rs/attachment-store/Cargo.toml",
+      "package": "codex-attachment-store",
+      "sha256": "740aa9e40fb205501ace3b6176c96e76a4737952fc47f2f07a456842225ae018",
+      "meaning": "源码构成索引，非单项功能或运行完成证明"
+    },
+    {
+      "path": "codex-rs/async-utils/Cargo.toml",
+      "package": "codex-async-utils",
+      "sha256": "880a0c8ea54a30e1db09db6398a01706ad501c834ba32eecd37b7ac3de8dcf4f",
+      "meaning": "源码构成索引，非单项功能或运行完成证明"
+    },
+    {
+      "path": "codex-rs/app-server/Cargo.toml",
+      "package": "codex-app-server",
+      "sha256": "c7db28ab330cb0257e3255c727f73f5ae888f080a856a72c80eff4feeda2bd47",
+      "meaning": "源码构成索引，非单项功能或运行完成证明"
+    },
+    {
+      "path": "codex-rs/app-server-transport/Cargo.toml",
+      "package": "codex-app-server-transport",
+      "sha256": "90e2b999c62733e9de5cc7d0e2c20757751ef417889330ce910c4294ddf0fd59",
+      "meaning": "源码构成索引，非单项功能或运行完成证明"
+    },
+    {
+      "path": "codex-rs/app-server-daemon/Cargo.toml",
+      "package": "codex-app-server-daemon",
+      "sha256": "07ec47b02a4028b928dde2ab24853107f728369b81294f5522dadcceda3e6d7c",
+      "meaning": "源码构成索引，非单项功能或运行完成证明"
+    },
+    {
+      "path": "codex-rs/app-server-client/Cargo.toml",
+      "package": "codex-app-server-client",
+      "sha256": "74fd9123b3697f600e1913c2665c4f235ca1c9999756b109361de41636e288c7",
+      "meaning": "源码构成索引，非单项功能或运行完成证明"
+    },
+    {
+      "path": "codex-rs/app-server-protocol/Cargo.toml",
+      "package": "codex-app-server-protocol",
+      "sha256": "eed16bab0bada46556378b378820cc51c73f09db677802e9de14c652ef13b92d",
+      "meaning": "源码构成索引，非单项功能或运行完成证明"
+    },
+    {
+      "path": "codex-rs/app-server-protocol-noop-macros/Cargo.toml",
+      "package": "codex-app-server-protocol-noop-macros",
+      "sha256": "86cca540f740f40a7dd58b1d2d62f518517b54c14915c0f3f2171df9223c0226",
+      "meaning": "源码构成索引，非单项功能或运行完成证明"
+    },
+    {
+      "path": "codex-rs/app-server-test-client/Cargo.toml",
+      "package": "codex-app-server-test-client",
+      "sha256": "1929e157ff492633b4dd806ef5627e1c53ccf9241e72dd73944ff5f489483080",
+      "meaning": "源码构成索引，非单项功能或运行完成证明"
+    },
+    {
+      "path": "codex-rs/apply-patch/Cargo.toml",
+      "package": "codex-apply-patch",
+      "sha256": "388b18e13d8e3f8aa419e30385e33fe58748b2bd972df32eb66aa1484ab3d54a",
+      "meaning": "源码构成索引，非单项功能或运行完成证明"
+    },
+    {
+      "path": "codex-rs/arg0/Cargo.toml",
+      "package": "codex-arg0",
+      "sha256": "b5ccf100791cf2cd47304683b1807bd7399845813ac162060be7bdaba77cb46c",
+      "meaning": "源码构成索引，非单项功能或运行完成证明"
+    },
+    {
+      "path": "codex-rs/feedback/Cargo.toml",
+      "package": "codex-feedback",
+      "sha256": "283042c3639700d3a1e00e6c421f0b2b805e69d8efdf6dbeacfff582aca80d7b",
+      "meaning": "源码构成索引，非单项功能或运行完成证明"
+    },
+    {
+      "path": "codex-rs/features/Cargo.toml",
+      "package": "codex-features",
+      "sha256": "a554de5c70b3ba2040cb5248522c9157dd3fc0b9a7e2afb6a5786eb111f14814",
+      "meaning": "源码构成索引，非单项功能或运行完成证明"
+    },
+    {
+      "path": "codex-rs/install-context/Cargo.toml",
+      "package": "codex-install-context",
+      "sha256": "f3889e33551bedcf564069d27568c5f1ea01e9e696cf122e4b8f99a7292fbff8",
+      "meaning": "源码构成索引，非单项功能或运行完成证明"
+    },
+    {
+      "path": "codex-rs/codex-backend-openapi-models/Cargo.toml",
+      "package": "codex-backend-openapi-models",
+      "sha256": "f1357552f32833762da0fe2730c65a542da56314ed07371a98fa420fceb45da4",
+      "meaning": "源码构成索引，非单项功能或运行完成证明"
+    },
+    {
+      "path": "codex-rs/code-mode/Cargo.toml",
+      "package": "codex-code-mode",
+      "sha256": "38656fd4118bdfdf740f2877dddb18d2598147a90c35150e893031c4025b0f09",
+      "meaning": "源码构成索引，非单项功能或运行完成证明"
+    },
+    {
+      "path": "codex-rs/code-mode-host/Cargo.toml",
+      "package": "codex-code-mode-host",
+      "sha256": "102bd33db5a318765e9c4259147f2e69cfb09ba51dd358aff19aa010019862cd",
+      "meaning": "源码构成索引，非单项功能或运行完成证明"
+    },
+    {
+      "path": "codex-rs/code-mode-protocol/Cargo.toml",
+      "package": "codex-code-mode-protocol",
+      "sha256": "2ac9af96867f5babb423d9865e1e1277329e6e1fb10a069d0cb9e380beef2b70",
+      "meaning": "源码构成索引，非单项功能或运行完成证明"
+    },
+    {
+      "path": "codex-rs/code-mode-runtime/Cargo.toml",
+      "package": "codex-code-mode-runtime",
+      "sha256": "593ded78596279c8e6ce85f2d9708d549c44b3fe693cbbab9341aeb57e3ea923",
+      "meaning": "源码构成索引，非单项功能或运行完成证明"
+    },
+    {
+      "path": "codex-rs/codex-home/Cargo.toml",
+      "package": "codex-home",
+      "sha256": "6c80a87eaad697efc4dc24f5eca9e7268dd8de29d2f84bc8982af3f89733c92b",
+      "meaning": "源码构成索引，非单项功能或运行完成证明"
+    },
+    {
+      "path": "codex-rs/cloud-config/Cargo.toml",
+      "package": "codex-cloud-config",
+      "sha256": "3c1dbe62c1a59cd5640a803050c304f3d793ef8f6e11aae32a885c58683ad05f",
+      "meaning": "源码构成索引，非单项功能或运行完成证明"
+    },
+    {
+      "path": "codex-rs/cloud-tasks/Cargo.toml",
+      "package": "codex-cloud-tasks",
+      "sha256": "5f06b8116e9f3f2486953e3776d256946c4faaab9f3c26c2e4001b9d14a95faf",
+      "meaning": "源码构成索引，非单项功能或运行完成证明"
+    },
+    {
+      "path": "codex-rs/cloud-tasks-client/Cargo.toml",
+      "package": "codex-cloud-tasks-client",
+      "sha256": "713fe5694a802106a72bdb245ed973ce80dd1bd977abfde5f308a14bf3180028",
+      "meaning": "源码构成索引，非单项功能或运行完成证明"
+    },
+    {
+      "path": "codex-rs/cloud-tasks-mock-client/Cargo.toml",
+      "package": "codex-cloud-tasks-mock-client",
+      "sha256": "c00ebb5e69c81d6d15793069773c1a84a521cc4d71a2a27b06854c71557f24d4",
+      "meaning": "源码构成索引，非单项功能或运行完成证明"
+    },
+    {
+      "path": "codex-rs/cli/Cargo.toml",
+      "package": "codex-cli",
+      "sha256": "a643fde880971aa23902bd8e2f0d838beea2efe41153b0e4d09b5ad78890f796",
+      "meaning": "源码构成索引，非单项功能或运行完成证明"
+    },
+    {
+      "path": "codex-rs/collaboration-mode-templates/Cargo.toml",
+      "package": "codex-collaboration-mode-templates",
+      "sha256": "52aa162c5ba6085b0eead685bd21a15043150789fcd08000465c95db0044fef4",
+      "meaning": "源码构成索引，非单项功能或运行完成证明"
+    },
+    {
+      "path": "codex-rs/connectors/Cargo.toml",
+      "package": "codex-connectors",
+      "sha256": "20515657b4ab715652a6be25d3b2ff408f36d8b53e0d1dddc1ea014910f95ea0",
+      "meaning": "源码构成索引，非单项功能或运行完成证明"
+    },
+    {
+      "path": "codex-rs/config/Cargo.toml",
+      "package": "codex-config",
+      "sha256": "8a2c383015a96d0ae2aa93593644176da09ef27a3d34357e3aa28342098610e9",
+      "meaning": "源码构成索引，非单项功能或运行完成证明"
+    },
+    {
+      "path": "codex-rs/config-schema/Cargo.toml",
+      "package": "codex-config-schema",
+      "sha256": "070bac9380f4f7140aee21972c9f52e7eb5816be2c306ee00201177cebce5ec9",
+      "meaning": "源码构成索引，非单项功能或运行完成证明"
+    },
+    {
+      "path": "codex-rs/context-fragments/Cargo.toml",
+      "package": "codex-context-fragments",
+      "sha256": "c75beb2f9f12fd93ac28cc6a75d92244fb0357d50c398ece72f328d82c6f4482",
+      "meaning": "源码构成索引，非单项功能或运行完成证明"
+    },
+    {
+      "path": "codex-rs/shell-command/Cargo.toml",
+      "package": "codex-shell-command",
+      "sha256": "6967abe322f82037b6c57f3e6bbe6425030c4ed0a388915527a59dea7317b856",
+      "meaning": "源码构成索引，非单项功能或运行完成证明"
+    },
+    {
+      "path": "codex-rs/skills/Cargo.toml",
+      "package": "codex-skills",
+      "sha256": "099f2da853fa6853df18b7923ccd55b6bd1374af7741fd6156ec84b7765ae086",
+      "meaning": "源码构成索引，非单项功能或运行完成证明"
+    },
+    {
+      "path": "codex-rs/core/Cargo.toml",
+      "package": "codex-core",
+      "sha256": "7c8048f7101ddbaedf6a232f9fa558d6f6cccddd16ae404a90348dd255f8e32b",
+      "meaning": "源码构成索引，非单项功能或运行完成证明"
+    },
+    {
+      "path": "codex-rs/core-api/Cargo.toml",
+      "package": "codex-core-api",
+      "sha256": "64d89566ae6c63d3dbd6c655fe9f5277dd93765330611be3f05ebf09e15dd015",
+      "meaning": "源码构成索引，非单项功能或运行完成证明"
+    },
+    {
+      "path": "codex-rs/core-plugin-common/Cargo.toml",
+      "package": "codex-core-plugin-common",
+      "sha256": "d68f45e18a957624d9a22d18c206b22976887b2c06d27b1ae3036850ca0a0424",
+      "meaning": "源码构成索引，非单项功能或运行完成证明"
+    },
+    {
+      "path": "codex-rs/core-plugins/Cargo.toml",
+      "package": "codex-core-plugins",
+      "sha256": "09eb8789b49e7b238d4989cb49192013d39d008c8a1df213c9d39f287c412f70",
+      "meaning": "源码构成索引，非单项功能或运行完成证明"
+    },
+    {
+      "path": "codex-rs/diagnostics/Cargo.toml",
+      "package": "codex-diagnostics",
+      "sha256": "11974d3cc33cfe81cc15a3def4cdaace9eae05d4ac3b22af0af2e35e12ef6d66",
+      "meaning": "源码构成索引，非单项功能或运行完成证明"
+    },
+    {
+      "path": "codex-rs/direct-tool-timing/Cargo.toml",
+      "package": "codex-direct-tool-timing",
+      "sha256": "4d722299243d4a0ae704d10806f578cf4d90ba823b960c60d455e3e8b0e66bf3",
+      "meaning": "源码构成索引，非单项功能或运行完成证明"
+    },
+    {
+      "path": "codex-rs/guardian-context/Cargo.toml",
+      "package": "codex-guardian-context",
+      "sha256": "164cce17d0cfb4a71a37c672984000473a60d84f3576002ab3f8252d0795e470",
+      "meaning": "源码构成索引，非单项功能或运行完成证明"
+    },
+    {
+      "path": "codex-rs/hooks/Cargo.toml",
+      "package": "codex-hooks",
+      "sha256": "d9cfb2602aecfe6ba83716e72d5bb2ecb6ddb698f79eb8aa3ff346a240098c68",
+      "meaning": "源码构成索引，非单项功能或运行完成证明"
+    },
+    {
+      "path": "codex-rs/history/Cargo.toml",
+      "package": "codex-history",
+      "sha256": "1efeca5a9781224b2682eb98ce880f0d1ed9ee614ff2d9a906195458924c0a89",
+      "meaning": "源码构成索引，非单项功能或运行完成证明"
+    },
+    {
+      "path": "codex-rs/http-client/Cargo.toml",
+      "package": "codex-http-client",
+      "sha256": "b522db0fba570b1667e21c4bbe1fae63f960f3821fa387b6c5bf9a24e3530f7c",
+      "meaning": "源码构成索引，非单项功能或运行完成证明"
+    },
+    {
+      "path": "codex-rs/secrets/Cargo.toml",
+      "package": "codex-secrets",
+      "sha256": "99d0a0c6bb4972d0ee5336949870ce0b2bc4b05c22bfe34f47edfb3655602150",
+      "meaning": "源码构成索引，非单项功能或运行完成证明"
+    },
+    {
+      "path": "codex-rs/exec/Cargo.toml",
+      "package": "codex-exec",
+      "sha256": "152344aec325b7769804e2e5aef39f590b7fb9faf6e324c83a91d84035e73c47",
+      "meaning": "源码构成索引，非单项功能或运行完成证明"
+    },
+    {
+      "path": "codex-rs/file-system/Cargo.toml",
+      "package": "codex-file-system",
+      "sha256": "bfac049ecd1d56c085f7030bdc59125df22a256f54b055e168c944a12eca6933",
+      "meaning": "源码构成索引，非单项功能或运行完成证明"
+    },
+    {
+      "path": "codex-rs/exec-server-protocol/Cargo.toml",
+      "package": "codex-exec-server-protocol",
+      "sha256": "50c8fa5ab4cdaaa95334794ea9817b289c6fa0bcd621de3c18348e7dae21dc56",
+      "meaning": "源码构成索引，非单项功能或运行完成证明"
+    },
+    {
+      "path": "codex-rs/exec-server/Cargo.toml",
+      "package": "codex-exec-server",
+      "sha256": "083817da36c4fac2215dd6a5a8d80c1d9a5599b214f329064774457182937f30",
+      "meaning": "源码构成索引，非单项功能或运行完成证明"
+    },
+    {
+      "path": "codex-rs/exec-server/tests/support/Cargo.toml",
+      "package": "codex-exec-server-test-support",
+      "sha256": "9bec1539cc8fc173c4691863ca16386b3b0f683402160219bea89d2ef0db9048",
+      "meaning": "源码构成索引，非单项功能或运行完成证明"
+    },
+    {
+      "path": "codex-rs/execpolicy/Cargo.toml",
+      "package": "codex-execpolicy",
+      "sha256": "a30850d1134be2b9a37a15d383d1cf7a3df72c81c3a4b970bcfac8bf15528e94",
+      "meaning": "源码构成索引，非单项功能或运行完成证明"
+    },
+    {
+      "path": "codex-rs/ext/agent/Cargo.toml",
+      "package": "codex-agent-extension",
+      "sha256": "684fe7c7a41900dd8c394b6cee6d1fcfd206a44c661811f356c846dcc07d51db",
+      "meaning": "源码构成索引，非单项功能或运行完成证明"
+    },
+    {
+      "path": "codex-rs/ext/agent-message-board/Cargo.toml",
+      "package": "codex-agent-message-board-extension",
+      "sha256": "e7dc5be42cfa562473924bd69d64359a7ca8344e8170edd3289cecfd3f4abd76",
+      "meaning": "源码构成索引，非单项功能或运行完成证明"
+    },
+    {
+      "path": "codex-rs/ext/connectors/Cargo.toml",
+      "package": "codex-connectors-extension",
+      "sha256": "d0dd96da7c42189b2e5a3c6976a54b565b02441bd2f4979652e3192b30b279a8",
+      "meaning": "源码构成索引，非单项功能或运行完成证明"
+    },
+    {
+      "path": "codex-rs/ext/extension-api/Cargo.toml",
+      "package": "codex-extension-api",
+      "sha256": "90497378f10aec84d0480c57801d39cefdec36b3a8ab17320c8fb703412aee43",
+      "meaning": "源码构成索引，非单项功能或运行完成证明"
+    },
+    {
+      "path": "codex-rs/ext/multi-env-copy-file/Cargo.toml",
+      "package": "codex-multi-env-copy-file",
+      "sha256": "f4f2dff49722e519964d7921390708bec5e486c02dbe9b25721f4d2825d95c90",
+      "meaning": "源码构成索引，非单项功能或运行完成证明"
+    },
+    {
+      "path": "codex-rs/ext/goal/Cargo.toml",
+      "package": "codex-goal-extension",
+      "sha256": "e03430bf9732d45b9aaebe6969d4a90e63daf348107f4b74bf227dfb38e33454",
+      "meaning": "源码构成索引，非单项功能或运行完成证明"
+    },
+    {
+      "path": "codex-rs/ext/git-attribution/Cargo.toml",
+      "package": "codex-git-attribution",
+      "sha256": "15e8f2143ff99c657b40045c9b0609dd93f89b55cc37a95039b9aed89f5e6687",
+      "meaning": "源码构成索引，非单项功能或运行完成证明"
+    },
+    {
+      "path": "codex-rs/ext/guardian-reviewer/Cargo.toml",
+      "package": "codex-guardian-reviewer",
+      "sha256": "1eed62189d9f282ff45b464cdb505916951c95ece9eefff46c0b4eda08416717",
+      "meaning": "源码构成索引，非单项功能或运行完成证明"
+    },
+    {
+      "path": "codex-rs/ext/guardian-v2/Cargo.toml",
+      "package": "codex-guardian-v2",
+      "sha256": "82aedeb1e33025705c1f0b2985fafd9e6b0b318833772a652149df5c4118e005",
+      "meaning": "源码构成索引，非单项功能或运行完成证明"
+    },
+    {
+      "path": "codex-rs/ext/guardian-v3/Cargo.toml",
+      "package": "codex-guardian-v3",
+      "sha256": "30277629dd4229212150877d593a4336c3a2ce5a5252e998566b845d1ab881c8",
+      "meaning": "源码构成索引，非单项功能或运行完成证明"
+    },
+    {
+      "path": "codex-rs/ext/history-notes/Cargo.toml",
+      "package": "codex-history-notes-extension",
+      "sha256": "758c79a48e49cb02ad814d8b64278043531ce2b488480407ade064db3a5503d6",
+      "meaning": "源码构成索引，非单项功能或运行完成证明"
+    },
+    {
+      "path": "codex-rs/ext/image-generation/Cargo.toml",
+      "package": "codex-image-generation-extension",
+      "sha256": "98a5e190316d02b87da99379358637be53cd40499830554068ecdb25ccad6147",
+      "meaning": "源码构成索引，非单项功能或运行完成证明"
+    },
+    {
+      "path": "codex-rs/ext/items/Cargo.toml",
+      "package": "codex-extension-items",
+      "sha256": "bbb3630e5a2dd711a1ff6d118e095a062606afaa5ca970316d668114d45d7df5",
+      "meaning": "源码构成索引，非单项功能或运行完成证明"
+    },
+    {
+      "path": "codex-rs/ext/memories/Cargo.toml",
+      "package": "codex-memories-extension",
+      "sha256": "b53ffe9567465a01a696bb0de03bcc9c3fcaa0052a0aab794143a025c778526c",
+      "meaning": "源码构成索引，非单项功能或运行完成证明"
+    },
+    {
+      "path": "codex-rs/ext/mcp/Cargo.toml",
+      "package": "codex-mcp-extension",
+      "sha256": "2a9619bae381bdf9059a7fd731ece652e73ea99547a9785837bc5fa1b448cbc5",
+      "meaning": "源码构成索引，非单项功能或运行完成证明"
+    },
+    {
+      "path": "codex-rs/ext/queue/Cargo.toml",
+      "package": "codex-queue-extension",
+      "sha256": "d7553e62f33e7cf4feb38f5f21b5e0c628773584340479dfa8155fca8886639e",
+      "meaning": "源码构成索引，非单项功能或运行完成证明"
+    },
+    {
+      "path": "codex-rs/ext/skills/Cargo.toml",
+      "package": "codex-skills-extension",
+      "sha256": "f9813629c60f14b59b7477dd2ea038c994fc6f7401b5951a4572270a3a1d9949",
+      "meaning": "源码构成索引，非单项功能或运行完成证明"
+    },
+    {
+      "path": "codex-rs/ext/web-search/Cargo.toml",
+      "package": "codex-web-search-extension",
+      "sha256": "b74df62ad7dd3159d96f68b3be17c8804cfc4ec280fbbfd9df06ab4326cfe9e4",
+      "meaning": "源码构成索引，非单项功能或运行完成证明"
+    },
+    {
+      "path": "codex-rs/external-agent-migration/Cargo.toml",
+      "package": "codex-external-agent-migration",
+      "sha256": "762a2915a42cbab1e1e4035bb9a3d0f66608a985010549c8b157699d2a498744",
+      "meaning": "源码构成索引，非单项功能或运行完成证明"
+    },
+    {
+      "path": "codex-rs/keyring-store/Cargo.toml",
+      "package": "codex-keyring-store",
+      "sha256": "6a6a49f225ecefe5b2d5c85e7b667001113363a4b75e4c30427c8e17adff1dc6",
+      "meaning": "源码构成索引，非单项功能或运行完成证明"
+    },
+    {
+      "path": "codex-rs/file-search/Cargo.toml",
+      "package": "codex-file-search",
+      "sha256": "ac012c6347e727e2a7a9cb927eec9fe4ece2c17a38474f7efa0563d3adbc98d4",
+      "meaning": "源码构成索引，非单项功能或运行完成证明"
+    },
+    {
+      "path": "codex-rs/file-watcher/Cargo.toml",
+      "package": "codex-file-watcher",
+      "sha256": "901925f6f2141e4f9e70e4ad1850bab4f26826a232b3dbca7a15666716b8a535",
+      "meaning": "源码构成索引，非单项功能或运行完成证明"
+    },
+    {
+      "path": "codex-rs/linux-sandbox/Cargo.toml",
+      "package": "codex-linux-sandbox",
+      "sha256": "7cbb24a865c6aec28e381fbbd75786cb73b99218666d36e5e95925a63312dea9",
+      "meaning": "源码构成索引，非单项功能或运行完成证明"
+    },
+    {
+      "path": "codex-rs/lmstudio/Cargo.toml",
+      "package": "codex-lmstudio",
+      "sha256": "f90889e3a31ae28b860e6a86da3d1fb9941f5b2232f82d42e178a777432cac48",
+      "meaning": "源码构成索引，非单项功能或运行完成证明"
+    },
+    {
+      "path": "codex-rs/login/Cargo.toml",
+      "package": "codex-login",
+      "sha256": "56f70c2fa40e353ead788e74077b5b25e3f6707f8809b1f9af95aef69ec51673",
+      "meaning": "源码构成索引，非单项功能或运行完成证明"
+    },
+    {
+      "path": "codex-rs/codex-mcp/Cargo.toml",
+      "package": "codex-mcp",
+      "sha256": "381061f4e435d5360e5c10e08bea6389ac2c6bed68b1563f83944192184ed3ba",
+      "meaning": "源码构成索引，非单项功能或运行完成证明"
+    },
+    {
+      "path": "codex-rs/memories/read/Cargo.toml",
+      "package": "codex-memories-read",
+      "sha256": "e51d8384f3a844f0687b9ea4864e19286b3fec7edfee69bd365cd02fd42886b5",
+      "meaning": "源码构成索引，非单项功能或运行完成证明"
+    },
+    {
+      "path": "codex-rs/memories/write/Cargo.toml",
+      "package": "codex-memories-write",
+      "sha256": "2ce09ca433559076a62b478f42c5a820a531c79811834bc2084b48e12f1276c1",
+      "meaning": "源码构成索引，非单项功能或运行完成证明"
+    },
+    {
+      "path": "codex-rs/mermaid/Cargo.toml",
+      "package": "codex-mermaid",
+      "sha256": "ceab314f8c1be29d0483813175f304e7114fb40442a66dbc2f3235a770432f67",
+      "meaning": "源码构成索引，非单项功能或运行完成证明"
+    },
+    {
+      "path": "codex-rs/message-board/Cargo.toml",
+      "package": "codex-message-board",
+      "sha256": "99547943eddb40ea7dad03e11a90814ad0e50717ccf794e1ea66c8ae3c0eca57",
+      "meaning": "源码构成索引，非单项功能或运行完成证明"
+    },
+    {
+      "path": "codex-rs/model-provider-info/Cargo.toml",
+      "package": "codex-model-provider-info",
+      "sha256": "901ee4b68854f0f43a16ff97b7d5806ddcfb90f8488e0c46595e739effb91adc",
+      "meaning": "源码构成索引，非单项功能或运行完成证明"
+    },
+    {
+      "path": "codex-rs/mxc-sandbox/Cargo.toml",
+      "package": "codex-mxc-sandbox",
+      "sha256": "fdc1865fda5f33a0ddb5caa9ff4e03b37cb33e94396da1a5e85e15dc98648051",
+      "meaning": "源码构成索引，非单项功能或运行完成证明"
+    },
+    {
+      "path": "codex-rs/models-manager/Cargo.toml",
+      "package": "codex-models-manager",
+      "sha256": "843d1a014174611f14256305ba2fcdcb1a0e150620a8a513bd20a4bef5648847",
+      "meaning": "源码构成索引，非单项功能或运行完成证明"
+    },
+    {
+      "path": "codex-rs/network-proxy/Cargo.toml",
+      "package": "codex-network-proxy",
+      "sha256": "5f69cb801de00de161c74ff3ee663531bc39bc48b8df2939597876b1ea7434dd",
+      "meaning": "源码构成索引，非单项功能或运行完成证明"
+    },
+    {
+      "path": "codex-rs/ollama/Cargo.toml",
+      "package": "codex-ollama",
+      "sha256": "4acd659c88671e6be1ce2be7b2920977c221461245b198c81c195197789ce2eb",
+      "meaning": "源码构成索引，非单项功能或运行完成证明"
+    },
+    {
+      "path": "codex-rs/process-hardening/Cargo.toml",
+      "package": "codex-process-hardening",
+      "sha256": "93c8131ae5485a66d16cff10dd254bf56bd49fd33235399cd5f59ccf0d75396d",
+      "meaning": "源码构成索引，非单项功能或运行完成证明"
+    },
+    {
+      "path": "codex-rs/realtime-webrtc/Cargo.toml",
+      "package": "codex-realtime-webrtc",
+      "sha256": "ba4f869d40ef25beea5e2ea534c3951ca155e545541208bfb2810f378778a1ea",
+      "meaning": "源码构成索引，非单项功能或运行完成证明"
+    },
+    {
+      "path": "codex-rs/voice-host/Cargo.toml",
+      "package": "codex-voice-host",
+      "sha256": "cc697897a4d9dbe53d24855dc579be170ae75b11471a76a2e0a6fcbb3d5b5bb2",
+      "meaning": "源码构成索引，非单项功能或运行完成证明"
+    },
+    {
+      "path": "codex-rs/protocol/Cargo.toml",
+      "package": "codex-protocol",
+      "sha256": "28a9261377f22f25a63214400e22741360f57354792d92f6cdb000286fb4842a",
+      "meaning": "源码构成索引，非单项功能或运行完成证明"
+    },
+    {
+      "path": "codex-rs/protocol/tests/support/Cargo.toml",
+      "package": "codex-protocol-test-support",
+      "sha256": "225cc5bc62c6fd4a25cc3d956449c3095d8bc47830dc724665da1575c1ff9ccc",
+      "meaning": "源码构成索引，非单项功能或运行完成证明"
+    },
+    {
+      "path": "codex-rs/prompts/Cargo.toml",
+      "package": "codex-prompts",
+      "sha256": "baaa046a96d07be4184fb29bdd52037a3c3853673155b4527e975720bc40e356",
+      "meaning": "源码构成索引，非单项功能或运行完成证明"
+    },
+    {
+      "path": "codex-rs/rollout/Cargo.toml",
+      "package": "codex-rollout",
+      "sha256": "00c45c4d4f5c0467c00f2373f3e6ba45e8cb5432958add0293c47b6721dc0e52",
+      "meaning": "源码构成索引，非单项功能或运行完成证明"
+    },
+    {
+      "path": "codex-rs/rollout-trace/Cargo.toml",
+      "package": "codex-rollout-trace",
+      "sha256": "0e50b3709f7bedc71aa9ce54aa9bb7f1d9ac2a7dbc11e3bfd6ac03b103d8bc00",
+      "meaning": "源码构成索引，非单项功能或运行完成证明"
+    },
+    {
+      "path": "codex-rs/rmcp-client/Cargo.toml",
+      "package": "codex-rmcp-client",
+      "sha256": "1d27143238c12d32abfff50eafeaea0feac6d338a2d8bf1300c4f07c75d07836",
+      "meaning": "源码构成索引，非单项功能或运行完成证明"
+    },
+    {
+      "path": "codex-rs/responses-api-proxy/Cargo.toml",
+      "package": "codex-responses-api-proxy",
+      "sha256": "309132cf3397dd411055bcc56d33987b653f38b530033d09b69ca5308650938b",
+      "meaning": "源码构成索引，非单项功能或运行完成证明"
+    },
+    {
+      "path": "codex-rs/runtime-agent-instance/Cargo.toml",
+      "package": "codex-runtime-agent-instance",
+      "sha256": "e2608f237bec6c3a27bff7dbc2eca6ab315c25a2f47884e71b4168bc271bcbd0",
+      "meaning": "源码构成索引，非单项功能或运行完成证明"
+    },
+    {
+      "path": "codex-rs/response-debug-context/Cargo.toml",
+      "package": "codex-response-debug-context",
+      "sha256": "a6075edb089d3c6ab4588c5cf17604e15827821d67320508344e0af5a9c49070",
+      "meaning": "源码构成索引，非单项功能或运行完成证明"
+    },
+    {
+      "path": "codex-rs/sandboxing/Cargo.toml",
+      "package": "codex-sandboxing",
+      "sha256": "24d17ffd9c5d3f9667738ba0ed0111f4398f2d67c0cb015ca6426300758eab7c",
+      "meaning": "源码构成索引，非单项功能或运行完成证明"
+    },
+    {
+      "path": "codex-rs/stdio-to-uds/Cargo.toml",
+      "package": "codex-stdio-to-uds",
+      "sha256": "86bc7744cb3455915a0dca21bdf9b95b1f446c03eee70dccda8ade7497ee1510",
+      "meaning": "源码构成索引，非单项功能或运行完成证明"
+    },
+    {
+      "path": "codex-rs/otel/Cargo.toml",
+      "package": "codex-otel",
+      "sha256": "02b7e6d1e204279c6aef6aef6d2c653ad69483ba138efb2ad536b686b67661ff",
+      "meaning": "源码构成索引，非单项功能或运行完成证明"
+    },
+    {
+      "path": "codex-rs/otel-trace-websocket/Cargo.toml",
+      "package": "codex-otel-trace-websocket",
+      "sha256": "61b323decc2b50de473480971f498a580e3c89574530743bef685f33febde7bf",
+      "meaning": "源码构成索引，非单项功能或运行完成证明"
+    },
+    {
+      "path": "codex-rs/tcp-tunnel/Cargo.toml",
+      "package": "codex-tcp-tunnel",
+      "sha256": "28342e9cc76b554fde97237814d2ac1d46fa45cb39d280a7a23aecb23c4751ff",
+      "meaning": "源码构成索引，非单项功能或运行完成证明"
+    },
+    {
+      "path": "codex-rs/tui/Cargo.toml",
+      "package": "codex-tui",
+      "sha256": "1eb18f1181bf947cee297f229517e66f687f491cb7068979fc20f60b476b4ca8",
+      "meaning": "源码构成索引，非单项功能或运行完成证明"
+    },
+    {
+      "path": "codex-rs/user-verification/Cargo.toml",
+      "package": "codex-user-verification",
+      "sha256": "a58cf92913a7bd187ab2f0b1692065b2c5229e086aba64554951926b782262a2",
+      "meaning": "源码构成索引，非单项功能或运行完成证明"
+    },
+    {
+      "path": "codex-rs/tools/Cargo.toml",
+      "package": "codex-tools",
+      "sha256": "eb88752b688512bcc000666abe5ca7c03e1aea805e5208871ed27ec6b26c4027",
+      "meaning": "源码构成索引，非单项功能或运行完成证明"
+    },
+    {
+      "path": "codex-rs/v8-poc/Cargo.toml",
+      "package": "codex-v8-poc",
+      "sha256": "e98d307ee1683087debb02cf5fba46cc1a23177a25cd6b03f74f1539239312c9",
+      "meaning": "源码构成索引，非单项功能或运行完成证明"
+    },
+    {
+      "path": "codex-rs/websocket-auth/Cargo.toml",
+      "package": "codex-websocket-auth",
+      "sha256": "899992915b3b1d746389d3c7c5e7a284ea2af9bf819b8544013d9c29f04e708d",
+      "meaning": "源码构成索引，非单项功能或运行完成证明"
+    },
+    {
+      "path": "codex-rs/websocket-client/Cargo.toml",
+      "package": "codex-websocket-client",
+      "sha256": "7575122d37c47bbb011945d68541422dc0122ab7be1374c9bc9c78ec56a74231",
+      "meaning": "源码构成索引，非单项功能或运行完成证明"
+    },
+    {
+      "path": "codex-rs/windows-sandbox-rs/tests/support/Cargo.toml",
+      "package": "codex-windows-sandbox-test-support",
+      "sha256": "ada0b514811022b794d23c714596c346e857160a7f29879faf4827aa079a504b",
+      "meaning": "源码构成索引，非单项功能或运行完成证明"
+    },
+    {
+      "path": "codex-rs/windows-sandbox-service/Cargo.toml",
+      "package": "codex-windows-sandbox-service",
+      "sha256": "357db7d43d81a2d6cd015acfe29f1fc6d5c56e57a3397fe026e16d70e230397a",
+      "meaning": "源码构成索引，非单项功能或运行完成证明"
+    },
+    {
+      "path": "codex-rs/worktree/Cargo.toml",
+      "package": "codex-worktree",
+      "sha256": "9d62ce3cda20191520e11f0d0dbc13a9a3c67d15f64a0261637698365039ab4f",
+      "meaning": "源码构成索引，非单项功能或运行完成证明"
+    },
+    {
+      "path": "codex-rs/workload-identity/Cargo.toml",
+      "package": "codex-workload-identity",
+      "sha256": "347f3a72058b81058498c83529b69d01a1055384ce6021112038193853a0d0fb",
+      "meaning": "源码构成索引，非单项功能或运行完成证明"
+    },
+    {
+      "path": "codex-rs/utils/absolute-path/Cargo.toml",
+      "package": "codex-utils-absolute-path",
+      "sha256": "ad98dc1a75333700db00f6bde0685ce7a3e0f5558b0520e7a09e9bbcc6576736",
+      "meaning": "源码构成索引，非单项功能或运行完成证明"
+    },
+    {
+      "path": "codex-rs/utils/audio/Cargo.toml",
+      "package": "codex-utils-audio",
+      "sha256": "a8bd5661a23ac093df6f9a307dc9e440201e7bf7995044dbfc632869f62914c0",
+      "meaning": "源码构成索引，非单项功能或运行完成证明"
+    },
+    {
+      "path": "codex-rs/utils/path-uri/Cargo.toml",
+      "package": "codex-utils-path-uri",
+      "sha256": "d45031c71d6dbcf8c7770ce1feebabbc2f3224841c5eb770d9e2dc70d19d9d20",
+      "meaning": "源码构成索引，非单项功能或运行完成证明"
+    },
+    {
+      "path": "codex-rs/utils/cargo-bin/Cargo.toml",
+      "package": "codex-utils-cargo-bin",
+      "sha256": "eecb409357a98472df8a81d9fd1a25902b967433f4df3403cf213f07e68f8786",
+      "meaning": "源码构成索引，非单项功能或运行完成证明"
+    },
+    {
+      "path": "codex-rs/git-utils/Cargo.toml",
+      "package": "codex-git-utils",
+      "sha256": "f30878ea0371fdebc17efc37199c561f225f52783ae0815c0ef79ec6706a0bdc",
+      "meaning": "源码构成索引，非单项功能或运行完成证明"
+    },
+    {
+      "path": "codex-rs/utils/cache/Cargo.toml",
+      "package": "codex-utils-cache",
+      "sha256": "79bf902f30726d663ca11ab7dad4bcd617de94b36baaeb33016d188ec06ebe89",
+      "meaning": "源码构成索引，非单项功能或运行完成证明"
+    },
+    {
+      "path": "codex-rs/utils/critical-path/Cargo.toml",
+      "package": "codex-utils-critical-path",
+      "sha256": "010d1017a6c878f9119c877007c1512e465daa6f817e3978dd0f96bde2fc5bbd",
+      "meaning": "源码构成索引，非单项功能或运行完成证明"
+    },
+    {
+      "path": "codex-rs/utils/git-discovery/Cargo.toml",
+      "package": "codex-utils-git-discovery",
+      "sha256": "79bb0d98647a830492dda425dca98b6a5f89a62841db9824a339502dbcd2cb51",
+      "meaning": "源码构成索引，非单项功能或运行完成证明"
+    },
+    {
+      "path": "codex-rs/utils/head-tail-buffer/Cargo.toml",
+      "package": "codex-utils-head-tail-buffer",
+      "sha256": "527803e5e2bd7453d3478499f660cd4d0e243b7ac1b06751baf0e5e708104827",
+      "meaning": "源码构成索引，非单项功能或运行完成证明"
+    },
+    {
+      "path": "codex-rs/utils/image/Cargo.toml",
+      "package": "codex-utils-image",
+      "sha256": "2f84e8c60810db1ec6ae392715d130117b27f6e3b94be089790a1a85221be9bd",
+      "meaning": "源码构成索引，非单项功能或运行完成证明"
+    },
+    {
+      "path": "codex-rs/utils/json-to-toml/Cargo.toml",
+      "package": "codex-utils-json-to-toml",
+      "sha256": "aa9e8d0262bbc8e021f32488083d6d003a83c2bca10186da2d2b17f764bb77f9",
+      "meaning": "源码构成索引，非单项功能或运行完成证明"
+    },
+    {
+      "path": "codex-rs/utils/home-dir/Cargo.toml",
+      "package": "codex-utils-home-dir",
+      "sha256": "9b81719e70c693dc156d90fb43a8d71b328e650ef566816b7bcc8014c4bd8e50",
+      "meaning": "源码构成索引，非单项功能或运行完成证明"
+    },
+    {
+      "path": "codex-rs/utils/process/Cargo.toml",
+      "package": "codex-utils-process",
+      "sha256": "f7c5bbba88c3f9166a31bfd68d39ec215861db67028becb2a34b782a73b22bf0",
+      "meaning": "源码构成索引，非单项功能或运行完成证明"
+    },
+    {
+      "path": "codex-rs/utils/pty/Cargo.toml",
+      "package": "codex-utils-pty",
+      "sha256": "bacf71d7afedb321054493d7353ea3c2f04eb0ba609e567fef4b7fec9906a2c4",
+      "meaning": "源码构成索引，非单项功能或运行完成证明"
+    },
+    {
+      "path": "codex-rs/utils/readiness/Cargo.toml",
+      "package": "codex-utils-readiness",
+      "sha256": "fae1bb2669768af1ef70d76bc3b124977110f1969c1a977ea65926cdbb0d5353",
+      "meaning": "源码构成索引，非单项功能或运行完成证明"
+    },
+    {
+      "path": "codex-rs/utils/redacted-string/Cargo.toml",
+      "package": "codex-utils-redacted-string",
+      "sha256": "b4db650414f5dff6c4823eeb5e05be5adb9bbf6bfaf87c5763a475379528d81d",
+      "meaning": "源码构成索引，非单项功能或运行完成证明"
+    },
+    {
+      "path": "codex-rs/utils/rustls-provider/Cargo.toml",
+      "package": "codex-utils-rustls-provider",
+      "sha256": "21fda73b6ea661f3626372e94b16bce766c5278e6c695c92fc490274d4582f33",
+      "meaning": "源码构成索引，非单项功能或运行完成证明"
+    },
+    {
+      "path": "codex-rs/utils/string/Cargo.toml",
+      "package": "codex-utils-string",
+      "sha256": "3d4f0131321ca76f08410c8a3278d1d2373c8a43118fafa5add9bd8fbb8672ff",
+      "meaning": "源码构成索引，非单项功能或运行完成证明"
+    },
+    {
+      "path": "codex-rs/utils/cli/Cargo.toml",
+      "package": "codex-utils-cli",
+      "sha256": "144258eae359f1b20753dcedff9d8c60a5947e261cec4ad97514b1daf1b35ca8",
+      "meaning": "源码构成索引，非单项功能或运行完成证明"
+    },
+    {
+      "path": "codex-rs/utils/elapsed/Cargo.toml",
+      "package": "codex-utils-elapsed",
+      "sha256": "998e972175e47355bcc0f14b326e5c71955bd670a12ab3200890d9168855ff40",
+      "meaning": "源码构成索引，非单项功能或运行完成证明"
+    },
+    {
+      "path": "codex-rs/utils/sandbox-summary/Cargo.toml",
+      "package": "codex-utils-sandbox-summary",
+      "sha256": "f8ee68013858432e2ff468e643345db592988e5482c59998d724deb0311dd58e",
+      "meaning": "源码构成索引，非单项功能或运行完成证明"
+    },
+    {
+      "path": "codex-rs/utils/sleep-inhibitor/Cargo.toml",
+      "package": "codex-utils-sleep-inhibitor",
+      "sha256": "ade46cdb5e13c8986605574caf47745a0b78e5382f847432765c3e3dec347ca8",
+      "meaning": "源码构成索引，非单项功能或运行完成证明"
+    },
+    {
+      "path": "codex-rs/utils/approval-presets/Cargo.toml",
+      "package": "codex-utils-approval-presets",
+      "sha256": "a8a1723c8fc4fef9815fa02f426b1bee8b1e16f43e9382b5fb878c9a603cdaff",
+      "meaning": "源码构成索引，非单项功能或运行完成证明"
+    },
+    {
+      "path": "codex-rs/utils/oss/Cargo.toml",
+      "package": "codex-utils-oss",
+      "sha256": "204e3ba8509541c37b2088dd6c8e596286f502a8990d2655e861c6babcac9b19",
+      "meaning": "源码构成索引，非单项功能或运行完成证明"
+    },
+    {
+      "path": "codex-rs/utils/output-truncation/Cargo.toml",
+      "package": "codex-utils-output-truncation",
+      "sha256": "76ce40f57554264573715e04ab9754cc3ac09fa37091d3abba71a8f22837e45e",
+      "meaning": "源码构成索引，非单项功能或运行完成证明"
+    },
+    {
+      "path": "codex-rs/utils/path-utils/Cargo.toml",
+      "package": "codex-utils-path",
+      "sha256": "71503aeb2195cbcecd60ab50b6cf3bd853ef4db4815d8c966336825591103fea",
+      "meaning": "源码构成索引，非单项功能或运行完成证明"
+    },
+    {
+      "path": "codex-rs/utils/plugins/Cargo.toml",
+      "package": "codex-utils-plugins",
+      "sha256": "2aa0eb685dc9595b71c33740108080bea0f448e3439afee76c75e0701d275a28",
+      "meaning": "源码构成索引，非单项功能或运行完成证明"
+    },
+    {
+      "path": "codex-rs/utils/fuzzy-match/Cargo.toml",
+      "package": "codex-utils-fuzzy-match",
+      "sha256": "d233d52afa20bbf405df269a31a76aeb7fe45de5e6e6bcc872dd331668996fbb",
+      "meaning": "源码构成索引，非单项功能或运行完成证明"
+    },
+    {
+      "path": "codex-rs/utils/stream-parser/Cargo.toml",
+      "package": "codex-utils-stream-parser",
+      "sha256": "d48dda6b4337f17002ae1698fa9a0aeb38df8fd6f35193980396f722afe09fe5",
+      "meaning": "源码构成索引，非单项功能或运行完成证明"
+    },
+    {
+      "path": "codex-rs/utils/template/Cargo.toml",
+      "package": "codex-utils-template",
+      "sha256": "5785b0365d1f99f5d719c8d6b16586fcaadedc373f4342c92aa28a52eb778368",
+      "meaning": "源码构成索引，非单项功能或运行完成证明"
+    },
+    {
+      "path": "codex-rs/codex-client/Cargo.toml",
+      "package": "codex-client",
+      "sha256": "76e3da92b54ed0c96b14be755fe8d072559d2a9ac6f11e82c1979487edb55b25",
+      "meaning": "源码构成索引，非单项功能或运行完成证明"
+    },
+    {
+      "path": "codex-rs/codex-api/Cargo.toml",
+      "package": "codex-api",
+      "sha256": "41fa3554b49fcfa0bfe7473e20fc41bff9a672bb3fc3da9aa4c1f3835c7e1266",
+      "meaning": "源码构成索引，非单项功能或运行完成证明"
+    },
+    {
+      "path": "codex-rs/state/Cargo.toml",
+      "package": "codex-state",
+      "sha256": "1e6d3abbb2baf1a549a7a3cc93b15bf6f748045ef075da7621f95ea42cb50e4e",
+      "meaning": "源码构成索引，非单项功能或运行完成证明"
+    },
+    {
+      "path": "codex-rs/terminal-detection/Cargo.toml",
+      "package": "codex-terminal-detection",
+      "sha256": "d6afc64a36ea33610d0fb4506f9b9fe809105ccde228bfa41c8ed24497dc4546",
+      "meaning": "源码构成索引，非单项功能或运行完成证明"
+    },
+    {
+      "path": "codex-rs/test-binary-support/Cargo.toml",
+      "package": "codex-test-binary-support",
+      "sha256": "72707d0f0238886c11269f3a9bf28fab63107120c13477e4e34b798add3dc9c5",
+      "meaning": "源码构成索引，非单项功能或运行完成证明"
+    },
+    {
+      "path": "codex-rs/thread-manager-sample/Cargo.toml",
+      "package": "codex-thread-manager-sample",
+      "sha256": "502a50a536c149f205579a25ba8175d0ba35a657810ff7a9a85dfb3af21dfd9a",
+      "meaning": "源码构成索引，非单项功能或运行完成证明"
+    },
+    {
+      "path": "codex-rs/thread-store/Cargo.toml",
+      "package": "codex-thread-store",
+      "sha256": "2abe7eb1f6e1a5c48a7364b2453296840ad27f911b43f9c9601f353a72227853",
+      "meaning": "源码构成索引，非单项功能或运行完成证明"
+    },
+    {
+      "path": "codex-rs/uds/Cargo.toml",
+      "package": "codex-uds",
+      "sha256": "9d12d74d08723dd5ff1ac2cf1998e79b03a5de65cb4c014e90b225167405577c",
+      "meaning": "源码构成索引，非单项功能或运行完成证明"
+    },
+    {
+      "path": "codex-rs/codex-experimental-api-macros/Cargo.toml",
+      "package": "codex-experimental-api-macros",
+      "sha256": "b8fcf3a548dfb052195e49969073aa22d8a2e0948d46732598cbeaaf9826f10b",
+      "meaning": "源码构成索引，非单项功能或运行完成证明"
+    },
+    {
+      "path": "codex-rs/plugin/Cargo.toml",
+      "package": "codex-plugin",
+      "sha256": "1032b4bf35e2a8426d07840a371f09a48bc568cac97292b4a29dfeac6838a088",
+      "meaning": "源码构成索引，非单项功能或运行完成证明"
+    },
+    {
+      "path": "codex-rs/model-provider/Cargo.toml",
+      "package": "codex-model-provider",
+      "sha256": "db38085ac58979599b551c8160ebd3dfbe942b4985a44ec449bccf297f111342",
+      "meaning": "源码构成索引，非单项功能或运行完成证明"
+    }
+  ],
+  "cli_source": {
+    "path": "codex-rs/cli/src/main.rs",
+    "sha256": "ac51c153916132c0be2c37ea1136562685b832957bc2e43e53d71608d0b28a4a",
+    "top_level_commands": 31
+  }
+}

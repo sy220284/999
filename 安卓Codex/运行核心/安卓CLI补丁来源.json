@@ -1,0 +1,16 @@
+{
+  "source_commit": "970111f6cb62cc02fe36a82ea7d71b37a2889c97",
+  "patch_sha256": "4d7014729c2c39c78742c6d8ea0830737b126885838f74ea1c3633535c7f0058",
+  "files": [
+    {
+      "path": "codex-rs/cloud-tasks/src/cli.rs",
+      "before": "9ffbf4e43e12986a3ade28f05bc3d70e80d2860314f32ace7b3060148bc2fbaa",
+      "after": "2e5d3ba7a4888831a736f2281854d80bb13a63390addb8d711f866cd30da432f"
+    },
+    {
+      "path": "codex-rs/cloud-tasks/src/lib.rs",
+      "before": "1bf8b6ce1d24dabe0653ebdb4aa6bc0db72cf657dfd58227db429c3f5f0672ab",
+      "after": "f167787e8e446d593f8b82332088f370140d99b05e1be4a441eccfe3906890dc"
+    }
+  ]
+}

@@ -1,0 +1,1650 @@
+[
+  {
+    "kind": "客户端请求",
+    "method": "initialize",
+    "status": "调用及界面代码已接入，未运行验证",
+    "entry": "core/src/main/kotlin/cn/codex/core/original/OriginalCodexClient.kt",
+    "phase": "待运行验证/继续语义审阅",
+    "validation": "未运行验证"
+  },
+  {
+    "kind": "客户端请求",
+    "method": "thread/start",
+    "status": "调用及界面代码已接入，未运行验证",
+    "entry": "core/src/main/kotlin/cn/codex/core/original/OriginalCodexClient.kt",
+    "phase": "待运行验证/继续语义审阅",
+    "validation": "未运行验证"
+  },
+  {
+    "kind": "客户端请求",
+    "method": "thread/resume",
+    "status": "调用及界面代码已接入，未运行验证",
+    "entry": "core/src/main/kotlin/cn/codex/core/original/OriginalCodexClient.kt",
+    "phase": "待运行验证/继续语义审阅",
+    "validation": "未运行验证"
+  },
+  {
+    "kind": "客户端请求",
+    "method": "thread/fork",
+    "status": "调用及界面代码已接入，未运行验证",
+    "entry": "core/src/main/kotlin/cn/codex/core/original/OriginalCodexClient.kt",
+    "phase": "待运行验证/继续语义审阅",
+    "validation": "未运行验证"
+  },
+  {
+    "kind": "客户端请求",
+    "method": "thread/archive",
+    "status": "调用及界面代码已接入，未运行验证",
+    "entry": "core/src/main/kotlin/cn/codex/core/original/OriginalCodexClient.kt",
+    "phase": "待运行验证/继续语义审阅",
+    "validation": "未运行验证"
+  },
+  {
+    "kind": "客户端请求",
+    "method": "thread/delete",
+    "status": "调用及界面代码已接入，未运行验证",
+    "entry": "core/src/main/kotlin/cn/codex/core/original/OriginalCodexClient.kt",
+    "phase": "待运行验证/继续语义审阅",
+    "validation": "未运行验证"
+  },
+  {
+    "kind": "客户端请求",
+    "method": "thread/unsubscribe",
+    "status": "调用及界面代码已接入，未运行验证",
+    "entry": "core/src/main/kotlin/cn/codex/core/original/OriginalCodexClient.kt",
+    "phase": "待运行验证/继续语义审阅",
+    "validation": "未运行验证"
+  },
+  {
+    "kind": "客户端请求",
+    "method": "thread/name/set",
+    "status": "调用及界面代码已接入，未运行验证",
+    "entry": "core/src/main/kotlin/cn/codex/core/original/OriginalCodexClient.kt",
+    "phase": "待运行验证/继续语义审阅",
+    "validation": "未运行验证"
+  },
+  {
+    "kind": "客户端请求",
+    "method": "thread/goal/set",
+    "status": "调用及界面代码已接入，未运行验证",
+    "entry": "core/src/main/kotlin/cn/codex/core/original/OriginalCodexClient.kt",
+    "phase": "待运行验证/继续语义审阅",
+    "validation": "未运行验证"
+  },
+  {
+    "kind": "客户端请求",
+    "method": "thread/goal/get",
+    "status": "调用及界面代码已接入，未运行验证",
+    "entry": "core/src/main/kotlin/cn/codex/core/original/OriginalCodexClient.kt",
+    "phase": "待运行验证/继续语义审阅",
+    "validation": "未运行验证"
+  },
+  {
+    "kind": "客户端请求",
+    "method": "thread/goal/clear",
+    "status": "调用及界面代码已接入，未运行验证",
+    "entry": "core/src/main/kotlin/cn/codex/core/original/OriginalCodexClient.kt",
+    "phase": "待运行验证/继续语义审阅",
+    "validation": "未运行验证"
+  },
+  {
+    "kind": "客户端请求",
+    "method": "thread/metadata/update",
+    "status": "调用及界面代码已接入，未运行验证",
+    "entry": "core/src/main/kotlin/cn/codex/core/original/OriginalCodexClient.kt;app/src/main/java/cn/codex/android/OriginalCoreHost.kt;app/src/main/java/cn/codex/android/OriginalSessionScreen.kt",
+    "phase": "待运行验证/继续语义审阅",
+    "validation": "未运行验证"
+  },
+  {
+    "kind": "客户端请求",
+    "method": "thread/attachment/add",
+    "status": "调用及界面代码已接入，未运行验证",
+    "entry": "core/src/main/kotlin/cn/codex/core/original/OriginalCodexClient.kt",
+    "phase": "待运行验证/继续语义审阅",
+    "validation": "未运行验证"
+  },
+  {
+    "kind": "客户端请求",
+    "method": "thread/attachment/list",
+    "status": "调用及界面代码已接入，未运行验证",
+    "entry": "core/src/main/kotlin/cn/codex/core/original/OriginalCodexClient.kt",
+    "phase": "待运行验证/继续语义审阅",
+    "validation": "未运行验证"
+  },
+  {
+    "kind": "客户端请求",
+    "method": "thread/attachmentOwner/list",
+    "status": "调用及界面代码已接入，未运行验证",
+    "entry": "core/src/main/kotlin/cn/codex/core/original/OriginalCodexClient.kt;app/src/main/java/cn/codex/android/OriginalCoreHost.kt;app/src/main/java/cn/codex/android/OriginalSessionScreen.kt",
+    "phase": "待运行验证/继续语义审阅",
+    "validation": "未运行验证"
+  },
+  {
+    "kind": "客户端请求",
+    "method": "thread/attachment/remove",
+    "status": "调用及界面代码已接入，未运行验证",
+    "entry": "core/src/main/kotlin/cn/codex/core/original/OriginalCodexClient.kt",
+    "phase": "待运行验证/继续语义审阅",
+    "validation": "未运行验证"
+  },
+  {
+    "kind": "客户端请求",
+    "method": "thread/section/move",
+    "status": "调用及界面代码已接入，未运行验证",
+    "entry": "core/src/main/kotlin/cn/codex/core/original/OriginalCodexClient.kt",
+    "phase": "待运行验证/继续语义审阅",
+    "validation": "未运行验证"
+  },
+  {
+    "kind": "客户端请求",
+    "method": "thread/unarchive",
+    "status": "调用及界面代码已接入，未运行验证",
+    "entry": "core/src/main/kotlin/cn/codex/core/original/OriginalCodexClient.kt",
+    "phase": "待运行验证/继续语义审阅",
+    "validation": "未运行验证"
+  },
+  {
+    "kind": "客户端请求",
+    "method": "thread/compact/start",
+    "status": "调用及界面代码已接入，未运行验证",
+    "entry": "core/src/main/kotlin/cn/codex/core/original/OriginalCodexClient.kt",
+    "phase": "待运行验证/继续语义审阅",
+    "validation": "未运行验证"
+  },
+  {
+    "kind": "客户端请求",
+    "method": "thread/shellCommand",
+    "status": "调用及界面代码已接入，未运行验证",
+    "entry": "core/src/main/kotlin/cn/codex/core/original/OriginalCodexClient.kt;app/src/main/java/cn/codex/android/OriginalCoreHost.kt;app/src/main/java/cn/codex/android/OriginalThreadAdvanced.kt",
+    "phase": "待运行验证/继续语义审阅",
+    "validation": "未运行验证"
+  },
+  {
+    "kind": "客户端请求",
+    "method": "thread/approveGuardianDeniedAction",
+    "status": "调用及界面代码已接入，未运行验证",
+    "entry": "core/src/main/kotlin/cn/codex/core/original/OriginalCodexClient.kt;app/src/main/java/cn/codex/android/OriginalCoreHost.kt;app/src/main/java/cn/codex/android/OriginalThreadAdvanced.kt",
+    "phase": "待运行验证/继续语义审阅",
+    "validation": "未运行验证"
+  },
+  {
+    "kind": "客户端请求",
+    "method": "thread/revert",
+    "status": "调用及界面代码已接入，未运行验证",
+    "entry": "core/src/main/kotlin/cn/codex/core/original/OriginalCodexClient.kt",
+    "phase": "待运行验证/继续语义审阅",
+    "validation": "未运行验证"
+  },
+  {
+    "kind": "客户端请求",
+    "method": "thread/list",
+    "status": "调用及界面代码已接入，未运行验证",
+    "entry": "core/src/main/kotlin/cn/codex/core/original/OriginalCodexClient.kt",
+    "phase": "待运行验证/继续语义审阅",
+    "validation": "未运行验证"
+  },
+  {
+    "kind": "客户端请求",
+    "method": "threadSection/list",
+    "status": "调用及界面代码已接入，未运行验证",
+    "entry": "core/src/main/kotlin/cn/codex/core/original/OriginalCodexClient.kt",
+    "phase": "待运行验证/继续语义审阅",
+    "validation": "未运行验证"
+  },
+  {
+    "kind": "客户端请求",
+    "method": "threadSection/create",
+    "status": "调用及界面代码已接入，未运行验证",
+    "entry": "core/src/main/kotlin/cn/codex/core/original/OriginalCodexClient.kt",
+    "phase": "待运行验证/继续语义审阅",
+    "validation": "未运行验证"
+  },
+  {
+    "kind": "客户端请求",
+    "method": "threadSection/update",
+    "status": "调用及界面代码已接入，未运行验证",
+    "entry": "core/src/main/kotlin/cn/codex/core/original/OriginalCodexClient.kt",
+    "phase": "待运行验证/继续语义审阅",
+    "validation": "未运行验证"
+  },
+  {
+    "kind": "客户端请求",
+    "method": "threadSection/delete",
+    "status": "调用及界面代码已接入，未运行验证",
+    "entry": "core/src/main/kotlin/cn/codex/core/original/OriginalCodexClient.kt",
+    "phase": "待运行验证/继续语义审阅",
+    "validation": "未运行验证"
+  },
+  {
+    "kind": "客户端请求",
+    "method": "thread/loaded/list",
+    "status": "调用及界面代码已接入，未运行验证",
+    "entry": "core/src/main/kotlin/cn/codex/core/original/OriginalCodexClient.kt;app/src/main/java/cn/codex/android/OriginalCoreHost.kt;app/src/main/java/cn/codex/android/OriginalSessionScreen.kt",
+    "phase": "待运行验证/继续语义审阅",
+    "validation": "未运行验证"
+  },
+  {
+    "kind": "客户端请求",
+    "method": "thread/read",
+    "status": "调用及界面代码已接入，未运行验证",
+    "entry": "core/src/main/kotlin/cn/codex/core/original/OriginalCodexClient.kt",
+    "phase": "待运行验证/继续语义审阅",
+    "validation": "未运行验证"
+  },
+  {
+    "kind": "客户端请求",
+    "method": "thread/turns/list",
+    "status": "调用及界面代码已接入，未运行验证",
+    "entry": "core/src/main/kotlin/cn/codex/core/original/OriginalCodexClient.kt",
+    "phase": "待运行验证/继续语义审阅",
+    "validation": "未运行验证"
+  },
+  {
+    "kind": "客户端请求",
+    "method": "thread/items/list",
+    "status": "调用及界面代码已接入，未运行验证",
+    "entry": "core/src/main/kotlin/cn/codex/core/original/OriginalCodexClient.kt",
+    "phase": "待运行验证/继续语义审阅",
+    "validation": "未运行验证"
+  },
+  {
+    "kind": "客户端请求",
+    "method": "thread/inject_items",
+    "status": "调用及界面代码已接入，未运行验证",
+    "entry": "core/src/main/kotlin/cn/codex/core/original/OriginalCodexClient.kt;app/src/main/java/cn/codex/android/OriginalCoreHost.kt;app/src/main/java/cn/codex/android/OriginalThreadAdvanced.kt",
+    "phase": "待运行验证/继续语义审阅",
+    "validation": "未运行验证"
+  },
+  {
+    "kind": "客户端请求",
+    "method": "skills/list",
+    "status": "调用及界面代码已接入，未运行验证",
+    "entry": "core/src/main/kotlin/cn/codex/core/original/OriginalCodexClient.kt;core/src/main/kotlin/cn/codex/core/original/OriginalExtensionsController.kt",
+    "phase": "待运行验证/继续语义审阅",
+    "validation": "未运行验证"
+  },
+  {
+    "kind": "客户端请求",
+    "method": "skills/extraRoots/set",
+    "status": "调用及界面代码已接入，未运行验证",
+    "entry": "core/src/main/kotlin/cn/codex/core/original/OriginalCodexClient.kt;core/src/main/kotlin/cn/codex/core/original/OriginalExtensionsController.kt",
+    "phase": "待运行验证/继续语义审阅",
+    "validation": "未运行验证"
+  },
+  {
+    "kind": "客户端请求",
+    "method": "hooks/list",
+    "status": "调用及界面代码已接入，未运行验证",
+    "entry": "core/src/main/kotlin/cn/codex/core/original/OriginalCodexClient.kt;core/src/main/kotlin/cn/codex/core/original/OriginalExtensionsController.kt",
+    "phase": "待运行验证/继续语义审阅",
+    "validation": "未运行验证"
+  },
+  {
+    "kind": "客户端请求",
+    "method": "marketplace/add",
+    "status": "调用及界面代码已接入，未运行验证",
+    "entry": "core/src/main/kotlin/cn/codex/core/original/OriginalCodexClient.kt;core/src/main/kotlin/cn/codex/core/original/OriginalLibraryController.kt;app/src/main/java/cn/codex/android/OriginalLibraryScreen.kt",
+    "phase": "待运行验证/继续语义审阅",
+    "validation": "未运行验证"
+  },
+  {
+    "kind": "客户端请求",
+    "method": "marketplace/remove",
+    "status": "调用及界面代码已接入，未运行验证",
+    "entry": "core/src/main/kotlin/cn/codex/core/original/OriginalCodexClient.kt;core/src/main/kotlin/cn/codex/core/original/OriginalLibraryController.kt;app/src/main/java/cn/codex/android/OriginalLibraryScreen.kt",
+    "phase": "待运行验证/继续语义审阅",
+    "validation": "未运行验证"
+  },
+  {
+    "kind": "客户端请求",
+    "method": "marketplace/upgrade",
+    "status": "调用及界面代码已接入，未运行验证",
+    "entry": "core/src/main/kotlin/cn/codex/core/original/OriginalCodexClient.kt;core/src/main/kotlin/cn/codex/core/original/OriginalLibraryController.kt;app/src/main/java/cn/codex/android/OriginalLibraryScreen.kt",
+    "phase": "待运行验证/继续语义审阅",
+    "validation": "未运行验证"
+  },
+  {
+    "kind": "客户端请求",
+    "method": "plugin/list",
+    "status": "调用及界面代码已接入，未运行验证",
+    "entry": "core/src/main/kotlin/cn/codex/core/original/OriginalCodexClient.kt;core/src/main/kotlin/cn/codex/core/original/OriginalExtensionsController.kt",
+    "phase": "待运行验证/继续语义审阅",
+    "validation": "未运行验证"
+  },
+  {
+    "kind": "客户端请求",
+    "method": "plugin/installed",
+    "status": "调用及界面代码已接入，未运行验证",
+    "entry": "core/src/main/kotlin/cn/codex/core/original/OriginalCodexClient.kt;core/src/main/kotlin/cn/codex/core/original/OriginalExtensionsController.kt",
+    "phase": "待运行验证/继续语义审阅",
+    "validation": "未运行验证"
+  },
+  {
+    "kind": "客户端请求",
+    "method": "plugin/reconcile",
+    "status": "调用及界面代码已接入，未运行验证",
+    "entry": "core/src/main/kotlin/cn/codex/core/original/OriginalCodexClient.kt;core/src/main/kotlin/cn/codex/core/original/OriginalLibraryController.kt;app/src/main/java/cn/codex/android/OriginalLibraryScreen.kt",
+    "phase": "待运行验证/继续语义审阅",
+    "validation": "未运行验证"
+  },
+  {
+    "kind": "客户端请求",
+    "method": "plugin/read",
+    "status": "调用及界面代码已接入，未运行验证",
+    "entry": "core/src/main/kotlin/cn/codex/core/original/OriginalCodexClient.kt;core/src/main/kotlin/cn/codex/core/original/OriginalExtensionsController.kt",
+    "phase": "待运行验证/继续语义审阅",
+    "validation": "未运行验证"
+  },
+  {
+    "kind": "客户端请求",
+    "method": "plugin/skill/read",
+    "status": "调用及界面代码已接入，未运行验证",
+    "entry": "core/src/main/kotlin/cn/codex/core/original/OriginalCodexClient.kt;core/src/main/kotlin/cn/codex/core/original/OriginalExtensionsController.kt",
+    "phase": "待运行验证/继续语义审阅",
+    "validation": "未运行验证"
+  },
+  {
+    "kind": "客户端请求",
+    "method": "plugin/share/save",
+    "status": "调用及界面代码已接入，未运行验证",
+    "entry": "core/src/main/kotlin/cn/codex/core/original/OriginalCodexClient.kt;core/src/main/kotlin/cn/codex/core/original/OriginalLibraryController.kt;app/src/main/java/cn/codex/android/OriginalLibraryScreen.kt",
+    "phase": "待运行验证/继续语义审阅",
+    "validation": "未运行验证"
+  },
+  {
+    "kind": "客户端请求",
+    "method": "plugin/share/updateTargets",
+    "status": "调用及界面代码已接入，未运行验证",
+    "entry": "core/src/main/kotlin/cn/codex/core/original/OriginalCodexClient.kt;core/src/main/kotlin/cn/codex/core/original/OriginalLibraryController.kt;app/src/main/java/cn/codex/android/OriginalLibraryScreen.kt",
+    "phase": "待运行验证/继续语义审阅",
+    "validation": "未运行验证"
+  },
+  {
+    "kind": "客户端请求",
+    "method": "plugin/share/list",
+    "status": "调用及界面代码已接入，未运行验证",
+    "entry": "core/src/main/kotlin/cn/codex/core/original/OriginalCodexClient.kt;core/src/main/kotlin/cn/codex/core/original/OriginalLibraryController.kt;app/src/main/java/cn/codex/android/OriginalLibraryScreen.kt",
+    "phase": "待运行验证/继续语义审阅",
+    "validation": "未运行验证"
+  },
+  {
+    "kind": "客户端请求",
+    "method": "plugin/share/checkout",
+    "status": "调用及界面代码已接入，未运行验证",
+    "entry": "core/src/main/kotlin/cn/codex/core/original/OriginalCodexClient.kt;core/src/main/kotlin/cn/codex/core/original/OriginalLibraryController.kt;app/src/main/java/cn/codex/android/OriginalLibraryScreen.kt",
+    "phase": "待运行验证/继续语义审阅",
+    "validation": "未运行验证"
+  },
+  {
+    "kind": "客户端请求",
+    "method": "plugin/share/delete",
+    "status": "调用及界面代码已接入，未运行验证",
+    "entry": "core/src/main/kotlin/cn/codex/core/original/OriginalCodexClient.kt;core/src/main/kotlin/cn/codex/core/original/OriginalLibraryController.kt;app/src/main/java/cn/codex/android/OriginalLibraryScreen.kt",
+    "phase": "待运行验证/继续语义审阅",
+    "validation": "未运行验证"
+  },
+  {
+    "kind": "客户端请求",
+    "method": "app/read",
+    "status": "调用及界面代码已接入，未运行验证",
+    "entry": "core/src/main/kotlin/cn/codex/core/original/OriginalCodexClient.kt;core/src/main/kotlin/cn/codex/core/original/OriginalLibraryController.kt;app/src/main/java/cn/codex/android/OriginalLibraryScreen.kt",
+    "phase": "待运行验证/继续语义审阅",
+    "validation": "未运行验证"
+  },
+  {
+    "kind": "客户端请求",
+    "method": "app/list",
+    "status": "调用及界面代码已接入，未运行验证",
+    "entry": "core/src/main/kotlin/cn/codex/core/original/OriginalCodexClient.kt;core/src/main/kotlin/cn/codex/core/original/OriginalLibraryController.kt;app/src/main/java/cn/codex/android/OriginalLibraryScreen.kt",
+    "phase": "待运行验证/继续语义审阅",
+    "validation": "未运行验证"
+  },
+  {
+    "kind": "客户端请求",
+    "method": "app/installed",
+    "status": "调用及界面代码已接入，未运行验证",
+    "entry": "core/src/main/kotlin/cn/codex/core/original/OriginalCodexClient.kt;core/src/main/kotlin/cn/codex/core/original/OriginalLibraryController.kt;app/src/main/java/cn/codex/android/OriginalLibraryScreen.kt",
+    "phase": "待运行验证/继续语义审阅",
+    "validation": "未运行验证"
+  },
+  {
+    "kind": "客户端请求",
+    "method": "fs/readFile",
+    "status": "调用及界面代码已接入，未运行验证",
+    "entry": "core/src/main/kotlin/cn/codex/core/original/OriginalCodexClient.kt;core/src/main/kotlin/cn/codex/core/original/OriginalFilesController.kt",
+    "phase": "待运行验证/继续语义审阅",
+    "validation": "未运行验证"
+  },
+  {
+    "kind": "客户端请求",
+    "method": "fs/writeFile",
+    "status": "调用及界面代码已接入，未运行验证",
+    "entry": "core/src/main/kotlin/cn/codex/core/original/OriginalCodexClient.kt;core/src/main/kotlin/cn/codex/core/original/OriginalFilesController.kt",
+    "phase": "待运行验证/继续语义审阅",
+    "validation": "未运行验证"
+  },
+  {
+    "kind": "客户端请求",
+    "method": "fs/createDirectory",
+    "status": "调用及界面代码已接入，未运行验证",
+    "entry": "core/src/main/kotlin/cn/codex/core/original/OriginalCodexClient.kt;core/src/main/kotlin/cn/codex/core/original/OriginalFilesController.kt",
+    "phase": "待运行验证/继续语义审阅",
+    "validation": "未运行验证"
+  },
+  {
+    "kind": "客户端请求",
+    "method": "fs/getMetadata",
+    "status": "调用及界面代码已接入，未运行验证",
+    "entry": "core/src/main/kotlin/cn/codex/core/original/OriginalCodexClient.kt;core/src/main/kotlin/cn/codex/core/original/OriginalFilesController.kt",
+    "phase": "待运行验证/继续语义审阅",
+    "validation": "未运行验证"
+  },
+  {
+    "kind": "客户端请求",
+    "method": "fs/readDirectory",
+    "status": "调用及界面代码已接入，未运行验证",
+    "entry": "core/src/main/kotlin/cn/codex/core/original/OriginalCodexClient.kt;core/src/main/kotlin/cn/codex/core/original/OriginalFilesController.kt",
+    "phase": "待运行验证/继续语义审阅",
+    "validation": "未运行验证"
+  },
+  {
+    "kind": "客户端请求",
+    "method": "fs/remove",
+    "status": "调用及界面代码已接入，未运行验证",
+    "entry": "core/src/main/kotlin/cn/codex/core/original/OriginalCodexClient.kt;core/src/main/kotlin/cn/codex/core/original/OriginalFilesController.kt",
+    "phase": "待运行验证/继续语义审阅",
+    "validation": "未运行验证"
+  },
+  {
+    "kind": "客户端请求",
+    "method": "fs/copy",
+    "status": "调用及界面代码已接入，未运行验证",
+    "entry": "core/src/main/kotlin/cn/codex/core/original/OriginalCodexClient.kt;core/src/main/kotlin/cn/codex/core/original/OriginalFilesController.kt",
+    "phase": "待运行验证/继续语义审阅",
+    "validation": "未运行验证"
+  },
+  {
+    "kind": "客户端请求",
+    "method": "fs/watch",
+    "status": "调用及界面代码已接入，未运行验证",
+    "entry": "core/src/main/kotlin/cn/codex/core/original/OriginalCodexClient.kt;core/src/main/kotlin/cn/codex/core/original/OriginalFilesController.kt",
+    "phase": "待运行验证/继续语义审阅",
+    "validation": "未运行验证"
+  },
+  {
+    "kind": "客户端请求",
+    "method": "fs/unwatch",
+    "status": "调用及界面代码已接入，未运行验证",
+    "entry": "core/src/main/kotlin/cn/codex/core/original/OriginalCodexClient.kt;core/src/main/kotlin/cn/codex/core/original/OriginalFilesController.kt",
+    "phase": "待运行验证/继续语义审阅",
+    "validation": "未运行验证"
+  },
+  {
+    "kind": "客户端请求",
+    "method": "skills/config/write",
+    "status": "调用及界面代码已接入，未运行验证",
+    "entry": "core/src/main/kotlin/cn/codex/core/original/OriginalCodexClient.kt;core/src/main/kotlin/cn/codex/core/original/OriginalExtensionsController.kt",
+    "phase": "待运行验证/继续语义审阅",
+    "validation": "未运行验证"
+  },
+  {
+    "kind": "客户端请求",
+    "method": "plugin/install",
+    "status": "调用及界面代码已接入，未运行验证",
+    "entry": "core/src/main/kotlin/cn/codex/core/original/OriginalCodexClient.kt;core/src/main/kotlin/cn/codex/core/original/OriginalExtensionsController.kt",
+    "phase": "待运行验证/继续语义审阅",
+    "validation": "未运行验证"
+  },
+  {
+    "kind": "客户端请求",
+    "method": "plugin/uninstall",
+    "status": "调用及界面代码已接入，未运行验证",
+    "entry": "core/src/main/kotlin/cn/codex/core/original/OriginalCodexClient.kt;core/src/main/kotlin/cn/codex/core/original/OriginalExtensionsController.kt",
+    "phase": "待运行验证/继续语义审阅",
+    "validation": "未运行验证"
+  },
+  {
+    "kind": "客户端请求",
+    "method": "turn/start",
+    "status": "调用及界面代码已接入，未运行验证",
+    "entry": "core/src/main/kotlin/cn/codex/core/original/OriginalCodexClient.kt",
+    "phase": "待运行验证/继续语义审阅",
+    "validation": "未运行验证"
+  },
+  {
+    "kind": "客户端请求",
+    "method": "turn/steer",
+    "status": "调用及界面代码已接入，未运行验证",
+    "entry": "core/src/main/kotlin/cn/codex/core/original/OriginalCodexClient.kt",
+    "phase": "待运行验证/继续语义审阅",
+    "validation": "未运行验证"
+  },
+  {
+    "kind": "客户端请求",
+    "method": "turn/interrupt",
+    "status": "调用及界面代码已接入，未运行验证",
+    "entry": "core/src/main/kotlin/cn/codex/core/original/OriginalCodexClient.kt",
+    "phase": "待运行验证/继续语义审阅",
+    "validation": "未运行验证"
+  },
+  {
+    "kind": "客户端请求",
+    "method": "review/start",
+    "status": "调用及界面代码已接入，未运行验证",
+    "entry": "core/src/main/kotlin/cn/codex/core/original/OriginalCodexClient.kt;app/src/main/java/cn/codex/android/OriginalCoreHost.kt;app/src/main/java/cn/codex/android/OriginalSessionScreen.kt",
+    "phase": "待运行验证/继续语义审阅",
+    "validation": "未运行验证"
+  },
+  {
+    "kind": "客户端请求",
+    "method": "model/list",
+    "status": "调用及界面代码已接入，未运行验证",
+    "entry": "core/src/main/kotlin/cn/codex/core/original/OriginalCodexClient.kt",
+    "phase": "待运行验证/继续语义审阅",
+    "validation": "未运行验证"
+  },
+  {
+    "kind": "客户端请求",
+    "method": "account/gatewayOAuth/read",
+    "status": "调用及界面代码已接入，未运行验证",
+    "entry": "core/src/main/kotlin/cn/codex/core/original/OriginalCodexClient.kt;core/src/main/kotlin/cn/codex/core/original/OriginalServicesController.kt;app/src/main/java/cn/codex/android/OriginalServicesScreen.kt",
+    "phase": "待运行验证/继续语义审阅",
+    "validation": "未运行验证"
+  },
+  {
+    "kind": "客户端请求",
+    "method": "account/gatewayOAuth/login",
+    "status": "调用及界面代码已接入，未运行验证",
+    "entry": "core/src/main/kotlin/cn/codex/core/original/OriginalCodexClient.kt;core/src/main/kotlin/cn/codex/core/original/OriginalServicesController.kt;app/src/main/java/cn/codex/android/OriginalServicesScreen.kt",
+    "phase": "待运行验证/继续语义审阅",
+    "validation": "未运行验证"
+  },
+  {
+    "kind": "客户端请求",
+    "method": "account/gatewayOAuth/cancel",
+    "status": "调用及界面代码已接入，未运行验证",
+    "entry": "core/src/main/kotlin/cn/codex/core/original/OriginalCodexClient.kt;core/src/main/kotlin/cn/codex/core/original/OriginalServicesController.kt;app/src/main/java/cn/codex/android/OriginalServicesScreen.kt",
+    "phase": "待运行验证/继续语义审阅",
+    "validation": "未运行验证"
+  },
+  {
+    "kind": "客户端请求",
+    "method": "modelProvider/capabilities/read",
+    "status": "调用及界面代码已接入，未运行验证",
+    "entry": "core/src/main/kotlin/cn/codex/core/original/OriginalCodexClient.kt;core/src/main/kotlin/cn/codex/core/original/OriginalSettingsController.kt",
+    "phase": "待运行验证/继续语义审阅",
+    "validation": "未运行验证"
+  },
+  {
+    "kind": "客户端请求",
+    "method": "experimentalFeature/list",
+    "status": "调用及界面代码已接入，未运行验证",
+    "entry": "core/src/main/kotlin/cn/codex/core/original/OriginalCodexClient.kt;core/src/main/kotlin/cn/codex/core/original/OriginalSettingsController.kt",
+    "phase": "待运行验证/继续语义审阅",
+    "validation": "未运行验证"
+  },
+  {
+    "kind": "客户端请求",
+    "method": "permissionProfile/list",
+    "status": "调用及界面代码已接入，未运行验证",
+    "entry": "core/src/main/kotlin/cn/codex/core/original/OriginalCodexClient.kt;core/src/main/kotlin/cn/codex/core/original/OriginalSettingsController.kt",
+    "phase": "待运行验证/继续语义审阅",
+    "validation": "未运行验证"
+  },
+  {
+    "kind": "客户端请求",
+    "method": "experimentalFeature/enablement/set",
+    "status": "调用及界面代码已接入，未运行验证",
+    "entry": "core/src/main/kotlin/cn/codex/core/original/OriginalCodexClient.kt;core/src/main/kotlin/cn/codex/core/original/OriginalSettingsController.kt",
+    "phase": "待运行验证/继续语义审阅",
+    "validation": "未运行验证"
+  },
+  {
+    "kind": "客户端请求",
+    "method": "mcpServer/oauth/login",
+    "status": "调用及界面代码已接入，未运行验证",
+    "entry": "core/src/main/kotlin/cn/codex/core/original/OriginalCodexClient.kt",
+    "phase": "待运行验证/继续语义审阅",
+    "validation": "未运行验证"
+  },
+  {
+    "kind": "客户端请求",
+    "method": "config/mcpServer/reload",
+    "status": "调用及界面代码已接入，未运行验证",
+    "entry": "core/src/main/kotlin/cn/codex/core/original/OriginalCodexClient.kt;core/src/main/kotlin/cn/codex/core/original/OriginalMcpController.kt",
+    "phase": "待运行验证/继续语义审阅",
+    "validation": "未运行验证"
+  },
+  {
+    "kind": "客户端请求",
+    "method": "mcpServerStatus/list",
+    "status": "调用及界面代码已接入，未运行验证",
+    "entry": "core/src/main/kotlin/cn/codex/core/original/OriginalCodexClient.kt;core/src/main/kotlin/cn/codex/core/original/OriginalMcpController.kt",
+    "phase": "待运行验证/继续语义审阅",
+    "validation": "未运行验证"
+  },
+  {
+    "kind": "客户端请求",
+    "method": "mcpServer/resource/read",
+    "status": "调用及界面代码已接入，未运行验证",
+    "entry": "core/src/main/kotlin/cn/codex/core/original/OriginalCodexClient.kt",
+    "phase": "待运行验证/继续语义审阅",
+    "validation": "未运行验证"
+  },
+  {
+    "kind": "客户端请求",
+    "method": "mcpServer/tool/call",
+    "status": "调用及界面代码已接入，未运行验证",
+    "entry": "core/src/main/kotlin/cn/codex/core/original/OriginalCodexClient.kt",
+    "phase": "待运行验证/继续语义审阅",
+    "validation": "未运行验证"
+  },
+  {
+    "kind": "客户端请求",
+    "method": "windowsSandbox/setupStart",
+    "status": "Windows 专用，Android 平台受限",
+    "entry": "",
+    "phase": "平台限制",
+    "validation": "未运行验证"
+  },
+  {
+    "kind": "客户端请求",
+    "method": "windowsSandbox/readiness",
+    "status": "Windows 专用，Android 平台受限",
+    "entry": "",
+    "phase": "平台限制",
+    "validation": "未运行验证"
+  },
+  {
+    "kind": "客户端请求",
+    "method": "account/login/start",
+    "status": "调用及界面代码已接入，未运行验证",
+    "entry": "core/src/main/kotlin/cn/codex/core/original/OriginalCodexClient.kt",
+    "phase": "待运行验证/继续语义审阅",
+    "validation": "未运行验证"
+  },
+  {
+    "kind": "客户端请求",
+    "method": "account/login/cancel",
+    "status": "调用及界面代码已接入，未运行验证",
+    "entry": "core/src/main/kotlin/cn/codex/core/original/OriginalCodexClient.kt",
+    "phase": "待运行验证/继续语义审阅",
+    "validation": "未运行验证"
+  },
+  {
+    "kind": "客户端请求",
+    "method": "account/logout",
+    "status": "调用及界面代码已接入，未运行验证",
+    "entry": "core/src/main/kotlin/cn/codex/core/original/OriginalCodexClient.kt",
+    "phase": "待运行验证/继续语义审阅",
+    "validation": "未运行验证"
+  },
+  {
+    "kind": "客户端请求",
+    "method": "account/rateLimits/read",
+    "status": "调用及界面代码已接入，未运行验证",
+    "entry": "core/src/main/kotlin/cn/codex/core/original/OriginalCodexClient.kt",
+    "phase": "待运行验证/继续语义审阅",
+    "validation": "未运行验证"
+  },
+  {
+    "kind": "客户端请求",
+    "method": "account/rateLimitResetCredit/consume",
+    "status": "调用及界面代码已接入，未运行验证",
+    "entry": "core/src/main/kotlin/cn/codex/core/original/OriginalCodexClient.kt;core/src/main/kotlin/cn/codex/core/original/OriginalServicesController.kt;app/src/main/java/cn/codex/android/OriginalServicesScreen.kt",
+    "phase": "待运行验证/继续语义审阅",
+    "validation": "未运行验证"
+  },
+  {
+    "kind": "客户端请求",
+    "method": "account/usage/read",
+    "status": "调用及界面代码已接入，未运行验证",
+    "entry": "core/src/main/kotlin/cn/codex/core/original/OriginalCodexClient.kt;core/src/main/kotlin/cn/codex/core/original/OriginalSettingsController.kt",
+    "phase": "待运行验证/继续语义审阅",
+    "validation": "未运行验证"
+  },
+  {
+    "kind": "客户端请求",
+    "method": "account/workspaceMessages/read",
+    "status": "调用及界面代码已接入，未运行验证",
+    "entry": "core/src/main/kotlin/cn/codex/core/original/OriginalCodexClient.kt;core/src/main/kotlin/cn/codex/core/original/OriginalSettingsController.kt",
+    "phase": "待运行验证/继续语义审阅",
+    "validation": "未运行验证"
+  },
+  {
+    "kind": "客户端请求",
+    "method": "account/sendAddCreditsNudgeEmail",
+    "status": "调用及界面代码已接入，未运行验证",
+    "entry": "core/src/main/kotlin/cn/codex/core/original/OriginalCodexClient.kt;core/src/main/kotlin/cn/codex/core/original/OriginalServicesController.kt;app/src/main/java/cn/codex/android/OriginalServicesScreen.kt",
+    "phase": "待运行验证/继续语义审阅",
+    "validation": "未运行验证"
+  },
+  {
+    "kind": "客户端请求",
+    "method": "feedback/upload",
+    "status": "调用及界面代码已接入，未运行验证",
+    "entry": "core/src/main/kotlin/cn/codex/core/original/OriginalCodexClient.kt;core/src/main/kotlin/cn/codex/core/original/OriginalServicesController.kt;app/src/main/java/cn/codex/android/OriginalServicesScreen.kt",
+    "phase": "待运行验证/继续语义审阅",
+    "validation": "未运行验证"
+  },
+  {
+    "kind": "客户端请求",
+    "method": "feedback/save",
+    "status": "调用及界面代码已接入，未运行验证",
+    "entry": "core/src/main/kotlin/cn/codex/core/original/OriginalCodexClient.kt;core/src/main/kotlin/cn/codex/core/original/OriginalServicesController.kt;app/src/main/java/cn/codex/android/OriginalServicesScreen.kt",
+    "phase": "待运行验证/继续语义审阅",
+    "validation": "未运行验证"
+  },
+  {
+    "kind": "客户端请求",
+    "method": "command/exec",
+    "status": "调用及界面代码已接入，未运行验证",
+    "entry": "core/src/main/kotlin/cn/codex/core/original/OriginalCodexClient.kt",
+    "phase": "待运行验证/继续语义审阅",
+    "validation": "未运行验证"
+  },
+  {
+    "kind": "客户端请求",
+    "method": "command/exec/write",
+    "status": "调用及界面代码已接入，未运行验证",
+    "entry": "core/src/main/kotlin/cn/codex/core/original/OriginalCodexClient.kt",
+    "phase": "待运行验证/继续语义审阅",
+    "validation": "未运行验证"
+  },
+  {
+    "kind": "客户端请求",
+    "method": "command/exec/terminate",
+    "status": "调用及界面代码已接入，未运行验证",
+    "entry": "core/src/main/kotlin/cn/codex/core/original/OriginalCodexClient.kt",
+    "phase": "待运行验证/继续语义审阅",
+    "validation": "未运行验证"
+  },
+  {
+    "kind": "客户端请求",
+    "method": "command/exec/resize",
+    "status": "调用及界面代码已接入，未运行验证",
+    "entry": "core/src/main/kotlin/cn/codex/core/original/OriginalCodexClient.kt",
+    "phase": "待运行验证/继续语义审阅",
+    "validation": "未运行验证"
+  },
+  {
+    "kind": "客户端请求",
+    "method": "config/read",
+    "status": "调用及界面代码已接入，未运行验证",
+    "entry": "core/src/main/kotlin/cn/codex/core/original/OriginalCodexClient.kt;core/src/main/kotlin/cn/codex/core/original/OriginalExtensionsController.kt;core/src/main/kotlin/cn/codex/core/original/OriginalMcpController.kt",
+    "phase": "待运行验证/继续语义审阅",
+    "validation": "未运行验证"
+  },
+  {
+    "kind": "客户端请求",
+    "method": "externalAgentConfig/detect",
+    "status": "调用及界面代码已接入，未运行验证",
+    "entry": "core/src/main/kotlin/cn/codex/core/original/OriginalCodexClient.kt;core/src/main/kotlin/cn/codex/core/original/OriginalMigrationController.kt;app/src/main/java/cn/codex/android/OriginalMigrationScreen.kt",
+    "phase": "待运行验证/继续语义审阅",
+    "validation": "未运行验证"
+  },
+  {
+    "kind": "客户端请求",
+    "method": "externalAgentConfig/import",
+    "status": "调用及界面代码已接入，未运行验证",
+    "entry": "core/src/main/kotlin/cn/codex/core/original/OriginalCodexClient.kt;core/src/main/kotlin/cn/codex/core/original/OriginalMigrationController.kt;app/src/main/java/cn/codex/android/OriginalMigrationScreen.kt",
+    "phase": "待运行验证/继续语义审阅",
+    "validation": "未运行验证"
+  },
+  {
+    "kind": "客户端请求",
+    "method": "externalAgentConfig/import/recordHistory",
+    "status": "调用及界面代码已接入，未运行验证",
+    "entry": "core/src/main/kotlin/cn/codex/core/original/OriginalCodexClient.kt;core/src/main/kotlin/cn/codex/core/original/OriginalMigrationController.kt;app/src/main/java/cn/codex/android/OriginalMigrationScreen.kt",
+    "phase": "待运行验证/继续语义审阅",
+    "validation": "未运行验证"
+  },
+  {
+    "kind": "客户端请求",
+    "method": "externalAgentConfig/import/readHistories",
+    "status": "调用及界面代码已接入，未运行验证",
+    "entry": "core/src/main/kotlin/cn/codex/core/original/OriginalCodexClient.kt;core/src/main/kotlin/cn/codex/core/original/OriginalMigrationController.kt;app/src/main/java/cn/codex/android/OriginalMigrationScreen.kt",
+    "phase": "待运行验证/继续语义审阅",
+    "validation": "未运行验证"
+  },
+  {
+    "kind": "客户端请求",
+    "method": "config/value/write",
+    "status": "调用及界面代码已接入，未运行验证",
+    "entry": "core/src/main/kotlin/cn/codex/core/original/OriginalCodexClient.kt;core/src/main/kotlin/cn/codex/core/original/OriginalMigrationController.kt;app/src/main/java/cn/codex/android/OriginalMigrationScreen.kt",
+    "phase": "待运行验证/继续语义审阅",
+    "validation": "未运行验证"
+  },
+  {
+    "kind": "客户端请求",
+    "method": "config/batchWrite",
+    "status": "调用及界面代码已接入，未运行验证",
+    "entry": "core/src/main/kotlin/cn/codex/core/original/OriginalCodexClient.kt;core/src/main/kotlin/cn/codex/core/original/OriginalExtensionsController.kt;core/src/main/kotlin/cn/codex/core/original/OriginalMcpController.kt",
+    "phase": "待运行验证/继续语义审阅",
+    "validation": "未运行验证"
+  },
+  {
+    "kind": "客户端请求",
+    "method": "configRequirements/read",
+    "status": "调用及界面代码已接入，未运行验证",
+    "entry": "core/src/main/kotlin/cn/codex/core/original/OriginalCodexClient.kt;core/src/main/kotlin/cn/codex/core/original/OriginalSettingsController.kt",
+    "phase": "待运行验证/继续语义审阅",
+    "validation": "未运行验证"
+  },
+  {
+    "kind": "客户端请求",
+    "method": "account/read",
+    "status": "调用及界面代码已接入，未运行验证",
+    "entry": "core/src/main/kotlin/cn/codex/core/original/OriginalCodexClient.kt",
+    "phase": "待运行验证/继续语义审阅",
+    "validation": "未运行验证"
+  },
+  {
+    "kind": "客户端请求",
+    "method": "getConversationSummary",
+    "status": "调用及界面代码已接入，未运行验证",
+    "entry": "core/src/main/kotlin/cn/codex/core/original/OriginalCodexClient.kt;core/src/main/kotlin/cn/codex/core/original/OriginalMigrationController.kt;app/src/main/java/cn/codex/android/OriginalMigrationScreen.kt",
+    "phase": "待运行验证/继续语义审阅",
+    "validation": "未运行验证"
+  },
+  {
+    "kind": "客户端请求",
+    "method": "gitDiffToRemote",
+    "status": "调用及界面代码已接入，未运行验证",
+    "entry": "core/src/main/kotlin/cn/codex/core/original/OriginalCodexClient.kt;core/src/main/kotlin/cn/codex/core/original/OriginalMigrationController.kt;app/src/main/java/cn/codex/android/OriginalMigrationScreen.kt",
+    "phase": "待运行验证/继续语义审阅",
+    "validation": "未运行验证"
+  },
+  {
+    "kind": "客户端请求",
+    "method": "getAuthStatus",
+    "status": "调用及界面代码已接入，未运行验证",
+    "entry": "core/src/main/kotlin/cn/codex/core/original/OriginalCodexClient.kt;core/src/main/kotlin/cn/codex/core/original/OriginalMigrationController.kt;app/src/main/java/cn/codex/android/OriginalMigrationScreen.kt",
+    "phase": "待运行验证/继续语义审阅",
+    "validation": "未运行验证"
+  },
+  {
+    "kind": "客户端请求",
+    "method": "fuzzyFileSearch",
+    "status": "调用及界面代码已接入，未运行验证",
+    "entry": "core/src/main/kotlin/cn/codex/core/original/OriginalCodexClient.kt;core/src/main/kotlin/cn/codex/core/original/OriginalMigrationController.kt;app/src/main/java/cn/codex/android/OriginalMigrationScreen.kt",
+    "phase": "待运行验证/继续语义审阅",
+    "validation": "未运行验证"
+  },
+  {
+    "kind": "服务端请求",
+    "method": "item/commandExecution/requestApproval",
+    "status": "中文交互已接入，未运行验证",
+    "entry": "app/src/main/java/cn/codex/android/OriginalCoreHost.kt",
+    "phase": "待验证",
+    "validation": "未运行验证"
+  },
+  {
+    "kind": "服务端请求",
+    "method": "item/fileChange/requestApproval",
+    "status": "中文交互已接入，未运行验证",
+    "entry": "app/src/main/java/cn/codex/android/OriginalCoreHost.kt",
+    "phase": "待验证",
+    "validation": "未运行验证"
+  },
+  {
+    "kind": "服务端请求",
+    "method": "item/tool/requestUserInput",
+    "status": "中文交互已接入，未运行验证",
+    "entry": "app/src/main/java/cn/codex/android/OriginalCoreHost.kt",
+    "phase": "待验证",
+    "validation": "未运行验证"
+  },
+  {
+    "kind": "服务端请求",
+    "method": "mcpServer/elicitation/request",
+    "status": "表单/URL/本机签名已接入；有限复杂 schema，未运行验证",
+    "entry": "app/src/main/java/cn/codex/android/OriginalCoreHost.kt",
+    "phase": "P2/待验证",
+    "validation": "未运行验证"
+  },
+  {
+    "kind": "服务端请求",
+    "method": "item/permissions/requestApproval",
+    "status": "中文交互已接入，未运行验证",
+    "entry": "app/src/main/java/cn/codex/android/OriginalCoreHost.kt",
+    "phase": "待验证",
+    "validation": "未运行验证"
+  },
+  {
+    "kind": "服务端请求",
+    "method": "item/tool/call",
+    "status": "中文交互已接入，未运行验证",
+    "entry": "app/src/main/java/cn/codex/android/OriginalCoreHost.kt",
+    "phase": "待验证",
+    "validation": "未运行验证"
+  },
+  {
+    "kind": "服务端请求",
+    "method": "account/chatgptAuthTokens/refresh",
+    "status": "缺少外部提供者，已有专用提示及协议拒绝",
+    "entry": "app/src/main/java/cn/codex/android/OriginalCoreHost.kt",
+    "phase": "外部依赖/待完成",
+    "validation": "未运行验证"
+  },
+  {
+    "kind": "服务端请求",
+    "method": "attestation/generate",
+    "status": "缺少外部提供者，已有专用提示及协议拒绝",
+    "entry": "app/src/main/java/cn/codex/android/OriginalCoreHost.kt",
+    "phase": "外部依赖/待完成",
+    "validation": "未运行验证"
+  },
+  {
+    "kind": "服务端请求",
+    "method": "applyPatchApproval",
+    "status": "中文交互已接入，未运行验证",
+    "entry": "app/src/main/java/cn/codex/android/OriginalCoreHost.kt",
+    "phase": "待验证",
+    "validation": "未运行验证"
+  },
+  {
+    "kind": "服务端请求",
+    "method": "execCommandApproval",
+    "status": "中文交互已接入，未运行验证",
+    "entry": "app/src/main/java/cn/codex/android/OriginalCoreHost.kt",
+    "phase": "待验证",
+    "validation": "未运行验证"
+  },
+  {
+    "kind": "服务端通知",
+    "method": "error",
+    "status": "通知分支已接入，未运行验证",
+    "entry": "app/src/main/java/cn/codex/android/OriginalCoreHost.kt",
+    "phase": "待验证/继续语义审阅",
+    "validation": "未运行验证"
+  },
+  {
+    "kind": "服务端通知",
+    "method": "thread/started",
+    "status": "通知分支已接入，未运行验证",
+    "entry": "app/src/main/java/cn/codex/android/OriginalCoreHost.kt",
+    "phase": "待验证/继续语义审阅",
+    "validation": "未运行验证"
+  },
+  {
+    "kind": "服务端通知",
+    "method": "thread/status/changed",
+    "status": "通知分支已接入，未运行验证",
+    "entry": "app/src/main/java/cn/codex/android/OriginalCoreHost.kt",
+    "phase": "待验证/继续语义审阅",
+    "validation": "未运行验证"
+  },
+  {
+    "kind": "服务端通知",
+    "method": "thread/readState/changed",
+    "status": "通知分支已接入，未运行验证",
+    "entry": "app/src/main/java/cn/codex/android/OriginalCoreHost.kt",
+    "phase": "待验证/继续语义审阅",
+    "validation": "未运行验证"
+  },
+  {
+    "kind": "服务端通知",
+    "method": "thread/archived",
+    "status": "通知分支已接入，未运行验证",
+    "entry": "app/src/main/java/cn/codex/android/OriginalCoreHost.kt",
+    "phase": "待验证/继续语义审阅",
+    "validation": "未运行验证"
+  },
+  {
+    "kind": "服务端通知",
+    "method": "thread/deleted",
+    "status": "通知分支已接入，未运行验证",
+    "entry": "app/src/main/java/cn/codex/android/OriginalCoreHost.kt",
+    "phase": "待验证/继续语义审阅",
+    "validation": "未运行验证"
+  },
+  {
+    "kind": "服务端通知",
+    "method": "thread/unarchived",
+    "status": "通知分支已接入，未运行验证",
+    "entry": "app/src/main/java/cn/codex/android/OriginalCoreHost.kt",
+    "phase": "待验证/继续语义审阅",
+    "validation": "未运行验证"
+  },
+  {
+    "kind": "服务端通知",
+    "method": "thread/closed",
+    "status": "通知分支已接入，未运行验证",
+    "entry": "app/src/main/java/cn/codex/android/OriginalCoreHost.kt",
+    "phase": "待验证/继续语义审阅",
+    "validation": "未运行验证"
+  },
+  {
+    "kind": "服务端通知",
+    "method": "thread/reverted",
+    "status": "通知分支已接入，未运行验证",
+    "entry": "app/src/main/java/cn/codex/android/OriginalCoreHost.kt",
+    "phase": "待验证/继续语义审阅",
+    "validation": "未运行验证"
+  },
+  {
+    "kind": "服务端通知",
+    "method": "skills/changed",
+    "status": "通知分支已接入，未运行验证",
+    "entry": "app/src/main/java/cn/codex/android/OriginalCoreHost.kt",
+    "phase": "待验证/继续语义审阅",
+    "validation": "未运行验证"
+  },
+  {
+    "kind": "服务端通知",
+    "method": "thread/name/updated",
+    "status": "通知分支已接入，未运行验证",
+    "entry": "app/src/main/java/cn/codex/android/OriginalCoreHost.kt",
+    "phase": "待验证/继续语义审阅",
+    "validation": "未运行验证"
+  },
+  {
+    "kind": "服务端通知",
+    "method": "thread/attachment/updated",
+    "status": "通知分支已接入，未运行验证",
+    "entry": "app/src/main/java/cn/codex/android/OriginalCoreHost.kt",
+    "phase": "待验证/继续语义审阅",
+    "validation": "未运行验证"
+  },
+  {
+    "kind": "服务端通知",
+    "method": "thread/goal/updated",
+    "status": "通知分支已接入，未运行验证",
+    "entry": "app/src/main/java/cn/codex/android/OriginalCoreHost.kt",
+    "phase": "待验证/继续语义审阅",
+    "validation": "未运行验证"
+  },
+  {
+    "kind": "服务端通知",
+    "method": "thread/prediction/updated",
+    "status": "通知分支已接入，未运行验证",
+    "entry": "app/src/main/java/cn/codex/android/OriginalCoreHost.kt",
+    "phase": "待验证/继续语义审阅",
+    "validation": "未运行验证"
+  },
+  {
+    "kind": "服务端通知",
+    "method": "thread/goal/cleared",
+    "status": "通知分支已接入，未运行验证",
+    "entry": "app/src/main/java/cn/codex/android/OriginalCoreHost.kt",
+    "phase": "待验证/继续语义审阅",
+    "validation": "未运行验证"
+  },
+  {
+    "kind": "服务端通知",
+    "method": "thread/queue/changed",
+    "status": "通知分支已接入，未运行验证",
+    "entry": "app/src/main/java/cn/codex/android/OriginalCoreHost.kt",
+    "phase": "待验证/继续语义审阅",
+    "validation": "未运行验证"
+  },
+  {
+    "kind": "服务端通知",
+    "method": "project/changed",
+    "status": "通知分支已接入，未运行验证",
+    "entry": "app/src/main/java/cn/codex/android/OriginalCoreHost.kt",
+    "phase": "待验证/继续语义审阅",
+    "validation": "未运行验证"
+  },
+  {
+    "kind": "服务端通知",
+    "method": "thread/project/updated",
+    "status": "通知分支已接入，未运行验证",
+    "entry": "app/src/main/java/cn/codex/android/OriginalCoreHost.kt",
+    "phase": "待验证/继续语义审阅",
+    "validation": "未运行验证"
+  },
+  {
+    "kind": "服务端通知",
+    "method": "thread/environment/connected",
+    "status": "通知分支已接入，未运行验证",
+    "entry": "app/src/main/java/cn/codex/android/OriginalCoreHost.kt",
+    "phase": "待验证/继续语义审阅",
+    "validation": "未运行验证"
+  },
+  {
+    "kind": "服务端通知",
+    "method": "thread/environment/disconnected",
+    "status": "通知分支已接入，未运行验证",
+    "entry": "app/src/main/java/cn/codex/android/OriginalCoreHost.kt",
+    "phase": "待验证/继续语义审阅",
+    "validation": "未运行验证"
+  },
+  {
+    "kind": "服务端通知",
+    "method": "thread/settings/updated",
+    "status": "通知分支已接入，未运行验证",
+    "entry": "app/src/main/java/cn/codex/android/OriginalCoreHost.kt",
+    "phase": "待验证/继续语义审阅",
+    "validation": "未运行验证"
+  },
+  {
+    "kind": "服务端通知",
+    "method": "thread/tokenUsage/updated",
+    "status": "通知分支已接入，未运行验证",
+    "entry": "app/src/main/java/cn/codex/android/OriginalCoreHost.kt",
+    "phase": "待验证/继续语义审阅",
+    "validation": "未运行验证"
+  },
+  {
+    "kind": "服务端通知",
+    "method": "turn/started",
+    "status": "通知分支已接入，未运行验证",
+    "entry": "app/src/main/java/cn/codex/android/OriginalCoreHost.kt",
+    "phase": "待验证/继续语义审阅",
+    "validation": "未运行验证"
+  },
+  {
+    "kind": "服务端通知",
+    "method": "hook/started",
+    "status": "通知分支已接入，未运行验证",
+    "entry": "app/src/main/java/cn/codex/android/OriginalCoreHost.kt",
+    "phase": "待验证/继续语义审阅",
+    "validation": "未运行验证"
+  },
+  {
+    "kind": "服务端通知",
+    "method": "turn/completed",
+    "status": "通知分支已接入，未运行验证",
+    "entry": "app/src/main/java/cn/codex/android/OriginalCoreHost.kt",
+    "phase": "待验证/继续语义审阅",
+    "validation": "未运行验证"
+  },
+  {
+    "kind": "服务端通知",
+    "method": "hook/completed",
+    "status": "通知分支已接入，未运行验证",
+    "entry": "app/src/main/java/cn/codex/android/OriginalCoreHost.kt",
+    "phase": "待验证/继续语义审阅",
+    "validation": "未运行验证"
+  },
+  {
+    "kind": "服务端通知",
+    "method": "turn/diff/updated",
+    "status": "通知分支已接入，未运行验证",
+    "entry": "app/src/main/java/cn/codex/android/OriginalCoreHost.kt",
+    "phase": "待验证/继续语义审阅",
+    "validation": "未运行验证"
+  },
+  {
+    "kind": "服务端通知",
+    "method": "turn/plan/updated",
+    "status": "通知分支已接入，未运行验证",
+    "entry": "app/src/main/java/cn/codex/android/OriginalCoreHost.kt",
+    "phase": "待验证/继续语义审阅",
+    "validation": "未运行验证"
+  },
+  {
+    "kind": "服务端通知",
+    "method": "item/started",
+    "status": "通知分支已接入，未运行验证",
+    "entry": "app/src/main/java/cn/codex/android/OriginalCoreHost.kt",
+    "phase": "待验证/继续语义审阅",
+    "validation": "未运行验证"
+  },
+  {
+    "kind": "服务端通知",
+    "method": "item/autoApprovalReview/started",
+    "status": "通知分支已接入，未运行验证",
+    "entry": "app/src/main/java/cn/codex/android/OriginalCoreHost.kt",
+    "phase": "待验证/继续语义审阅",
+    "validation": "未运行验证"
+  },
+  {
+    "kind": "服务端通知",
+    "method": "item/autoApprovalReview/completed",
+    "status": "通知分支已接入，未运行验证",
+    "entry": "app/src/main/java/cn/codex/android/OriginalCoreHost.kt",
+    "phase": "待验证/继续语义审阅",
+    "validation": "未运行验证"
+  },
+  {
+    "kind": "服务端通知",
+    "method": "autoApprovalReview/strictReviewRequired",
+    "status": "通知分支已接入，未运行验证",
+    "entry": "app/src/main/java/cn/codex/android/OriginalCoreHost.kt",
+    "phase": "待验证/继续语义审阅",
+    "validation": "未运行验证"
+  },
+  {
+    "kind": "服务端通知",
+    "method": "item/completed",
+    "status": "通知分支已接入，未运行验证",
+    "entry": "app/src/main/java/cn/codex/android/OriginalCoreHost.kt",
+    "phase": "待验证/继续语义审阅",
+    "validation": "未运行验证"
+  },
+  {
+    "kind": "服务端通知",
+    "method": "rawResponseItem/completed",
+    "status": "通知分支已接入，未运行验证",
+    "entry": "app/src/main/java/cn/codex/android/OriginalCoreHost.kt",
+    "phase": "待验证/继续语义审阅",
+    "validation": "未运行验证"
+  },
+  {
+    "kind": "服务端通知",
+    "method": "rawResponse/completed",
+    "status": "通知分支已接入，未运行验证",
+    "entry": "app/src/main/java/cn/codex/android/OriginalCoreHost.kt",
+    "phase": "待验证/继续语义审阅",
+    "validation": "未运行验证"
+  },
+  {
+    "kind": "服务端通知",
+    "method": "item/agentMessage/delta",
+    "status": "通知分支已接入，未运行验证",
+    "entry": "app/src/main/java/cn/codex/android/OriginalCoreHost.kt",
+    "phase": "待验证/继续语义审阅",
+    "validation": "未运行验证"
+  },
+  {
+    "kind": "服务端通知",
+    "method": "item/plan/delta",
+    "status": "通知分支已接入，未运行验证",
+    "entry": "app/src/main/java/cn/codex/android/OriginalCoreHost.kt",
+    "phase": "待验证/继续语义审阅",
+    "validation": "未运行验证"
+  },
+  {
+    "kind": "服务端通知",
+    "method": "command/exec/outputDelta",
+    "status": "通知分支已接入，未运行验证",
+    "entry": "app/src/main/java/cn/codex/android/OriginalCoreHost.kt",
+    "phase": "待验证/继续语义审阅",
+    "validation": "未运行验证"
+  },
+  {
+    "kind": "服务端通知",
+    "method": "process/outputDelta",
+    "status": "实验发起/通知/操作代码已接入，未运行验证",
+    "entry": "app/src/main/java/cn/codex/android/OriginalCoreHost.kt",
+    "phase": "实验运行验收",
+    "validation": "未运行验证"
+  },
+  {
+    "kind": "服务端通知",
+    "method": "process/exited",
+    "status": "实验发起/通知/操作代码已接入，未运行验证",
+    "entry": "app/src/main/java/cn/codex/android/OriginalCoreHost.kt",
+    "phase": "实验运行验收",
+    "validation": "未运行验证"
+  },
+  {
+    "kind": "服务端通知",
+    "method": "item/commandExecution/outputDelta",
+    "status": "通知分支已接入，未运行验证",
+    "entry": "app/src/main/java/cn/codex/android/OriginalCoreHost.kt",
+    "phase": "待验证/继续语义审阅",
+    "validation": "未运行验证"
+  },
+  {
+    "kind": "服务端通知",
+    "method": "item/commandExecution/terminalInteraction",
+    "status": "通知分支已接入，未运行验证",
+    "entry": "app/src/main/java/cn/codex/android/OriginalCoreHost.kt",
+    "phase": "待验证/继续语义审阅",
+    "validation": "未运行验证"
+  },
+  {
+    "kind": "服务端通知",
+    "method": "item/fileChange/outputDelta",
+    "status": "通知分支已接入，未运行验证",
+    "entry": "app/src/main/java/cn/codex/android/OriginalCoreHost.kt",
+    "phase": "待验证/继续语义审阅",
+    "validation": "未运行验证"
+  },
+  {
+    "kind": "服务端通知",
+    "method": "item/fileChange/patchUpdated",
+    "status": "通知分支已接入，未运行验证",
+    "entry": "app/src/main/java/cn/codex/android/OriginalCoreHost.kt",
+    "phase": "待验证/继续语义审阅",
+    "validation": "未运行验证"
+  },
+  {
+    "kind": "服务端通知",
+    "method": "serverRequest/resolved",
+    "status": "通知分支已接入，未运行验证",
+    "entry": "app/src/main/java/cn/codex/android/OriginalCoreHost.kt",
+    "phase": "待验证/继续语义审阅",
+    "validation": "未运行验证"
+  },
+  {
+    "kind": "服务端通知",
+    "method": "item/mcpToolCall/progress",
+    "status": "通知分支已接入，未运行验证",
+    "entry": "app/src/main/java/cn/codex/android/OriginalCoreHost.kt",
+    "phase": "待验证/继续语义审阅",
+    "validation": "未运行验证"
+  },
+  {
+    "kind": "服务端通知",
+    "method": "mcpServer/oauthLogin/completed",
+    "status": "通知分支已接入，未运行验证",
+    "entry": "app/src/main/java/cn/codex/android/OriginalCoreHost.kt",
+    "phase": "待验证/继续语义审阅",
+    "validation": "未运行验证"
+  },
+  {
+    "kind": "服务端通知",
+    "method": "mcpServer/startupStatus/updated",
+    "status": "通知分支已接入，未运行验证",
+    "entry": "app/src/main/java/cn/codex/android/OriginalCoreHost.kt",
+    "phase": "待验证/继续语义审阅",
+    "validation": "未运行验证"
+  },
+  {
+    "kind": "服务端通知",
+    "method": "mcpServer/event/stream/notification",
+    "status": "通知分支已接入，未运行验证",
+    "entry": "app/src/main/java/cn/codex/android/OriginalCoreHost.kt",
+    "phase": "待验证/继续语义审阅",
+    "validation": "未运行验证"
+  },
+  {
+    "kind": "服务端通知",
+    "method": "account/updated",
+    "status": "通知分支已接入，未运行验证",
+    "entry": "app/src/main/java/cn/codex/android/OriginalCoreHost.kt",
+    "phase": "待验证/继续语义审阅",
+    "validation": "未运行验证"
+  },
+  {
+    "kind": "服务端通知",
+    "method": "account/gatewayOAuth/changed",
+    "status": "通知分支已接入，未运行验证",
+    "entry": "app/src/main/java/cn/codex/android/OriginalCoreHost.kt",
+    "phase": "待验证/继续语义审阅",
+    "validation": "未运行验证"
+  },
+  {
+    "kind": "服务端通知",
+    "method": "account/rateLimits/updated",
+    "status": "通知分支已接入，未运行验证",
+    "entry": "app/src/main/java/cn/codex/android/OriginalCoreHost.kt",
+    "phase": "待验证/继续语义审阅",
+    "validation": "未运行验证"
+  },
+  {
+    "kind": "服务端通知",
+    "method": "app/list/updated",
+    "status": "通知分支已接入，未运行验证",
+    "entry": "app/src/main/java/cn/codex/android/OriginalCoreHost.kt",
+    "phase": "待验证/继续语义审阅",
+    "validation": "未运行验证"
+  },
+  {
+    "kind": "服务端通知",
+    "method": "remoteControl/status/changed",
+    "status": "通知分支已接入，未运行验证",
+    "entry": "app/src/main/java/cn/codex/android/OriginalCoreHost.kt",
+    "phase": "待验证/继续语义审阅",
+    "validation": "未运行验证"
+  },
+  {
+    "kind": "服务端通知",
+    "method": "externalAgentConfig/import/progress",
+    "status": "通知分支已接入，未运行验证",
+    "entry": "app/src/main/java/cn/codex/android/OriginalCoreHost.kt",
+    "phase": "待验证/继续语义审阅",
+    "validation": "未运行验证"
+  },
+  {
+    "kind": "服务端通知",
+    "method": "externalAgentConfig/import/completed",
+    "status": "通知分支已接入，未运行验证",
+    "entry": "app/src/main/java/cn/codex/android/OriginalCoreHost.kt",
+    "phase": "待验证/继续语义审阅",
+    "validation": "未运行验证"
+  },
+  {
+    "kind": "服务端通知",
+    "method": "fs/changed",
+    "status": "通知分支已接入，未运行验证",
+    "entry": "app/src/main/java/cn/codex/android/OriginalCoreHost.kt",
+    "phase": "待验证/继续语义审阅",
+    "validation": "未运行验证"
+  },
+  {
+    "kind": "服务端通知",
+    "method": "item/reasoning/summaryTextDelta",
+    "status": "通知分支已接入，未运行验证",
+    "entry": "app/src/main/java/cn/codex/android/OriginalCoreHost.kt",
+    "phase": "待验证/继续语义审阅",
+    "validation": "未运行验证"
+  },
+  {
+    "kind": "服务端通知",
+    "method": "item/reasoning/summaryPartAdded",
+    "status": "通知分支已接入，未运行验证",
+    "entry": "app/src/main/java/cn/codex/android/OriginalCoreHost.kt",
+    "phase": "待验证/继续语义审阅",
+    "validation": "未运行验证"
+  },
+  {
+    "kind": "服务端通知",
+    "method": "item/reasoning/textDelta",
+    "status": "通知分支已接入，未运行验证",
+    "entry": "app/src/main/java/cn/codex/android/OriginalCoreHost.kt",
+    "phase": "待验证/继续语义审阅",
+    "validation": "未运行验证"
+  },
+  {
+    "kind": "服务端通知",
+    "method": "thread/compacted",
+    "status": "通知分支已接入，未运行验证",
+    "entry": "app/src/main/java/cn/codex/android/OriginalCoreHost.kt",
+    "phase": "待验证/继续语义审阅",
+    "validation": "未运行验证"
+  },
+  {
+    "kind": "服务端通知",
+    "method": "model/rerouted",
+    "status": "通知分支已接入，未运行验证",
+    "entry": "app/src/main/java/cn/codex/android/OriginalCoreHost.kt",
+    "phase": "待验证/继续语义审阅",
+    "validation": "未运行验证"
+  },
+  {
+    "kind": "服务端通知",
+    "method": "model/verification",
+    "status": "通知分支已接入，未运行验证",
+    "entry": "app/src/main/java/cn/codex/android/OriginalCoreHost.kt",
+    "phase": "待验证/继续语义审阅",
+    "validation": "未运行验证"
+  },
+  {
+    "kind": "服务端通知",
+    "method": "modelProvider/authRecoveryStarted",
+    "status": "通知分支已接入，未运行验证",
+    "entry": "app/src/main/java/cn/codex/android/OriginalCoreHost.kt",
+    "phase": "待验证/继续语义审阅",
+    "validation": "未运行验证"
+  },
+  {
+    "kind": "服务端通知",
+    "method": "modelProvider/authRecoveryCompleted",
+    "status": "通知分支已接入，未运行验证",
+    "entry": "app/src/main/java/cn/codex/android/OriginalCoreHost.kt",
+    "phase": "待验证/继续语义审阅",
+    "validation": "未运行验证"
+  },
+  {
+    "kind": "服务端通知",
+    "method": "turn/moderationMetadata",
+    "status": "通知分支已接入，未运行验证",
+    "entry": "app/src/main/java/cn/codex/android/OriginalCoreHost.kt",
+    "phase": "待验证/继续语义审阅",
+    "validation": "未运行验证"
+  },
+  {
+    "kind": "服务端通知",
+    "method": "model/safetyBuffering/updated",
+    "status": "通知分支已接入，未运行验证",
+    "entry": "app/src/main/java/cn/codex/android/OriginalCoreHost.kt",
+    "phase": "待验证/继续语义审阅",
+    "validation": "未运行验证"
+  },
+  {
+    "kind": "服务端通知",
+    "method": "warning",
+    "status": "通知分支已接入，未运行验证",
+    "entry": "app/src/main/java/cn/codex/android/OriginalCoreHost.kt",
+    "phase": "待验证/继续语义审阅",
+    "validation": "未运行验证"
+  },
+  {
+    "kind": "服务端通知",
+    "method": "guardianWarning",
+    "status": "通知分支已接入，未运行验证",
+    "entry": "app/src/main/java/cn/codex/android/OriginalCoreHost.kt",
+    "phase": "待验证/继续语义审阅",
+    "validation": "未运行验证"
+  },
+  {
+    "kind": "服务端通知",
+    "method": "deprecationNotice",
+    "status": "通知分支已接入，未运行验证",
+    "entry": "app/src/main/java/cn/codex/android/OriginalCoreHost.kt",
+    "phase": "待验证/继续语义审阅",
+    "validation": "未运行验证"
+  },
+  {
+    "kind": "服务端通知",
+    "method": "configWarning",
+    "status": "通知分支已接入，未运行验证",
+    "entry": "app/src/main/java/cn/codex/android/OriginalCoreHost.kt",
+    "phase": "待验证/继续语义审阅",
+    "validation": "未运行验证"
+  },
+  {
+    "kind": "服务端通知",
+    "method": "fuzzyFileSearch/sessionUpdated",
+    "status": "实验发起/通知/操作代码已接入，未运行验证",
+    "entry": "app/src/main/java/cn/codex/android/OriginalCoreHost.kt",
+    "phase": "实验运行验收",
+    "validation": "未运行验证"
+  },
+  {
+    "kind": "服务端通知",
+    "method": "fuzzyFileSearch/sessionCompleted",
+    "status": "实验发起/通知/操作代码已接入，未运行验证",
+    "entry": "app/src/main/java/cn/codex/android/OriginalCoreHost.kt",
+    "phase": "实验运行验收",
+    "validation": "未运行验证"
+  },
+  {
+    "kind": "服务端通知",
+    "method": "thread/realtime/started",
+    "status": "WebSocket发起/文字/录音/PCM输出代码已接入，未运行验证",
+    "entry": "app/src/main/java/cn/codex/android/OriginalCoreHost.kt",
+    "phase": "实时媒体运行验收",
+    "validation": "未运行验证"
+  },
+  {
+    "kind": "服务端通知",
+    "method": "thread/realtime/itemAdded",
+    "status": "WebSocket发起/文字/录音/PCM输出代码已接入，未运行验证",
+    "entry": "app/src/main/java/cn/codex/android/OriginalCoreHost.kt",
+    "phase": "实时媒体运行验收",
+    "validation": "未运行验证"
+  },
+  {
+    "kind": "服务端通知",
+    "method": "thread/realtime/item/started",
+    "status": "WebSocket发起/文字/录音/PCM输出代码已接入，未运行验证",
+    "entry": "app/src/main/java/cn/codex/android/OriginalCoreHost.kt",
+    "phase": "实时媒体运行验收",
+    "validation": "未运行验证"
+  },
+  {
+    "kind": "服务端通知",
+    "method": "thread/realtime/item/transcript/delta",
+    "status": "WebSocket发起/文字/录音/PCM输出代码已接入，未运行验证",
+    "entry": "app/src/main/java/cn/codex/android/OriginalCoreHost.kt",
+    "phase": "实时媒体运行验收",
+    "validation": "未运行验证"
+  },
+  {
+    "kind": "服务端通知",
+    "method": "thread/realtime/item/completed",
+    "status": "WebSocket发起/文字/录音/PCM输出代码已接入，未运行验证",
+    "entry": "app/src/main/java/cn/codex/android/OriginalCoreHost.kt",
+    "phase": "实时媒体运行验收",
+    "validation": "未运行验证"
+  },
+  {
+    "kind": "服务端通知",
+    "method": "thread/realtime/transcript/delta",
+    "status": "WebSocket发起/文字/录音/PCM输出代码已接入，未运行验证",
+    "entry": "app/src/main/java/cn/codex/android/OriginalCoreHost.kt",
+    "phase": "实时媒体运行验收",
+    "validation": "未运行验证"
+  },
+  {
+    "kind": "服务端通知",
+    "method": "thread/realtime/transcript/done",
+    "status": "WebSocket发起/文字/录音/PCM输出代码已接入，未运行验证",
+    "entry": "app/src/main/java/cn/codex/android/OriginalCoreHost.kt",
+    "phase": "实时媒体运行验收",
+    "validation": "未运行验证"
+  },
+  {
+    "kind": "服务端通知",
+    "method": "thread/realtime/outputAudio/delta",
+    "status": "WebSocket发起/文字/录音/PCM输出代码已接入，未运行验证",
+    "entry": "app/src/main/java/cn/codex/android/OriginalCoreHost.kt",
+    "phase": "实时媒体运行验收",
+    "validation": "未运行验证"
+  },
+  {
+    "kind": "服务端通知",
+    "method": "thread/realtime/sdp",
+    "status": "WebRTC协商/媒体/静音控制代码已接入，未构建或运行验证",
+    "entry": "app/src/main/java/cn/codex/android/OriginalCoreHost.kt;app/src/main/java/cn/codex/android/OriginalWebRtcAudio.kt",
+    "phase": "WebRTC运行验收",
+    "validation": "未运行验证"
+  },
+  {
+    "kind": "服务端通知",
+    "method": "thread/realtime/error",
+    "status": "WebSocket发起/文字/录音/PCM输出代码已接入，未运行验证",
+    "entry": "app/src/main/java/cn/codex/android/OriginalCoreHost.kt",
+    "phase": "实时媒体运行验收",
+    "validation": "未运行验证"
+  },
+  {
+    "kind": "服务端通知",
+    "method": "thread/realtime/closed",
+    "status": "WebSocket发起/文字/录音/PCM输出代码已接入，未运行验证",
+    "entry": "app/src/main/java/cn/codex/android/OriginalCoreHost.kt",
+    "phase": "实时媒体运行验收",
+    "validation": "未运行验证"
+  },
+  {
+    "kind": "服务端通知",
+    "method": "windows/worldWritableWarning",
+    "status": "Windows 专用，Android 平台受限",
+    "entry": "",
+    "phase": "平台限制",
+    "validation": "未运行验证"
+  },
+  {
+    "kind": "服务端通知",
+    "method": "windowsSandbox/setupCompleted",
+    "status": "Windows 专用，Android 平台受限",
+    "entry": "",
+    "phase": "平台限制",
+    "validation": "未运行验证"
+  },
+  {
+    "kind": "服务端通知",
+    "method": "account/login/completed",
+    "status": "通知分支已接入，未运行验证",
+    "entry": "app/src/main/java/cn/codex/android/OriginalCoreHost.kt",
+    "phase": "待验证/继续语义审阅",
+    "validation": "未运行验证"
+  }
+]

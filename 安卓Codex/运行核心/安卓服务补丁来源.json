@@ -1,0 +1,56 @@
+{
+  "source_commit": "970111f6cb62cc02fe36a82ea7d71b37a2889c97",
+  "patch_sha256": "47db4494e557a325e8fb6cf74da63732ac7dcf53a58541d8a421d637b529edd0",
+  "files": [
+    {
+      "path": "codex-rs/responses-api-proxy/src/lib.rs",
+      "before": "e080ce9ef9b8e858ceee145842ad8b84ce3b38056c892e3f2115d5caeae71b71",
+      "after": "196a14d39c3069452ff88e445bbdc0fbffca3259bb102d3ce144e044526ed06c"
+    },
+    {
+      "path": "codex-rs/responses-api-proxy/Cargo.toml",
+      "before": "309132cf3397dd411055bcc56d33987b653f38b530033d09b69ca5308650938b",
+      "after": "48c35541329e7dcfbc9891bc986af0610e130fc12865c6af5b94005a90399a0f"
+    },
+    {
+      "path": "codex-rs/responses-api-proxy/src/auth_tests.rs",
+      "before": "a13d8fa07dcaa16a0abeda10459b32c7bc3eeecbfbdc2e07f5c02620c2355c5c",
+      "after": "b4f9d0383f98669139dd93801bb11dcdf6e7febd265bad527a7d7793603874cd"
+    },
+    {
+      "path": "codex-rs/cli/src/exec_server_command.rs",
+      "before": "29f5c9a229c824d2f3ccbe85f27c6f2e17e44a3939532320295b4cdc51e018fc",
+      "after": "64bce6b7474adbfb984b33c42864fbb6a7f8418fa8d93dbfdbb2452f6099aeba"
+    },
+    {
+      "path": "codex-rs/cli/src/main.rs",
+      "before": "ac51c153916132c0be2c37ea1136562685b832957bc2e43e53d71608d0b28a4a",
+      "after": "27236844a691709f9e86956ffeaffad7fa817c41442af450efab03bc6df3db4c"
+    },
+    {
+      "path": "codex-rs/app-server-transport/src/transport/websocket.rs",
+      "before": "38cb8c3e8e3fb77da1849644d1230814828973f19ec94eb8f6bba40dd62995cc",
+      "after": "c101fec5380d5cf61a07899d6092bc97aee13d2428f82208227cb9549305784e"
+    },
+    {
+      "path": "codex-rs/chatgpt/src/apply_command.rs",
+      "before": "3dd0f72d3bfa12eb4310c4428c4cd7ad4e0002b15f884002e3fb14d2e01725a8",
+      "after": "efa521e9c606a63561b6373be230ca905be198d7051ebccbbe9b803d92cc1353"
+    }
+  ],
+  "cargo_dependencies": [
+    {
+      "path": "codex-rs/Cargo.lock",
+      "package": "codex-responses-api-proxy",
+      "add": "subtle",
+      "before": "1ed0e1a4821d2e089fe7d0cf2f6c0c821c68a8f4ff2b839045ee08f4d202baa0",
+      "after": "839f98ffaa731fac12a59193797b94d5953d67bdaaee3516d25050b57e26c4e3",
+      "locked_packages": [
+        {
+          "package": "subtle",
+          "sha256": "8e40ae4185f4d6ce35aa9945e83aa90012ad92bd94c8f216dfc3db137f46fdd4"
+        }
+      ]
+    }
+  ]
+}

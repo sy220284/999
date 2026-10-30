@@ -1,0 +1,11 @@
+{
+  "source_commit": "970111f6cb62cc02fe36a82ea7d71b37a2889c97",
+  "patch_sha256": "3a0cd83e6511193c39347ed3b5f1bd62e30a1160e8bc7e2a7057263f25decc8f",
+  "files": [
+    {
+      "path": "codex-rs/app-server-test-client/src/lib.rs",
+      "before": "b6006b701fc200d9eb7934d148f1c309b96a65fbff022ce5fe91323736f6c335",
+      "after": "6388375837cd6bbd0e342a93a2c4bd7df2c5546ccd2a863629a66fc2cfd4f030"
+    }
+  ]
+}

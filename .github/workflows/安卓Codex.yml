@@ -1,0 +1,68 @@
+name: 安卓 Codex 构建与检查
+on:
+  push:
+    paths: ['安卓Codex/**', '.github/workflows/安卓Codex.yml']
+  pull_request:
+    paths: ['安卓Codex/**', '.github/workflows/安卓Codex.yml']
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    defaults:
+      run:
+        working-directory: 安卓Codex
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: android-actions/setup-android@v3
+      - name: 安装 Android 17 开发工具
+        run: sdkmanager 'platforms;android-37.0' 'build-tools;37.0.0' 'ndk;28.2.13676358' 'cmake;3.22.1'
+      - uses: gradle/actions/setup-gradle@v4
+      - name: 行为测试、静态检查与打包
+        run: ./gradlew --no-daemon :core:test :app:lintDebug :app:assembleDebug :app:assembleDebugAndroidTest
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: 测试与检查报告
+          path: |
+            安卓Codex/core/build/reports/
+            安卓Codex/app/build/reports/
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Codex安卓安装包
+          path: 安卓Codex/app/build/outputs/apk/debug/*.apk
+  device:
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: android-actions/setup-android@v3
+      - uses: gradle/actions/setup-gradle@v4
+      - name: 安装 Android 17 开发工具
+        run: sdkmanager 'platforms;android-37.0' 'build-tools;37.0.0' 'ndk;28.2.13676358' 'cmake;3.22.1'
+      - name: Android 17 界面与本机命令回归
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: '37.0'
+          target: aosp_atd
+          arch: x86_64
+          profile: pixel_7
+          disable-animations: true
+          script: cd 安卓Codex && ./gradlew --no-daemon :app:connectedDebugAndroidTest
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: Android17设备测试报告
+          path: |
+            安卓Codex/app/build/reports/androidTests/
+            安卓Codex/app/build/outputs/androidTest-results/

@@ -1,0 +1,12 @@
+.gradle/
+.kotlin/
+**/build/
+local.properties
+*.jks
+*.keystore
+
+.cxx/
+**/.cxx/
+
+# 原版 PIE 产物由固定源码构建，禁止提交二进制
+app/src/main/jniLibs/

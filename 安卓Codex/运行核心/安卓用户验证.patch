@@ -1,0 +1,83 @@
+diff --git a/codex-rs/user-verification/src/lib.rs b/codex-rs/user-verification/src/lib.rs
+--- a/codex-rs/user-verification/src/lib.rs
++++ b/codex-rs/user-verification/src/lib.rs
+@@ -10,8 +10,10 @@
+ mod native_operation;
+ #[cfg(any(target_os = "macos", test))]
+ mod platform_macos;
+-#[cfg(not(target_os = "macos"))]
++#[cfg(not(any(target_os = "macos", target_os = "android")))]
+ mod unsupported;
++#[cfg(target_os = "android")]
++mod platform_android;
+ 
+ pub use credential::UserVerificationKeyCreation;
+ pub use credential::UserVerificationKeyDeletion;
+@@ -60,7 +62,7 @@
+ 
+ /// Reports whether this build contains a native provider, independently of local readiness.
+ pub fn platform_supported() -> bool {
+-    cfg!(target_os = "macos")
++    cfg!(any(target_os = "macos", target_os = "android"))
+ }
+ 
+ /// Probes biometric hardware without reading credentials, prompting, or checking enrollment.
+@@ -70,7 +72,11 @@
+     {
+         platform_macos::device_supported()
+     }
+-    #[cfg(not(target_os = "macos"))]
++    #[cfg(target_os = "android")]
++    {
++        platform_android::device_supported()
++    }
++    #[cfg(not(any(target_os = "macos", target_os = "android")))]
+     {
+         false
+     }
+@@ -83,7 +89,11 @@
+     {
+         Arc::new(platform_macos::NativeProvider { namespace })
+     }
+-    #[cfg(not(target_os = "macos"))]
++    #[cfg(target_os = "android")]
++    {
++        Arc::new(platform_android::NativeProvider { namespace })
++    }
++    #[cfg(not(any(target_os = "macos", target_os = "android")))]
+     {
+         let _ = namespace.label;
+         Arc::new(unsupported::UnsupportedProvider)
+diff --git a/codex-rs/user-verification/Cargo.toml b/codex-rs/user-verification/Cargo.toml
+--- a/codex-rs/user-verification/Cargo.toml
++++ b/codex-rs/user-verification/Cargo.toml
+@@ -24,6 +24,10 @@
+ security-framework = { version = "3.5", features = ["OSX_10_15"] }
+ security-framework-sys = "2.15"
+ 
++[target.'cfg(target_os = "android")'.dependencies]
++libc = { workspace = true }
++serde_json = { workspace = true }
++
+ [dev-dependencies]
+ p256 = { version = "0.13", features = ["ecdsa"] }
+ pretty_assertions = { workspace = true }
+diff --git a/codex-rs/Cargo.lock b/codex-rs/Cargo.lock
+--- a/codex-rs/Cargo.lock
++++ b/codex-rs/Cargo.lock
+@@ -5079,6 +5079,7 @@
+  "block2",
+  "core-foundation 0.10.1",
+  "dirs",
++ "libc",
+  "objc2",
+  "objc2-foundation",
+  "objc2-local-authentication",
+@@ -5086,6 +5087,7 @@
+  "pretty_assertions",
+  "security-framework 3.5.1",
+  "security-framework-sys",
++ "serde_json",
+  "sha2 0.10.9",
+  "tempfile",
+  "thiserror 2.0.18",

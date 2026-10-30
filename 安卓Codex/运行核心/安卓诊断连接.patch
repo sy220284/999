@@ -1,0 +1,42 @@
+--- a/codex-rs/app-server-test-client/src/lib.rs
++++ b/codex-rs/app-server-test-client/src/lib.rs
+@@ -758,0 +759,6 @@
++    #[cfg(target_os = "android")]
++    let endpoint = match android_debug_connection()? {
++        Some((address, _)) => Endpoint::ConnectWs(address),
++        None => Endpoint::SpawnCodex(codex_bin.to_path_buf()),
++    };
++    #[cfg(not(target_os = "android"))]
+@@ -1550 +1556,13 @@
+-            match connect(parsed.as_str()) {
++            #[cfg(target_os = "android")]
++            let attempt = (|| -> Result<_> {
++                use tungstenite::client::IntoClientRequest;
++                let mut request = parsed.as_str().into_client_request()?;
++                if let Some((address, credential)) = android_debug_connection()? {
++                    anyhow::ensure!(address == url, "debug endpoint changed");
++                    request.headers_mut().insert("Authorization", format!("Bearer {}", credential.as_str()).parse()?);
++                }
++                Ok(connect(request)?)
++            })();
++            #[cfg(not(target_os = "android"))]
++            let attempt = connect(parsed.as_str());
++            match attempt {
+@@ -2312,0 +2331,17 @@
++
++// Only the Android host supplies this scoped file; tool subprocesses never receive it.
++#[cfg(target_os = "android")]
++fn android_debug_connection() -> Result<Option<(String, String)>> {
++    use std::io::Read;
++    let Some(path) = std::env::var_os("CODEX_ANDROID_DEBUG_CONNECTION_FILE") else { return Ok(None); };
++    let mut bytes = Vec::new();
++    std::fs::File::open(path)?.take(4097).read_to_end(&mut bytes)?;
++    anyhow::ensure!(bytes.len() <= 4096, "debug connection exceeds budget");
++    let data: serde_json::Value = serde_json::from_slice(&bytes)?;
++    let address = data["address"].as_str().ok_or_else(|| anyhow::anyhow!("missing debug address"))?;
++    let token = data["credential"].as_str().ok_or_else(|| anyhow::anyhow!("missing debug credential"))?;
++    let url = Url::parse(address)?;
++    anyhow::ensure!(url.scheme() == "ws" && url.host_str() == Some("127.0.0.1") && url.port().is_some_and(|p| p > 0) && url.username().is_empty() && url.password().is_none() && url.query().is_none() && url.fragment().is_none() && url.path() == "/", "invalid debug endpoint");
++    anyhow::ensure!((32..=128).contains(&token.len()) && token.bytes().all(|b| b.is_ascii_alphanumeric() || b == b'-' || b == b'_'), "invalid debug credential");
++    Ok(Some((address.to_owned(), token.to_owned())))
++}
